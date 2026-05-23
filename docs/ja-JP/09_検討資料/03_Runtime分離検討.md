@@ -1,4 +1,4 @@
-[目次](../目次.md) > docs/ja-JP > 09_検討資料 > Runtime 分離検討
+[目次](../目次.md) > [検討資料目次](検討資料目次.md) > Runtime 分離検討
 
 # Runtime 分離検討
 
@@ -42,4 +42,5 @@ Page 間連携は UI 内 Event Bus を利用する。
 UI と Runtime は UI API を介して連携する。
 
 ---
-[目次](../目次.md) > docs/ja-JP > 09_検討資料 > Runtime 分離検討
+
+[目次](../目次.md) > [検討資料目次](検討資料目次.md) > Runtime 分離検討

@@ -1,4 +1,4 @@
-[目次](../目次.md) > docs/ja-JP > 09_検討資料 > Command System 検討
+[目次](../目次.md) > [検討資料目次](検討資料目次.md) > Command System 検討
 
 # Command System 検討
 
@@ -42,4 +42,5 @@ Command は以下を持てる。
 - Toolbar 統一
 
 ---
-[目次](../目次.md) > docs/ja-JP > 09_検討資料 > Command System 検討
+
+[目次](../目次.md) > [検討資料目次](検討資料目次.md) > Command System 検討
