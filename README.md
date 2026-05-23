@@ -1,9 +1,8 @@
-[目次](docs/ja-JP/目次.md) > README
+[日本語](./README.md) | [English](./README_en-US.md)
 
 # Workflow IDE Framework
 
-Workflow IDE Framework は、IDE 型アプリケーションを構築するための Rust ベース IDE Platform Framework です。
-
+Workflow IDE Framework は、IDE 型アプリケーションを構築するための Rust ベース IDE Platform Framework です。  
 Windows / macOS / Linux 上で動作する、Dock 型・Scene 型 UI を持つ IDE アプリケーション構築を目的とします。
 
 ## 目的
@@ -55,8 +54,7 @@ IDE Product
 
 ## ドキュメント
 
-- docs/ja-JP/目次.md
-- docs/ja-JP/09_検討資料
+- [目次](./docs/ja-JP/目次.md)
 
 ## 採用仕様
 
@@ -65,4 +63,3 @@ IDE Product
 - https://github.com/mayusaki3/HLDocS
 
 ---
-[目次](docs/ja-JP/目次.md) > README
