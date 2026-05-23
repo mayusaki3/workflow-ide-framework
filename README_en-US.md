@@ -54,7 +54,7 @@ IDE Product
 
 ## Documentation
 
-- [Table of Contents](./docs/ja-JP/目次.md) (Japanese)
+- [Workflow IDE Framework Table of Contents](./docs/ja-JP/目次.md) (Japanese)
 
 ## Documentation Specifications
 

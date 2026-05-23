@@ -1,4 +1,4 @@
-[目次](../目次.md) > docs/ja-JP > 09_検討資料 > IDE Platform 構想
+[目次](../目次.md) > [検討資料目次](検討資料目次.md) > IDE Platform 構想
 
 # IDE Platform 構想
 
@@ -48,4 +48,5 @@ UI と Runtime は process 分離可能な構成を考慮する。
 MuJoCo や VRM preview 等を埋め込み表示可能な GPU Viewport を考慮する。
 
 ---
-[目次](../目次.md) > docs/ja-JP > 09_検討資料 > IDE Platform 構想
+
+[目次](../目次.md) > [検討資料目次](検討資料目次.md) > IDE Platform 構想
