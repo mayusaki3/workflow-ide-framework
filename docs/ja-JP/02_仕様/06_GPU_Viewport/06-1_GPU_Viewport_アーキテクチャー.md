@@ -17,8 +17,7 @@ Workflow IDE Framework は GPU Viewport を IDE Core 構造として扱う。
 
 # 2. GPU Viewport
 
-GPU Viewport は Docking UI と統合する。
-
+GPU Viewport は Docking UI と統合する。  
 複数 Viewport を扱える構造を考慮する。
 
 # 3. Viewport API

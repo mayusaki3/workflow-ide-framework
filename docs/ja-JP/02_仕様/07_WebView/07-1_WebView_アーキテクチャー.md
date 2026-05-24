@@ -13,14 +13,12 @@ canonical_document: true
 
 # 1. 概要
 
-Workflow IDE Framework は WebView を Support Panel として扱う。
-
+Workflow IDE Framework は WebView を Support Panel として扱う。  
 IDE Core UI は egui ベース構造とする。
 
 # 2. WebView 構造
 
-WebView は Panel 単位で扱う。
-
+WebView は Panel 単位で扱う。  
 wry を利用する。
 
 # 3. 想定用途
@@ -32,8 +30,7 @@ wry を利用する。
 
 # 4. IDE 連携
 
-WebView から IDE 操作を可能とする。
-
+WebView から IDE 操作を可能とする。  
 IDE 操作は Command 経由で行う。
 
 # 5. 今後の詳細仕様

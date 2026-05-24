@@ -13,8 +13,7 @@ canonical_document: true
 
 # 1. 概要
 
-Workflow IDE Framework は Command モデルを採用する。
-
+Workflow IDE Framework は Command モデルを採用する。  
 UI・API・WebView・外部 Runtime などの操作を統一 Command として扱う。
 
 # 2. Command モデル

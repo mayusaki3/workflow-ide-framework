@@ -13,14 +13,12 @@ canonical_document: true
 
 # 1. 概要
 
-Workflow IDE Framework は Runtime process 分離構造を採用する。
-
+Workflow IDE Framework は Runtime process 分離構造を採用する。  
 UI と Runtime を分離し、外部 Runtime 接続を可能とする。
 
 # 2. Runtime 構造
 
-Runtime は独立 process として動作可能とする。
-
+Runtime は独立 process として動作可能とする。  
 UI process とは IPC を通じて通信する。
 
 # 3. Runtime 接続

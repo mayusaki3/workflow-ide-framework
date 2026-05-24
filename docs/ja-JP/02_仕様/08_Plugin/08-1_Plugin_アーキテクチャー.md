@@ -17,8 +17,7 @@ Workflow IDE Framework は IPC Plugin 構造を採用する。
 
 # 2. Plugin 構造
 
-Plugin は独立 process として動作可能とする。
-
+Plugin は独立 process として動作可能とする。  
 IPC により IDE Core と通信する。
 
 # 3. Plugin 用途
