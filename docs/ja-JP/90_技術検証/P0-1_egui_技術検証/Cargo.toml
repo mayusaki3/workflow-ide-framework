@@ -1,0 +1,11 @@
+[package]
+name = "p0_1_egui_validation"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+eframe = "0"
+egui_dock = "0"
+
+[dev-dependencies]
