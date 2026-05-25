@@ -13,7 +13,7 @@ canonical_document: true
 
 # 1. 状態
 
-実施中。
+P0-1-1 完了。
 
 # 2. 実施結果
 
@@ -25,7 +25,7 @@ canonical_document: true
 - egui
 - egui_dock
 
-の取得および build 開始を確認した。
+の取得および build 成功を確認した。
 
 ## 2.2 API 差異
 
@@ -33,7 +33,7 @@ canonical_document: true
 
 ### eframe
 
-- run_native API 差異
+- run_simple_native API 差異
 - App trait API 差異
 
 ### egui_dock
@@ -43,18 +43,33 @@ canonical_document: true
 
 ## 2.3 修正方針
 
-以下へ追従する。
+以下へ変更した。
 
-- eframe 0.34 系
-- egui_dock 最新系
+- eframe 0.33 系
+- egui_dock 0.18 系
+- Minimal Window 構成
+
+## 2.4 Windows 検証結果
+
+以下を確認した。
+
+- Window 表示成功
+- egui 描画成功
+- Event Loop 動作
+- Rust build 成功
 
 # 3. 現在の状態
 
-ソース修正後、再実行待ち。
+## P0-1-1 Minimal Window
+
+PASS。
+
+## P0-1-2 Docking
+
+未実施。
 
 # 4. 今後の確認項目
 
-- Window 表示
 - Docking
 - Multi Panel
 - GPU Viewport Placeholder
