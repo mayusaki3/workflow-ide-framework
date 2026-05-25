@@ -2,6 +2,10 @@
 /target/
 **/target/
 
+# Rust lock files for technical validation
+Cargo.lock
+**/Cargo.lock
+
 # Temporary logs
 *.log
 *.tmp
