@@ -7,7 +7,7 @@ document_type: note
 canonical_document: true
 -->
 
-[目次](../../目次.md) > [技術検討目次](../技術検討目次.md) > P0-2 WebView 技術検証
+[目次](../../目次.md) > [技術検討目次](../技術検証目次.md) > P0-2 WebView 技術検証
 
 # P0-2 WebView 技術検証
 
@@ -41,4 +41,4 @@ wry を利用した WebView Support Panel 構造の成立性を確認する。
 
 ---
 
-[目次](../../目次.md) > [技術検討目次](../技術検討目次.md) > P0-2 WebView 技術検証
+[目次](../../目次.md) > [技術検討目次](../技術検証目次.md) > P0-2 WebView 技術検証
