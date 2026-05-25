@@ -12,20 +12,28 @@
 
 use eframe::egui;
 
+/// 最小検証アプリ
+struct MinimalApp;
+
+impl eframe::App for MinimalApp {
+    /// UI 更新
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.heading("Workflow IDE Framework");
+            ui.separator();
+            ui.label("P0-1 Minimal Window Validation");
+            ui.label("eframe / egui 起動確認");
+        });
+    }
+}
+
 /// エントリーポイント
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions::default();
 
-    eframe::run_simple_native(
+    eframe::run_native(
         "P0-1 Minimal Window",
         options,
-        Box::new(|ctx, _frame| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.heading("Workflow IDE Framework");
-                ui.separator();
-                ui.label("P0-1 Minimal Window Validation");
-                ui.label("eframe / egui 起動確認");
-            });
-        }),
+        Box::new(|_cc| Ok(Box::new(MinimalApp))),
     )
 }
