@@ -1,0 +1,18 @@
+# Rust build artifacts
+/target/
+**/target/
+
+# Temporary logs
+*.log
+*.tmp
+
+# Local editor settings
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Local branch protection helper files
+branch-protection.json
