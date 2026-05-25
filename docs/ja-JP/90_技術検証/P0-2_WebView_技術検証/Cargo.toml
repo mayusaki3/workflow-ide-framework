@@ -1,0 +1,10 @@
+[package]
+name = "p0_2_webview_validation"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+wry = "0"
+
+[dev-dependencies]
