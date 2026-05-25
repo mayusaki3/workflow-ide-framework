@@ -13,9 +13,46 @@ canonical_document: true
 
 # 1. 状態
 
-未実施。
+実施中。
 
-# 2. 今後の確認項目
+# 2. 実施結果
+
+## 2.1 cargo build
+
+依存取得成功。
+
+- eframe
+- egui
+- egui_dock
+
+の取得および build 開始を確認した。
+
+## 2.2 API 差異
+
+以下の API 差異を確認した。
+
+### eframe
+
+- run_native API 差異
+- App trait API 差異
+
+### egui_dock
+
+- show() deprecated
+- show_inside() へ変更必要
+
+## 2.3 修正方針
+
+以下へ追従する。
+
+- eframe 0.34 系
+- egui_dock 最新系
+
+# 3. 現在の状態
+
+ソース修正後、再実行待ち。
+
+# 4. 今後の確認項目
 
 - Window 表示
 - Docking
@@ -23,7 +60,7 @@ canonical_document: true
 - GPU Viewport Placeholder
 - egui_dock
 
-# 3. 想定リスク
+# 5. 想定リスク
 
 - egui_dock version 差異
 - eframe backend 差異
