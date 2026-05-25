@@ -93,8 +93,10 @@ impl eframe::App for ValidationApp {
             });
         });
 
-        DockArea::new(&mut self.dock_state)
-            .show(ctx, &mut ValidationTabViewer);
+        egui::CentralPanel::default().show(ctx, |ui| {
+            DockArea::new(&mut self.dock_state)
+                .show_inside(ui, &mut ValidationTabViewer);
+        });
     }
 }
 
@@ -105,6 +107,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "P0-1 egui 技術検証",
         options,
-        Box::new(|_cc| Box::new(ValidationApp::new())),
+        Box::new(|_cc| Ok(Box::new(ValidationApp::new()))),
     )
 }
