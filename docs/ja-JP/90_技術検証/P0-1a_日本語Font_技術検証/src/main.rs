@@ -2,15 +2,15 @@
 //!
 //! 目的:
 //! - egui 日本語表示確認
-//! - Noto CJK font load 確認
+//! - OS font fallback 確認
 //! - Docking UI 日本語確認
 //!
 //! 注意:
 //! - 本コードは技術検証用であり、正式実装ではない
 //! - eframe 0.34 系の App::ui API を前提とする
+//! - 固定 font path はクロスプラットフォーム性を壊すため使用しない
 
 use eframe::egui;
-use egui::{FontData, FontDefinitions, FontFamily};
 use egui_dock::{DockArea, DockState, TabViewer};
 
 /// Dock Tab
@@ -44,6 +44,7 @@ impl TabViewer for ValidationTabViewer {
                 ui.heading("日本語Font 技術検証");
                 ui.label("日本語表示確認");
                 ui.label("Docking UI 日本語確認");
+                ui.label("OS font fallback 検証");
                 ui.separator();
                 ui.label("状態 Panel");
             }
@@ -63,28 +64,7 @@ struct ValidationApp {
 
 impl ValidationApp {
     /// 初期化
-    fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let mut fonts = FontDefinitions::default();
-
-        fonts.font_data.insert(
-            "noto_sans_jp".to_owned(),
-            FontData::from_owned(
-                std::fs::read(
-                    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-                )
-                .expect("failed to load Noto font"),
-            )
-            .into(),
-        );
-
-        fonts
-            .families
-            .entry(FontFamily::Proportional)
-            .or_default()
-            .insert(0, "noto_sans_jp".to_owned());
-
-        cc.egui_ctx.set_fonts(fonts);
-
+    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let dock_state = DockState::new(vec![
             PanelTab::状態,
             PanelTab::ログ,
