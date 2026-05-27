@@ -7,6 +7,30 @@
 
 use eframe::egui;
 
+/// title mode
+#[derive(Debug)]
+enum TitleMode {
+    /// ASCII only
+    Ascii,
+
+    /// 日本語 only
+    Japanese,
+
+    /// mixed
+    Mixed,
+}
+
+impl TitleMode {
+    /// title 取得
+    fn window_title(&self) -> &'static str {
+        match self {
+            TitleMode::Ascii => "P0-1c ASCII TITLE",
+            TitleMode::Japanese => "日本語タイトル検証",
+            TitleMode::Mixed => "P0-1c Linux 日本語タイトル検証",
+        }
+    }
+}
+
 /// 検証アプリ
 #[derive(Default)]
 struct ValidationApp;
@@ -47,10 +71,16 @@ fn main() -> eframe::Result<()> {
     println!("LC_ALL={:?}", std::env::var("LC_ALL"));
     println!("XDG_SESSION_TYPE={:?}", std::env::var("XDG_SESSION_TYPE"));
 
+    // TODO:
+    // 将来 command line argument 化予定
+    let title_mode = TitleMode::Mixed;
+
+    println!("TitleMode={title_mode:?}");
+
     let options = eframe::NativeOptions::default();
 
     eframe::run_native(
-        "P0-1c Linux 日本語タイトル検証",
+        title_mode.window_title(),
         options,
         Box::new(|_cc| Ok(Box::new(ValidationApp))),
     )
