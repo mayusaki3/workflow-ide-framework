@@ -8,10 +8,16 @@
 //! 注意:
 //! - 本コードは技術検証用
 //! - include_bytes! による font 埋め込みを想定
-//! - font asset は後続コミットで追加予定
+//! - font asset は repository へ含めない
+
+use std::path::Path;
 
 use eframe::egui;
+use egui::{FontData, FontDefinitions, FontFamily};
 use egui_dock::{DockArea, DockState, TabViewer};
+
+/// Embedded Font path
+const FONT_PATH: &str = "assets/fonts/default/NotoSansCJK-Regular.ttc";
 
 /// Dock Tab
 #[derive(Debug, Clone)]
@@ -56,6 +62,8 @@ impl TabViewer for ValidationTabViewer {
                 ui.label("Workspace font");
                 ui.label("Custom font");
                 ui.label("Runtime font reload");
+                ui.separator();
+                ui.label(format!("Font Path: {FONT_PATH}"));
             }
             PanelTab::ログ => {
                 ui.heading("ログ");
@@ -73,9 +81,36 @@ struct ValidationApp {
 
 impl ValidationApp {
     /// 初期化
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        // TODO:
-        // include_bytes! による Embedded Font を追加予定
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // Embedded Font 読み込み
+        if Path::new(FONT_PATH).exists() {
+            match std::fs::read(FONT_PATH) {
+                Ok(font_bytes) => {
+                    let mut fonts = FontDefinitions::default();
+
+                    fonts.font_data.insert(
+                        "embedded_font".to_owned(),
+                        FontData::from_owned(font_bytes).into(),
+                    );
+
+                    fonts
+                        .families
+                        .entry(FontFamily::Proportional)
+                        .or_default()
+                        .insert(0, "embedded_font".to_owned());
+
+                    cc.egui_ctx.set_fonts(fonts);
+
+                    println!("Embedded Font Loaded");
+                }
+                Err(error) => {
+                    println!("Failed to load font: {error}");
+                }
+            }
+        } else {
+            println!("Font asset not found: {FONT_PATH}");
+            println!("Run setup_fonts script before execution");
+        }
 
         let dock_state = DockState::new(vec![
             PanelTab::状態,
