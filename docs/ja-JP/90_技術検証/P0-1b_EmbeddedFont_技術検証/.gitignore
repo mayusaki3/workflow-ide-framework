@@ -1,0 +1,8 @@
+# Embedded font assets
+assets/fonts/default/*.ttc
+assets/fonts/default/*.ttf
+assets/fonts/default/*.otf
+
+# Keep structure
+!assets/fonts/default/.gitkeep
+!assets/fonts/default/README.md
