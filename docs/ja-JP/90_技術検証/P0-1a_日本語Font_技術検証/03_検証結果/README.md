@@ -15,38 +15,88 @@ canonical_document: true
 
 部分成功。
 
-# 2. 成功内容
+# 2. 想定していた結果
+
+OS font fallback のみで Linux / Windows 間の日本語表示を成立可能か確認する。
+
+# 3. 実際の結果
+
+## 3.1 Linux
+
+### 成功
 
 - Linux GUI 起動
-- cargo build 実行
-- egui ecosystem 導入
-- 日本語 Font load 構造確認
-- Noto CJK 利用方針確認
+- egui 起動
+- egui_dock 起動
+- Docking UI 表示
 
-# 3. 検出事項
+### 問題
 
-## 3.1 eframe API 差異
+- Panel 日本語文字化け
+- Window title 日本語文字化け
 
-eframe 0.34 系で App trait requirement が変更されている。
+## 3.2 Windows
 
-## 3.2 egui_dock API 差異
+### 成功
 
-DockArea::show() が deprecated。
+- Windows GUI 起動
+- egui 起動
+- egui_dock 起動
+- Window title 日本語表示
 
-## 3.3 version pin 必須
+### 問題
 
-技術検証では Cargo.toml の version 固定が必要。
+- Panel 日本語文字化け
 
 # 4. 結論
 
-egui ecosystem は更新速度が速いため、技術検証では Cargo.lock を含めた再現性管理が必要。
+OS font fallback のみでは、cross-platform 環境で安定した日本語表示は成立しなかった。
 
-# 5. 今後の対応
+一方で、以下は成立を確認した。
 
-- crate version 固定
+- cross-platform GUI
+- egui_dock
+- Runtime IDE 基本構造
+- Linux / Windows 実行
+
+# 5. 許容判断
+
+Runtime IDE 基本構造は成立しているため、文字化け問題は許容範囲と判断する。
+
+ただし、正式 Runtime IDE では日本語表示は必須要求である。
+
+# 6. 引継ぎ先
+
+本課題は以下で継続検証する。
+
+- P0-1b EmbeddedFont 技術検証
+
+# 7. 検出事項
+
+## 7.1 eframe API 差異
+
+eframe 0.34 系で App trait requirement が変更されている。
+
+## 7.2 egui_dock API 差異
+
+DockArea::show() が deprecated。
+
+## 7.3 version pin 必須
+
+技術検証では Cargo.toml の version 固定が必要。
+
+## 7.4 OS font fallback 限界
+
+OS font fallback のみでは、cross-platform 一致が得られなかった。
+
+# 8. 今後の対応
+
+- Embedded Font
+- custom font
+- Runtime font reload
+- font selector
 - Cargo.lock 管理
-- eframe 0.34 対応
-- DockArea::show_inside() 対応
+- crate version 固定
 
 ---
 
