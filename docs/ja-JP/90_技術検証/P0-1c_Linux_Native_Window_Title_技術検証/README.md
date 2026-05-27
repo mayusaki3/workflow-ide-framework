@@ -15,13 +15,23 @@ canonical_document: true
 
 Linux 環境で native window title の日本語表示が成立するか確認する。
 
-# 2. 背景
+# 2. 関連ドキュメント
+
+## 2.1 仕様
+
+- [Linux Native Window Title 技術検証仕様](./01_仕様/01_Linux_Native_Window_Title_技術検証仕様.md)
+
+## 2.2 検証仕様
+
+- [Linux Native Window Title 検証ケース](./02_検証仕様/01_検証ケース.md)
+
+# 3. 背景
 
 P0-1b にて IDE renderer 内の日本語表示は成立した。
 
 しかし Linux native window title のみ文字化けが発生した。
 
-# 3. 想定原因
+# 4. 想定原因
 
 - Wayland
 - X11
@@ -30,7 +40,7 @@ P0-1b にて IDE renderer 内の日本語表示は成立した。
 - fontconfig
 - window manager
 
-# 4. 検証対象
+# 5. 検証対象
 
 - native title
 - locale
@@ -39,7 +49,28 @@ P0-1b にて IDE renderer 内の日本語表示は成立した。
 - window manager
 - Wayland/X11 差異
 
-# 5. 想定方針
+# 6. 実行方法
+
+## 6.1 Linux
+
+```bash
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
+
+cargo run
+```
+
+# 7. 確認項目
+
+以下を確認する。
+
+- native window title
+- LANG
+- LC_ALL
+- XDG_SESSION_TYPE
+- Wayland/X11
+- ASCII / 日本語 / mixed title
+
+# 8. 想定方針
 
 本問題は Runtime IDE renderer 問題ではなく、OS integration 問題として扱う。
 
