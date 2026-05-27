@@ -4,14 +4,16 @@
 #
 # 目的:
 # - Noto Sans CJK download
-# - assets/fonts/default へ配置
+# - P0-1b assets/fonts/default へ配置
 # - 技術検証再現性向上
 
 $ErrorActionPreference = "Stop"
 
 $RootDir = Split-Path -Parent $PSScriptRoot
 
-$FontDir = Join-Path $RootDir "assets/fonts/default"
+$FontDir = Join-Path `
+    $RootDir `
+    "docs/ja-JP/90_技術検証/P0-1b_EmbeddedFont_技術検証/assets/fonts/default"
 
 $FontFile = Join-Path $FontDir "NotoSansCJK-Regular.ttc"
 
