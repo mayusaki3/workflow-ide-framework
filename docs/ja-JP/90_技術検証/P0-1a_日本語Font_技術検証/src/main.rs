@@ -4,6 +4,10 @@
 //! - egui 日本語表示確認
 //! - Noto CJK font load 確認
 //! - Docking UI 日本語確認
+//!
+//! 注意:
+//! - 本コードは技術検証用であり、正式実装ではない
+//! - eframe 0.34 系の App::ui API を前提とする
 
 use eframe::egui;
 use egui::{FontData, FontDefinitions, FontFamily};
@@ -40,10 +44,13 @@ impl TabViewer for ValidationTabViewer {
                 ui.heading("日本語Font 技術検証");
                 ui.label("日本語表示確認");
                 ui.label("Docking UI 日本語確認");
+                ui.separator();
+                ui.label("状態 Panel");
             }
             PanelTab::ログ => {
                 ui.heading("ログ");
                 ui.label("イベントログ表示予定");
+                ui.label("日本語ログ表示テスト");
             }
         }
     }
@@ -89,9 +96,9 @@ impl ValidationApp {
 
 impl eframe::App for ValidationApp {
     /// UI 更新
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         DockArea::new(&mut self.dock_state)
-            .show(ctx, &mut ValidationTabViewer);
+            .show_inside(ui, &mut ValidationTabViewer);
     }
 }
 
