@@ -16,8 +16,19 @@ FONT_DIR="$(cd "$(dirname "$0")/.." && pwd)/assets/fonts/default"
 
 mkdir -p "$FONT_DIR"
 
-curl -L \
-  -o "$FONT_DIR/NotoSansJP-Regular.ttf" \
-  https://github.com/notofonts/noto-cjk/raw/main/Sans/TTF/Japanese/NotoSansJP-Regular.ttf
+FONT_PATH="$FONT_DIR/NotoSansJP-Regular.ttf"
+FONT_URL="https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/TTF/Japanese/NotoSansJP-Regular.ttf"
 
-printf 'Font downloaded: %s\n' "$FONT_DIR/NotoSansJP-Regular.ttf"
+curl -L \
+  -o "$FONT_PATH" \
+  "$FONT_URL"
+
+FONT_SIZE=$(stat -c%s "$FONT_PATH")
+
+if [ "$FONT_SIZE" -lt 100000 ]; then
+    echo "Invalid font download: file too small (${FONT_SIZE} bytes)" >&2
+    exit 1
+fi
+
+printf 'Font downloaded: %s\n' "$FONT_PATH"
+printf 'Font size: %s bytes\n' "$FONT_SIZE"
