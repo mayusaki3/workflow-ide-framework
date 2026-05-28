@@ -27,6 +27,18 @@ Linux GUI backend 問題に対する fallback 運用方針を検証する。
 
 # 3. 検証対象
 
+本検証は、P0-1d 独自の Cargo project を実行するものではない。
+
+P0-1c の Cargo project を Linux fallback 条件付きで起動し、fallback 起動方式の有効性を検証する。
+
+検証対象 project:
+
+```text
+../P0-1c_Linux_Native_Window_Title_技術検証
+```
+
+検証対象:
+
 - software renderer fallback
 - X11 fallback
 - Hyper-V Ubuntu Desktop
@@ -42,7 +54,7 @@ WINIT_UNIX_BACKEND=x11
 
 # 5. 実行方法
 
-## 5.1 Linux
+## 5.1 P0-1d fallback script による実行
 
 ```bash
 cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1d_Linux_GUI_Fallback_技術検証
@@ -52,11 +64,38 @@ chmod +x ./scripts/run_linux_fallback.sh
 ./scripts/run_linux_fallback.sh
 ```
 
-# 6. 想定方針
+この script は、内部で以下へ移動して `cargo run` を実行する。
+
+```text
+../P0-1c_Linux_Native_Window_Title_技術検証
+```
+
+## 5.2 比較用の直接実行
+
+P0-1c を fallback なしで直接実行する場合は、以下を使用する。
+
+```bash
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
+
+cargo run
+```
+
+# 6. 記録方針
+
+P0-1d の検証結果には、以下を分けて記録する。
+
+- P0-1c fallback なし直接実行結果
+- P0-1c fallback あり実行結果
+- fallback により改善した項目
+- fallback でも改善しない項目
+
+# 7. 想定方針
 
 Linux GUI backend failure 時は fallback 起動を許容する。
 
-# 7. 今後の確認対象
+ただし、fallback は native window title 日本語表示を改善するためではなく、Linux GUI backend 起動安定化のための回避策として扱う。
+
+# 8. 今後の確認対象
 
 - WebView
 - WebKitGTK
