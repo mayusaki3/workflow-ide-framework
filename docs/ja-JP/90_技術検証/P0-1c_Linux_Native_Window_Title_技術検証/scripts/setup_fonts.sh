@@ -16,8 +16,10 @@ FONT_DIR="$(cd "$(dirname "$0")/.." && pwd)/assets/fonts/default"
 
 mkdir -p "$FONT_DIR"
 
-FONT_PATH="$FONT_DIR/NotoSansJP-Regular.ttf"
-FONT_URL="https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/TTF/Japanese/NotoSansJP-Regular.ttf"
+FONT_PATH="$FONT_DIR/NotoSansCJKjp-Regular.otf"
+HOST_NAME="raw.githubusercontent.com"
+REPO_PATH="notofonts/noto-cjk/main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf"
+FONT_URL="https://${HOST_NAME}/${REPO_PATH}"
 
 curl -L \
   -o "$FONT_PATH" \
