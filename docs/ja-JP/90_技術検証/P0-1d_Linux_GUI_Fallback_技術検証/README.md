@@ -21,6 +21,10 @@ Linux GUI backend 問題に対する fallback 運用方針を検証する。
 
 - [P0-1c Linux Native Window Title 技術検証](../P0-1c_Linux_Native_Window_Title_技術検証/README.md)
 
+## 2.2 検証仕様
+
+- [Linux GUI Fallback 検証ケース](./02_検証仕様/01_検証ケース.md)
+
 # 3. 検証対象
 
 - software renderer fallback
@@ -36,11 +40,23 @@ LIBGL_ALWAYS_SOFTWARE=1
 WINIT_UNIX_BACKEND=x11
 ```
 
-# 5. 想定方針
+# 5. 実行方法
+
+## 5.1 Linux
+
+```bash
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1d_Linux_GUI_Fallback_技術検証
+
+chmod +x ./scripts/run_linux_fallback.sh
+
+./scripts/run_linux_fallback.sh
+```
+
+# 6. 想定方針
 
 Linux GUI backend failure 時は fallback 起動を許容する。
 
-# 6. 今後の確認対象
+# 7. 今後の確認対象
 
 - WebView
 - WebKitGTK
