@@ -39,9 +39,18 @@ P0-1b にて IDE renderer 内の日本語表示は成立した。
 
 ## 4.1 P0-1c 単独検証
 
-P0-1c 単独検証では font download は実施しない。
+P0-1c 単独検証では EmbeddedFont asset を使用しない。
 
 OS default font 環境で native title を検証する。
+
+検証前に cleanup script を実行する。
+
+cleanup script:
+
+```text
+scripts/cleanup_fonts.sh
+scripts/cleanup_fonts.ps1
+```
 
 ## 4.2 P0-1d fallback 検証
 
@@ -86,6 +95,10 @@ scripts/setup_fonts.ps1
 
 ```bash
 cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
+
+chmod +x ./scripts/cleanup_fonts.sh
+
+./scripts/cleanup_fonts.sh
 
 cargo run
 ```
