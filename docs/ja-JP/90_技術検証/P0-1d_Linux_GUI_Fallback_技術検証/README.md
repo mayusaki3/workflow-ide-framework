@@ -54,7 +54,31 @@ WINIT_UNIX_BACKEND=x11
 
 # 5. 実行方法
 
-## 5.1 P0-1c fallback script による実行
+## 5.1 Font setup
+
+P0-1d では EmbeddedFont あり構成で fallback を確認する。
+
+font は P0-1c 配下へ配置する。
+
+### Linux
+
+```bash
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
+
+chmod +x ./scripts/setup_fonts.sh
+
+./scripts/setup_fonts.sh
+```
+
+### Windows PowerShell
+
+```powershell
+cd C:\WORKPLACE\Makes\GitHub\workflow-ide-framework\docs\ja-JP\90_技術検証\P0-1c_Linux_Native_Window_Title_技術検証
+
+./scripts/setup_fonts.ps1
+```
+
+## 5.2 P0-1c fallback script による実行
 
 ```bash
 cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
@@ -73,7 +97,7 @@ fallback script は P0-1c 配下で管理する。
 - working tree 汚染を避けるため
 - fallback 実行と通常実行を同一 project 配下で比較するため
 
-## 5.2 比較用の直接実行
+## 5.3 比較用の直接実行
 
 P0-1c を fallback なしで直接実行する場合は、以下を使用する。
 
@@ -91,6 +115,7 @@ P0-1d の検証結果には、以下を分けて記録する。
 - P0-1c fallback あり実行結果
 - fallback により改善した項目
 - fallback でも改善しない項目
+- EmbeddedFont 有無による差異
 
 # 7. 想定方針
 
