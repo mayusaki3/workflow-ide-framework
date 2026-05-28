@@ -1,21 +1,25 @@
 # P0-1c/P0-1d font setup script
 #
-# 目的:
-# - P0-1d fallback 検証用
-# - P0-1c + EmbeddedFont 構成確認
+# Purpose:
+# - Used by P0-1d fallback validation.
+# - Places the font asset under the P0-1c validation project.
 #
-# 注意:
-# - P0-1c 単独検証では通常実行しない
-# - P0-1d 検証時のみ利用する
+# Notes:
+# - Do not run this for the normal P0-1c standalone validation.
+# - Use this only for P0-1d validation.
+
+$ErrorActionPreference = "Stop"
 
 $ScriptRoot = Split-Path -Parent $PSScriptRoot
 $FontDir = Join-Path $ScriptRoot "assets/fonts/default"
 
 New-Item -ItemType Directory -Force -Path $FontDir | Out-Null
 
-$FontPath = Join-Path $FontDir "NotoSansJP-Regular.ttf"
+$FontPath = Join-Path $FontDir "NotoSansCJKjp-Regular.otf"
 
-$FontUrl = "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/TTF/Japanese/NotoSansJP-Regular.ttf"
+$HostName = "raw.githubusercontent.com"
+$RepoPath = "notofonts/noto-cjk/main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf"
+$FontUrl = "https://$HostName/$RepoPath"
 
 Invoke-WebRequest `
     -Uri $FontUrl `
