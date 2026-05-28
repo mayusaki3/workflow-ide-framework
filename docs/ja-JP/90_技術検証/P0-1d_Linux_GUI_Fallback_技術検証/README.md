@@ -54,21 +54,24 @@ WINIT_UNIX_BACKEND=x11
 
 # 5. 実行方法
 
-## 5.1 P0-1d fallback script による実行
+## 5.1 P0-1c fallback script による実行
 
 ```bash
-cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1d_Linux_GUI_Fallback_技術検証
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
 
 chmod +x ./scripts/run_linux_fallback.sh
 
 ./scripts/run_linux_fallback.sh
 ```
 
-この script は、内部で以下へ移動して `cargo run` を実行する。
+fallback script は P0-1c 配下で管理する。
 
-```text
-../P0-1c_Linux_Native_Window_Title_技術検証
-```
+理由:
+
+- fallback の対象 project が P0-1c
+- Cargo project 側で target 管理するため
+- working tree 汚染を避けるため
+- fallback 実行と通常実行を同一 project 配下で比較するため
 
 ## 5.2 比較用の直接実行
 
