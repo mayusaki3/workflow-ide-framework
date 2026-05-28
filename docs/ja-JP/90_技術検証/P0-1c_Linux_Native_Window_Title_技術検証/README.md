@@ -35,7 +35,32 @@ P0-1b にて IDE renderer 内の日本語表示は成立した。
 
 しかし Linux native window title のみ文字化けが発生した。
 
-# 4. 想定原因
+# 4. 検証条件
+
+## 4.1 P0-1c 単独検証
+
+P0-1c 単独検証では font download は実施しない。
+
+OS default font 環境で native title を検証する。
+
+## 4.2 P0-1d fallback 検証
+
+P0-1d fallback 検証では、P0-1c 配下へ font download を実施可能とする。
+
+font 配置先:
+
+```text
+assets/fonts/default
+```
+
+font setup script:
+
+```text
+scripts/setup_fonts.sh
+scripts/setup_fonts.ps1
+```
+
+# 5. 想定原因
 
 - Wayland
 - X11
@@ -44,7 +69,7 @@ P0-1b にて IDE renderer 内の日本語表示は成立した。
 - fontconfig
 - window manager
 
-# 5. 検証対象
+# 6. 検証対象
 
 - native title
 - locale
@@ -53,9 +78,11 @@ P0-1b にて IDE renderer 内の日本語表示は成立した。
 - window manager
 - Wayland/X11 差異
 
-# 6. 実行方法
+# 7. 実行方法
 
-## 6.1 Linux
+## 7.1 Linux
+
+### P0-1c 単独検証
 
 ```bash
 cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
@@ -63,7 +90,21 @@ cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window
 cargo run
 ```
 
-# 7. 確認項目
+### P0-1d fallback 用 font setup
+
+通常の P0-1c 単独検証では実施しない。
+
+P0-1d fallback 検証時のみ利用する。
+
+```bash
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
+
+chmod +x ./scripts/setup_fonts.sh
+
+./scripts/setup_fonts.sh
+```
+
+# 8. 確認項目
 
 以下を確認する。
 
@@ -74,7 +115,7 @@ cargo run
 - Wayland/X11
 - ASCII / 日本語 / mixed title
 
-# 8. 想定方針
+# 9. 想定方針
 
 本問題は Runtime IDE renderer 問題ではなく、OS integration 問題として扱う。
 
