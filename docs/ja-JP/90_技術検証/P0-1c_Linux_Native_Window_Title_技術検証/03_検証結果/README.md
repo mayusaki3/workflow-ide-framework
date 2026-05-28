@@ -97,21 +97,27 @@ IDE renderer は成立しているため Runtime IDE blocker ではない。
 
 継続検討課題として扱う。
 
-# 6. 検出事項
+# 6. 引継ぎ先
 
-## 6.1 renderer と native title は別問題
+以下で継続検証する。
+
+- [P0-1d Linux GUI Fallback 技術検証](../../P0-1d_Linux_GUI_Fallback_技術検証/README.md)
+
+# 7. 検出事項
+
+## 7.1 renderer と native title は別問題
 
 Panel renderer と native title は別系統である。
 
-## 6.2 Hyper-V Linux GUI
+## 7.2 Hyper-V Linux GUI
 
 Hyper-V Ubuntu Desktop 環境では software renderer fallback が必要な可能性が高い。
 
-## 6.3 UTF-8 title
+## 7.3 UTF-8 title
 
 Linux native title UTF-8 handling 問題の可能性がある。
 
-# 7. 今後の候補
+# 8. 今後の候補
 
 - GTK backend 詳細調査
 - Wayland compositor 調査
