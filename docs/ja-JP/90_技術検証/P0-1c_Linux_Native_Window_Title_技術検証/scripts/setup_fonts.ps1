@@ -15,8 +15,17 @@ New-Item -ItemType Directory -Force -Path $FontDir | Out-Null
 
 $FontPath = Join-Path $FontDir "NotoSansJP-Regular.ttf"
 
+$FontUrl = "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/TTF/Japanese/NotoSansJP-Regular.ttf"
+
 Invoke-WebRequest `
-    -Uri "https://github.com/notofonts/noto-cjk/raw/main/Sans/TTF/Japanese/NotoSansJP-Regular.ttf" `
+    -Uri $FontUrl `
     -OutFile $FontPath
 
+$FontSize = (Get-Item $FontPath).Length
+
+if ($FontSize -lt 100000) {
+    throw "Invalid font download: file too small ($FontSize bytes)"
+}
+
 Write-Host "Font downloaded: $FontPath"
+Write-Host "Font size: $FontSize bytes"
