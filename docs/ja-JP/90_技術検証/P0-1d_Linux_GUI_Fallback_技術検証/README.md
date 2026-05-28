@@ -54,7 +54,21 @@ WINIT_UNIX_BACKEND=x11
 
 # 5. 実行方法
 
-## 5.1 Font setup
+## 5.1 Linux script 初期設定
+
+Linux clone 後は executable bit が失われる可能性がある。
+
+最初に以下を実施する。
+
+```bash
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
+
+chmod +x ./scripts/cleanup_fonts.sh
+chmod +x ./scripts/setup_fonts.sh
+chmod +x ./scripts/run_linux_fallback.sh
+```
+
+## 5.2 Font setup
 
 P0-1d では EmbeddedFont あり構成で fallback を確認する。
 
@@ -64,8 +78,6 @@ font は P0-1c 配下へ配置する。
 
 ```bash
 cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
-
-chmod +x ./scripts/setup_fonts.sh
 
 ./scripts/setup_fonts.sh
 ```
@@ -78,12 +90,10 @@ cd C:\WORKPLACE\Makes\GitHub\workflow-ide-framework\docs\ja-JP\90_技術検証\P
 ./scripts/setup_fonts.ps1
 ```
 
-## 5.2 P0-1c fallback script による実行
+## 5.3 P0-1c fallback script による実行
 
 ```bash
 cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
-
-chmod +x ./scripts/run_linux_fallback.sh
 
 ./scripts/run_linux_fallback.sh
 ```
@@ -97,7 +107,7 @@ fallback script は P0-1c 配下で管理する。
 - working tree 汚染を避けるため
 - fallback 実行と通常実行を同一 project 配下で比較するため
 
-## 5.3 比較用の直接実行
+## 5.4 比較用の直接実行
 
 P0-1c を fallback なしで直接実行する場合は、以下を使用する。
 
