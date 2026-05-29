@@ -15,7 +15,25 @@ canonical_document: true
 
 Linux native window title 日本語問題に対し、custom title bar により回避可能か確認する。
 
-# 2. 背景
+# 2. 関連ドキュメント
+
+## 2.1 仕様
+
+- [Custom Title Bar 技術検証仕様](./01_仕様/01_Custom_Title_Bar_技術検証仕様.md)
+
+## 2.2 検証仕様
+
+- [Custom Title Bar 検証ケース](./02_検証仕様/01_検証ケース.md)
+
+## 2.3 検証結果
+
+- [Custom Title Bar 検証結果](./03_検証結果/README.md)
+
+## 2.4 引継ぎ元
+
+- [P0-1d Linux GUI Fallback 技術検証](../P0-1d_Linux_GUI_Fallback_技術検証/README.md)
+
+# 3. 背景
 
 P0-1d にて以下を確認した。
 
@@ -26,7 +44,7 @@ P0-1d にて以下を確認した。
 
 このため、native title 非依存構成を検証する。
 
-# 3. 検証対象
+# 4. 検証対象
 
 - undecorated window
 - egui custom title bar
@@ -36,7 +54,7 @@ P0-1d にて以下を確認した。
 - Linux fallback 共存
 - 日本語 title
 
-# 4. 想定構成
+# 5. 想定構成
 
 ```text
 native title
@@ -44,15 +62,11 @@ native title
 custom title bar
 ```
 
-# 5. 想定結果
+# 6. 想定結果
 
 - renderer 内 title 日本語成立
 - Linux native title 非依存
 - Runtime IDE UI 共通化可能
-
-# 6. 引継ぎ元
-
-- P0-1d Linux GUI Fallback 技術検証
 
 # 7. 引継ぎ先候補
 
