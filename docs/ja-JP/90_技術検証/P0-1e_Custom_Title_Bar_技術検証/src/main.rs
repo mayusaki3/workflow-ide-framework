@@ -77,7 +77,9 @@ impl eframe::App for ValidationApp {
                     //
                     let _ = ui.small_button("－");
                     let _ = ui.small_button("□");
-                    let _ = ui.small_button("×");
+                    if ui.small_button("×").clicked() {
+                        println!("CLOSE BUTTON CLICKED");
+                    }
                 });
             });
 
