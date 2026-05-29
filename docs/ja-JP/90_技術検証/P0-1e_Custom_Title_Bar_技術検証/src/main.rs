@@ -5,7 +5,9 @@ use std::fs;
 use std::path::Path;
 
 #[derive(Default)]
-struct ValidationApp;
+struct ValidationApp {
+    is_maximized: bool,
+}
 
 fn setup_optional_embedded_font(ctx: &egui::Context) {
     let font_path = Path::new("assets/fonts/default/NotoSansCJKjp-Regular.otf");
@@ -83,10 +85,12 @@ impl eframe::App for ValidationApp {
                                     egui::ViewportCommand::Close
                                 );
                             }
-
+                            
                             if ui.small_button("□").clicked() {
+                                self.is_maximized = !self.is_maximized;
+
                                 ui.ctx().send_viewport_cmd(
-                                    egui::ViewportCommand::Maximized(true)
+                                    egui::ViewportCommand::Maximized(self.is_maximized)
                                 );
                             }
 
