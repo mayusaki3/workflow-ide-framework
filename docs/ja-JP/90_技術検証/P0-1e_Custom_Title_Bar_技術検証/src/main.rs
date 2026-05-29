@@ -57,53 +57,107 @@ impl eframe::App for ValidationApp {
         // Custom Title Bar (描画のみ)
         //
         egui::Frame::default()
-            .inner_margin(egui::Margin::same(8))
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
+        .inner_margin(egui::Margin::same(8))
+        .show(ui, |ui| {
 
-                    //
-                    // タイトル
-                    //
-                    ui.heading("Workflow 日本語IDE");
+            //
+            // タイトルバー領域
+            //
+            let desired_size =
+                egui::vec2(ui.available_width(), 36.0);
 
-                    //
-                    // 右寄せ
-                    //
-                    ui.add_space(
-                        (ui.available_width() - 120.0).max(0.0)
-                    );
+            let (title_bar_rect, title_bar_response) =
+                ui.allocate_exact_size(
+                    desired_size,
+                    egui::Sense::click_and_drag(),
+                );
 
-                    //
-                    // Window Control (まだ動作なし)
-                    //
-                    ui.with_layout(
-                        egui::Layout::right_to_left(egui::Align::Center),
-                        |ui| {
+            //
+            // Drag
+            //
+            if title_bar_response.drag_started() {
+                println!("DRAG START");
 
-                            if ui.small_button("×").clicked() {
-                                ui.ctx().send_viewport_cmd(
-                                    egui::ViewportCommand::Close
-                                );
-                            }
-                            
-                            if ui.small_button("□").clicked() {
-                                self.is_maximized = !self.is_maximized;
+                ui.ctx().send_viewport_cmd(
+                    egui::ViewportCommand::StartDrag
+                );
+            }
 
-                                ui.ctx().send_viewport_cmd(
-                                    egui::ViewportCommand::Maximized(self.is_maximized)
-                                );
-                            }
+            //
+            // Double Click
+            //
+            if title_bar_response.double_clicked() {
+                println!("DOUBLE CLICK");
 
-                            if ui.small_button("－").clicked() {
-                                ui.ctx().send_viewport_cmd(
-                                    egui::ViewportCommand::Minimized(true)
-                                );
-                            }
-                        },
-                    );
-                });
+                self.is_maximized = !self.is_maximized;
+
+                ui.ctx().send_viewport_cmd(
+                    egui::ViewportCommand::Maximized(
+                        self.is_maximized
+                    )
+                );
+            }
+
+            //
+            // タイトルバー描画
+            //
+            let mut title_ui = ui.new_child(
+                egui::UiBuilder::new()
+                    .max_rect(title_bar_rect)
+            );
+
+            title_ui.horizontal(|ui| {
+
+                //
+                // タイトル
+                //
+                ui.heading("Workflow 日本語IDE");
+
+                //
+                // 右寄せ
+                //
+                ui.add_space(
+                    (ui.available_width() - 120.0).max(0.0)
+                );
+
+                //
+                // Window Control
+                //
+                ui.with_layout(
+                    egui::Layout::right_to_left(
+                        egui::Align::Center
+                    ),
+                    |ui| {
+
+                        if ui.small_button("×").clicked() {
+                            ui.ctx().send_viewport_cmd(
+                                egui::ViewportCommand::Close
+                            );
+                        }
+
+                        if ui.small_button("□").clicked() {
+                            self.is_maximized =
+                                !self.is_maximized;
+
+                            ui.ctx().send_viewport_cmd(
+                                egui::ViewportCommand::Maximized(
+                                    self.is_maximized
+                                )
+                            );
+                        }
+
+                        if ui.small_button("－").clicked() {
+                            ui.ctx().send_viewport_cmd(
+                                egui::ViewportCommand::Minimized(
+                                    true
+                                )
+                            );
+                        }
+                    },
+                );
             });
-
+        });
+            
         ui.separator();
 
         //
