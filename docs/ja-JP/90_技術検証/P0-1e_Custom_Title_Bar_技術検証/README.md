@@ -61,6 +61,20 @@ src/main.rs
 
 # 6. 実行方法
 
+## 6.1 Font Setup
+
+```text
+scripts/setup_fonts.ps1
+scripts/setup_fonts.sh
+```
+
+## 6.2 実行手順
+
+```text
+1. setup_fonts 実行
+2. cargo run
+```
+
 ```bash
 cargo run
 ```
