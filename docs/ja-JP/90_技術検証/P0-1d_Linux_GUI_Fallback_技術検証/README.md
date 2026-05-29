@@ -25,6 +25,10 @@ Linux GUI backend 問題に対する fallback 運用方針を検証する。
 
 - [Linux GUI Fallback 検証ケース](./02_検証仕様/01_検証ケース.md)
 
+## 2.3 検証結果
+
+- [Linux GUI Fallback 検証結果](./03_検証結果/README.md)
+
 # 3. 検証対象
 
 本検証は、P0-1d 独自の Cargo project を実行するものではない。
