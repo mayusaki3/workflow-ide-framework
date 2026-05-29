@@ -53,15 +53,94 @@ WINIT_UNIX_BACKEND=x11
 ```
 
 # 5. 実行方法
-...(省略同内容)...
 
-# 9. P0-1e 引継ぎ
+## 5.1 Linux script 初期設定
 
-P0-1d で Linux GUI backend 起動安定化方針を確認後、次段階として Custom Title Bar 実装可能性を検証する。
+Linux clone 後は executable bit が失われる可能性がある。
 
-後続:
+最初に以下を実施する。
 
-- ../P0-1e_Custom_Title_Bar_技術検証/README.md
+```bash
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
+
+chmod +x ./scripts/cleanup_fonts.sh
+chmod +x ./scripts/setup_fonts.sh
+chmod +x ./scripts/run_linux_fallback.sh
+```
+
+## 5.2 Font setup
+
+P0-1d では EmbeddedFont あり構成で fallback を確認する。
+
+font は P0-1c 配下へ配置する。
+
+### Linux
+
+```bash
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
+
+./scripts/setup_fonts.sh
+```
+
+### Windows PowerShell
+
+```powershell
+cd C:\WORKPLACE\Makes\GitHub\workflow-ide-framework\docs\ja-JP\90_技術検証\P0-1c_Linux_Native_Window_Title_技術検証
+
+./scripts/setup_fonts.ps1
+```
+
+## 5.3 P0-1c fallback script による実行
+
+```bash
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
+
+./scripts/run_linux_fallback.sh
+```
+
+fallback script は P0-1c 配下で管理する。
+
+理由:
+
+- fallback の対象 project が P0-1c
+- Cargo project 側で target 管理するため
+- working tree 汚染を避けるため
+- fallback 実行と通常実行を同一 project 配下で比較するため
+
+## 5.4 比較用の直接実行
+
+P0-1c を fallback なしで直接実行する場合は、以下を使用する。
+
+```bash
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1c_Linux_Native_Window_Title_技術検証
+
+cargo run
+```
+
+# 6. 記録方針
+
+P0-1d の検証結果には、以下を分けて記録する。
+
+- P0-1c fallback なし直接実行結果
+- P0-1c fallback あり実行結果
+- fallback により改善した項目
+- fallback でも改善しない項目
+- EmbeddedFont 有無による差異
+
+# 7. 想定方針
+
+Linux GUI backend failure 時は fallback 起動を許容する。
+
+ただし、fallback は native window title 日本語表示を改善するためではなく、Linux GUI backend 起動安定化のための回避策として扱う。
+
+# 8. 今後の確認対象
+
+- WebView
+- WebKitGTK
+- IME
+- 日本語入力
+- GPU backend
+- Vulkan/OpenGL
 
 ---
 
