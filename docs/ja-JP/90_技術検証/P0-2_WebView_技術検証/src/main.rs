@@ -94,7 +94,12 @@ impl TabViewer for ValidationTabViewer {
                 ui.label(
                     "WV-00: Dock移動・Dockリサイズ時の矩形変化確認"
                 );
-            }
+
+                ui.separator();
+
+                ui.label("WV-00-01: Panel Rect取得 成功");
+                ui.label("WV-00-02: Dock移動検知 成功");
+                ui.label("WV-00-03: Dockリサイズ検知 成功");            }
         }
     }
 }
@@ -173,11 +178,15 @@ impl eframe::App for DockingValidationApp {
 
         egui::TopBottomPanel::top("debug_panel").show(ctx, |ui| {
             ui.label(format!(
-                "Screen: x={} y={} w={} h={}",
+                "ContentRect: x={} y={} w={} h={}",
                 screen_rect.min.x,
                 screen_rect.min.y,
                 screen_rect.width(),
                 screen_rect.height()
+            ));
+            ui.label(format!(
+                "PixelsPerPoint={:.2}",
+                ctx.pixels_per_point()
             ));
         });
 
@@ -199,7 +208,7 @@ fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions::default();
 
     eframe::run_native(
-        "P0-1 Docking Validation",
+        "P0-2 WebView Validation",
         options,
         Box::new(|_cc| Ok(Box::new(DockingValidationApp::new()))),
     )

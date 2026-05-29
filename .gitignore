@@ -20,3 +20,14 @@ Thumbs.db
 
 # Local branch protection helper files
 branch-protection.json
+
+# Layout persistence
+dock_layout.json
+
+# Local fonts
+assets/fonts/default/*.otf
+assets/fonts/default/*.ttf
+
+# Keep directory
+!assets/fonts/default/.gitkeep
+!assets/fonts/default/README.md
