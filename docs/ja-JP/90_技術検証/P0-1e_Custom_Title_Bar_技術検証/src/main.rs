@@ -1,9 +1,49 @@
 //! P0-1e Custom Title Bar 技術検証
 
 use eframe::egui;
+use std::fs;
+use std::path::Path;
 
 #[derive(Default)]
 struct ValidationApp;
+
+fn setup_optional_embedded_font(ctx: &egui::Context) {
+    let font_path = Path::new("assets/fonts/default/NotoSansCJKjp-Regular.otf");
+
+    if !font_path.exists() {
+        println!("EmbeddedFont not found");
+        return;
+    }
+
+    let font_data = match fs::read(font_path) {
+        Ok(data) => data,
+        Err(error) => {
+            println!("EmbeddedFont load failed: {error}");
+            return;
+        }
+    };
+
+    let mut fonts = egui::FontDefinitions::default();
+
+    fonts.font_data.insert(
+        "embedded_noto_jp".to_owned(),
+        egui::FontData::from_owned(font_data).into(),
+    );
+
+    fonts
+        .families
+        .entry(egui::FontFamily::Proportional)
+        .or_default()
+        .insert(0, "embedded_noto_jp".to_owned());
+
+    fonts
+        .families
+        .entry(egui::FontFamily::Monospace)
+        .or_default()
+        .push("embedded_noto_jp".to_owned());
+
+    ctx.set_fonts(fonts);
+}
 
 impl eframe::App for ValidationApp {
     fn ui(
@@ -34,6 +74,9 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "P0-1e",
         options,
-        Box::new(|_cc| Ok(Box::new(ValidationApp::default()))),
+        Box::new(|cc| {
+            setup_optional_embedded_font(&cc.egui_ctx);
+            Ok(Box::new(ValidationApp::default()))
+        })
     )
 }
