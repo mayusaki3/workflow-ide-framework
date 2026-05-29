@@ -15,59 +15,37 @@ canonical_document: true
 
 PASS。
 
-# 2. 想定していた結果
+# 2. 検証対象
 
-Linux native window title の日本語表示が成立する。
+P0-1c は、Font download なしの Linux native title 検証である。
 
-# 3. 実際の結果
+P0-1a / P0-1b で確認した renderer 内日本語表示は、本検証の主判定対象に含めない。
 
-## 3.1 locale
+# 3. 検証条件
 
-### 結果
+## 3.1 Font 条件
+
+cleanup script により EmbeddedFont asset を削除した状態で実行する。
+
+```bash
+./scripts/cleanup_fonts.sh
+cargo run
+```
+
+## 3.2 環境
 
 ```text
 LANG=ja_JP.UTF-8
+XDG_SESSION_TYPE=wayland
 ```
 
-### 判定
+# 4. 想定していた結果
 
-locale 設定自体は正常。
+Linux native window title の日本語表示が成立する。
 
-## 3.2 renderer backend
+# 5. 実際の結果
 
-### 初期状態
-
-以下 error 発生。
-
-```text
-libEGL
-MESA
-ZINK
-```
-
-### 判定
-
-Hyper-V Ubuntu Desktop 環境では GPU backend 問題が発生した。
-
-## 3.3 software renderer fallback
-
-### 実施内容
-
-```bash
-LIBGL_ALWAYS_SOFTWARE=1 WINIT_UNIX_BACKEND=x11 cargo run
-```
-
-### 結果
-
-- window 表示成功
-- egui renderer 正常
-- Panel 日本語表示成功
-
-### 判定
-
-software renderer fallback により Linux GUI 実行が安定化した。
-
-## 3.4 native title
+## 5.1 native title
 
 ### ASCII
 
@@ -75,55 +53,45 @@ ASCII title は正常表示。
 
 ### 日本語
 
-日本語部分のみ □ 化。
+日本語部分は □ 化した。
 
 ### mixed
 
-mixed title でも日本語部分のみ □ 化。
+mixed title でも日本語部分のみ □ 化した。
 
-### 判定
+## 5.2 renderer 内日本語表示
 
-Linux native title UTF-8 日本語表示問題を確認した。
+Font download なし条件では renderer 内日本語表示も □ 化した。
 
-# 4. 結論
+ただし、renderer 内日本語表示は P0-1a / P0-1b の検証対象であり、P0-1c の主判定対象ではない。
 
-本問題は egui renderer 問題ではない。
+# 6. 判定
 
-Linux native window title / OS integration 側問題である可能性が高い。
+Linux native title の日本語表示は未成立。
 
-# 5. 許容判断
+Font download なし条件で Linux native title 日本語問題を再現できた。
 
-IDE renderer は成立しているため Runtime IDE blocker ではない。
+# 7. 結論
 
-継続検討課題として扱う。
+P0-1c では、Linux native window title の日本語表示が成立しないことを確認した。
 
-# 6. 引継ぎ先
+次段では、EmbeddedFont あり条件でも native title が改善するかを P0-1d で確認する。
+
+# 8. 引継ぎ先
 
 以下で継続検証する。
 
 - [P0-1d Linux GUI Fallback 技術検証](../../P0-1d_Linux_GUI_Fallback_技術検証/README.md)
 
-# 7. 検出事項
+# 9. 検出事項
 
-## 7.1 renderer と native title は別問題
+## 9.1 native title と renderer は別系統
 
-Panel renderer と native title は別系統である。
+native title は OS / window manager / toolkit integration 側の表示であり、renderer 内表示と分離して扱う必要がある。
 
-## 7.2 Hyper-V Linux GUI
+## 9.2 Font なし条件の固定
 
-Hyper-V Ubuntu Desktop 環境では software renderer fallback が必要な可能性が高い。
-
-## 7.3 UTF-8 title
-
-Linux native title UTF-8 handling 問題の可能性がある。
-
-# 8. 今後の候補
-
-- GTK backend 詳細調査
-- Wayland compositor 調査
-- X11 専用検証
-- eframe/winit upstream 調査
-- native title workaround
+cleanup script により、P0-1c 単独検証を Font なし条件へ戻せる。
 
 ---
 
