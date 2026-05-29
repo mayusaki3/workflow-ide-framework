@@ -70,12 +70,18 @@ scripts/setup_fonts.sh
 
 ## 6.2 実行手順
 
-```text
-1. setup_fonts 実行
-2. cargo run
+### 6.2.1 Windows / PowerShell
+
+```powershell
+./scripts/setup_fonts.ps1
+cargo run
 ```
 
+### 6.2.2 Linux / macOS
+
 ```bash
+chmod +x scripts/setup_fonts.sh
+./scripts/setup_fonts.sh
 cargo run
 ```
 
