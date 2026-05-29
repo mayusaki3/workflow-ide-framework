@@ -51,7 +51,42 @@ impl eframe::App for ValidationApp {
         ui: &mut egui::Ui,
         _frame: &mut eframe::Frame,
     ) {
-        ui.heading("P0-1e カスタムタイトルバー検証");
+        //
+        // Custom Title Bar (描画のみ)
+        //
+        egui::Frame::default()
+            .inner_margin(egui::Margin::same(8))
+            .show(ui, |ui| {
+
+                ui.horizontal(|ui| {
+
+                    //
+                    // タイトル
+                    //
+                    ui.heading("Workflow 日本語IDE");
+
+                    //
+                    // 右寄せ
+                    //
+                    ui.add_space(
+                        (ui.available_width() - 120.0).max(0.0)
+                    );
+
+                    //
+                    // Window Control (まだ動作なし)
+                    //
+                    let _ = ui.small_button("－");
+                    let _ = ui.small_button("□");
+                    let _ = ui.small_button("×");
+                });
+            });
+
+        ui.separator();
+
+        //
+        // 検証領域
+        //
+        ui.heading("P0-1e Custom Title Bar Validation");
 
         ui.separator();
 
