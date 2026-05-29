@@ -169,6 +169,18 @@ impl Drop for DockingValidationApp {
 impl eframe::App for DockingValidationApp {
     /// UI 更新
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let screen_rect = ctx.input(|i| i.content_rect());
+
+        egui::TopBottomPanel::top("debug_panel").show(ctx, |ui| {
+            ui.label(format!(
+                "Screen: x={} y={} w={} h={}",
+                screen_rect.min.x,
+                screen_rect.min.y,
+                screen_rect.width(),
+                screen_rect.height()
+            ));
+        });
+
         egui::TopBottomPanel::top("menu_panel").show(ctx, |ui| {
             if ui.button("Save Layout").clicked() {
                 self.save_layout();
