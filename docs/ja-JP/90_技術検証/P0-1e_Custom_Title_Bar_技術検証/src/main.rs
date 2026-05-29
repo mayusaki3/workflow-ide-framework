@@ -57,7 +57,6 @@ impl eframe::App for ValidationApp {
         egui::Frame::default()
             .inner_margin(egui::Margin::same(8))
             .show(ui, |ui| {
-
                 ui.horizontal(|ui| {
 
                     //
@@ -75,11 +74,29 @@ impl eframe::App for ValidationApp {
                     //
                     // Window Control (まだ動作なし)
                     //
-                    let _ = ui.small_button("－");
-                    let _ = ui.small_button("□");
-                    if ui.small_button("×").clicked() {
-                        println!("CLOSE BUTTON CLICKED");
-                    }
+                    ui.with_layout(
+                        egui::Layout::right_to_left(egui::Align::Center),
+                        |ui| {
+
+                            if ui.small_button("×").clicked() {
+                                ui.ctx().send_viewport_cmd(
+                                    egui::ViewportCommand::Close
+                                );
+                            }
+
+                            if ui.small_button("□").clicked() {
+                                ui.ctx().send_viewport_cmd(
+                                    egui::ViewportCommand::Maximized(true)
+                                );
+                            }
+
+                            if ui.small_button("－").clicked() {
+                                ui.ctx().send_viewport_cmd(
+                                    egui::ViewportCommand::Minimized(true)
+                                );
+                            }
+                        },
+                    );
                 });
             });
 
