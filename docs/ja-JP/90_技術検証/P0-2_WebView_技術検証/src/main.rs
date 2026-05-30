@@ -219,11 +219,6 @@ impl eframe::App for DockingValidationApp {
                 "ViewportId = {:?}",
                 egui::ViewportId::ROOT
             ));
-
-            ui.separator();
-
-            ui.label("PoC-1d");
-            ui.label("Winit Window coexist validation");
         });
 
         egui::TopBottomPanel::top("menu_panel").show(ctx, |ui| {

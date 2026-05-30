@@ -40,7 +40,7 @@ P0-2 WebView 技術検証の実施結果を記録する。
 | WV-00-01 | 成功 | Dock Panel矩形取得成功           |
 | WV-00-02 | 成功 | Dock移動検知成功                 |
 | WV-00-03 | 成功 | Dockリサイズ検知成功               |
-| WV-00-04 | 成功 | Child Window配置に必要な座標情報取得成功 |
+| WV-00-04 | 部分成功 | Dock Panel矩形取得成功、親Window取得方式は継続検証 |
 
 ### OS別確認結果
 
@@ -284,7 +284,19 @@ WebView表示
 
 ## 判断
 
-未判定。
+以下を確認した。
+
+* Dock Panel矩形取得
+* Dock移動検知
+* Dockリサイズ検知
+* ViewportInfo調査
+* FrameInfo調査
+* CreationContext調査
+* eframe Native Window取得調査
+
+結果として、eframe公開APIから親Window取得は確認できなかった。
+
+WV-00は継続中とし、PoC-1e Child Window生成で成立性を確認する。
 
 ### 次アクション
 
