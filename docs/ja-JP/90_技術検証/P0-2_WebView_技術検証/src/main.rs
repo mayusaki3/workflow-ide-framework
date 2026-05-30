@@ -192,14 +192,12 @@ impl eframe::App for DockingValidationApp {
                 screen_rect.width(),
                 screen_rect.height()
             ));
+            
             ui.label(format!(
                 "PixelsPerPoint={:.2}",
                 ctx.pixels_per_point()
             ));
-            ui.label(format!(
-                "ViewportInfo={}",
-                self.viewport_info
-            ));
+
             ui.label(format!(
                 "ViewportRect: {:?}",
                 ctx.viewport_rect()
