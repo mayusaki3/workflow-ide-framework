@@ -1,3 +1,5 @@
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > PoC-1c 親Window取得
+
 # PoC-1c 親Window取得
 
 ## 目的
@@ -21,3 +23,7 @@ PoC-1d Child Window生成
 
 失敗:
 別Window管理方式を検討
+
+---
+
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > PoC-1c 親Window取得

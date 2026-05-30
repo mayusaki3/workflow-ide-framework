@@ -7,7 +7,7 @@ document_type: test_spec
 canonical_document: true
 -->
 
-[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > [P0-2 WebView 技術検証](../P0-2_WebView_技術検証/README.md) > WebView 検証項目
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WebView 検証項目
 
 # WebView 検証項目
 
@@ -196,4 +196,4 @@ P0-2 WebView 技術検証は、WV-01 から WV-07 までの検証項目がすべ
 
 ---
 
-[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > [P0-2 WebView 技術検証](../P0-2_WebView_技術検証/README.md) > WebView 検証項目
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WebView 検証項目

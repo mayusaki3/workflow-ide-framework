@@ -99,7 +99,8 @@ impl TabViewer for ValidationTabViewer {
 
                 ui.label("WV-00-01: Panel Rect取得 成功");
                 ui.label("WV-00-02: Dock移動検知 成功");
-                ui.label("WV-00-03: Dockリサイズ検知 成功");            }
+                ui.label("WV-00-03: Dockリサイズ検知 成功");
+            }
         }
     }
 }
@@ -112,11 +113,6 @@ struct DockingValidationApp {
 impl DockingValidationApp {
     /// 初期化
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        println!(
-            "integration_info={:#?}",
-            _cc.integration_info
-        );
-
         let dock_state = Self::load_layout()
             .unwrap_or_else(Self::create_default_layout);
 

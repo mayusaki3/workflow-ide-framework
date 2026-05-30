@@ -7,7 +7,7 @@ document_type: spec
 canonical_document: true
 -->
 
-[目次](../../../目次.md) > [技術検討目次](../../技術検討目次.md) > [P0-2 WebView 技術検証](../README.md) > WebView 技術検証仕様
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WebView 技術検証仕様
 
 # WebView 技術検証仕様
 
@@ -52,4 +52,4 @@ WebView と egui 間で Focus 切替可能であること。
 
 ---
 
-[目次](../../../目次.md) > [技術検討目次](../../技術検討目次.md) > [P0-2 WebView 技術検証](../README.md) > WebView 技術検証仕様
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WebView 技術検証仕様

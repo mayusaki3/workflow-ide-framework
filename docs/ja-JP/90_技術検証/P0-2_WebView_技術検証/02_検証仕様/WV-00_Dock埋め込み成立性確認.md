@@ -7,7 +7,7 @@ document_type: test_spec
 canonical_document: true
 -->
 
-[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WV-00 Dock埋め込み成立性確認
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WV-00 Dock埋め込み成立性確認
 
 # WV-00 Dock埋め込み成立性確認
 
@@ -101,6 +101,19 @@ Dock 移動後も WebView が正しい位置に表示されること。
 
 * WV-00-05 Dock移動後もWebViewが正しい位置へ追従すること
 
+### 実施済みPoC
+
+* PoC-0 Dock矩形取得
+* PoC-1a ViewportInfo調査（不採用）
+* PoC-1b FrameInfo調査（不採用）
+* PoC-1c CreationContext調査（不採用）
+
+### 次工程
+
+* PoC-1d winit Window生成
+* PoC-1e Child Window生成
+* PoC-1f Dock追従確認
+
 ### 現時点の評価
 
 案A:
@@ -118,4 +131,4 @@ WV-00はP0-2全体のGo/No-Go判定とする。
 
 ---
 
-[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WV-00 Dock埋め込み成立性確認
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WV-00 Dock埋め込み成立性確認

@@ -7,7 +7,7 @@ document_type: test_result
 canonical_document: true
 -->
 
-[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > [P0-2 WebView 技術検証](../P0-2_WebView_技術検証/README.md) > WebView 検証結果
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WebView 検証結果
 
 # WebView 検証結果
 
@@ -259,10 +259,18 @@ Dock追従確認
 
 ## 次アクション
 
-- P0-2 WebView 技術検証用 PoC 実装を作成する。
-- WV-01 から順に検証を実施する。
-- OS ごとの差異がある場合は本結果へ記録する。
+PoC-1d:
+winit Window生成
+
+PoC-1e:
+Child Window生成
+
+PoC-1f:
+Dock追従確認
+
+WV-01:
+WebView表示
 
 ---
 
-[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > [P0-2 WebView 技術検証](../P0-2_WebView_技術検証/README.md) > WebView 検証結果
+[目次](../../../目次.md) > [技術検証目次](..././技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WebView 検証結果
