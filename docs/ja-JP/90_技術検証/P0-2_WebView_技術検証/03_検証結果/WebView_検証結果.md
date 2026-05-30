@@ -40,7 +40,8 @@ P0-2 WebView 技術検証の実施結果を記録する。
 | WV-00-01 | 成功 | Dock Panel矩形取得成功           |
 | WV-00-02 | 成功 | Dock移動検知成功                 |
 | WV-00-03 | 成功 | Dockリサイズ検知成功               |
-| WV-00-04 | 部分成功 | Dock Panel矩形取得成功、親Window取得方式は継続検証 |
+| WV-00-04 | 成功 | Child Window配置およびDock矩形追従成功 |
+| WV-00-05 | 条件付き成功 | Child WindowはDock追従可能。ただしDock UI操作を阻害する |
 
 ### OS別確認結果
 
@@ -134,10 +135,129 @@ eframe公開APIから親Windowを取得する方式は採用しない。
 
 今後は eframe から Window を取得するのではなく、winit / OS Native API を直接利用して Child Window 生成可否を確認する。
 
-### 次アクション
+### PoC-1e Foreground Window取得調査
 
-PoC-1e:
-Child Window生成
+取得内容:
+
+* GetForegroundWindow()
+
+確認結果:
+
+Windows:
+* HWND取得成功
+
+Ubuntu Desktop:
+* Windows API利用不可
+
+判断:
+
+Windows環境では HWND を取得可能であることを確認した。
+
+Child Window生成検証へ進む。
+
+### PoC-1e-2 CreateWindowEx調査
+
+取得内容:
+
+* RegisterClassW
+* CreateWindowExW
+* ShowWindow
+
+確認結果:
+
+Windows:
+* Window生成成功
+* HWND取得成功
+* Window表示成功
+
+取得値例:
+
+* RegisterClassW = 49875
+* HWND(0x1241462)
+
+判断:
+
+Windows API による独立ネイティブWindow生成は可能。
+
+次工程:
+SetParent による親子Window化確認
+
+### PoC-1e-3 SetParent調査
+
+取得内容:
+
+* SetParent
+* IsWindow
+
+確認結果:
+
+Windows:
+
+* Parent HWND取得成功
+* Child HWND生成成功
+* Parent != Child確認
+* SetParent成功
+* Child Window表示成功
+* IsWindow=true
+
+取得値例:
+
+* Parent HWND = HWND(0x401104)
+* Child HWND = HWND(0x2810122)
+
+判断:
+
+Windows APIによるChild Window化は可能。
+
+WV-00の前提条件は成立した。
+
+次工程:
+PoC-1f Dock追従確認
+
+### PoC-1f Dock追従確認
+
+取得内容:
+
+* MoveWindow
+* Dock Panel Rect
+* Child Window追従
+
+確認結果:
+
+Windows:
+
+* Child WindowをDock Panel矩形へ追従可能
+* Dock移動時に追従確認
+* Dockリサイズ時に追従確認
+* レイアウト変更後も再配置可能
+
+確認結果:
+
+* Overlay方式によりDock埋め込み相当の表示は可能
+* Child WindowがDock UIのマウス操作を阻害する
+
+追加検証:
+
+Hide Child Window
+↓
+Dock操作
+↓
+Show Child Window
+
+結果:
+
+* Dock操作正常
+* Child Window正常復帰
+
+判断:
+
+Child Window Overlay方式は成立する。
+
+ただしDock UIとの共存に課題がある。
+
+Dock操作中のみWebViewを非表示化する方式は成立可能性が高い。
+
+### 次アクション
 
 PoC-1f:
 Dock追従確認
@@ -296,12 +416,35 @@ WebView表示
 
 結果として、eframe公開APIから親Window取得は確認できなかった。
 
-WV-00は継続中とし、PoC-1e Child Window生成で成立性を確認する。
+WV-00について以下を確認した。
+
+* Dock Panel矩形取得
+* Dock移動検知
+* Dockリサイズ検知
+* Child Window生成
+* Child Window親子化
+* Child Window Dock追従
+
+結果:
+
+Child Window Overlay方式は成立した。
+
+ただしDock UIとの同時操作ではマウス入力競合が発生する。
+
+対策案:
+
+* Dock操作中のみWebView非表示
+* Dock操作終了後再表示
+
+Hide/Show方式により正常復帰することを確認した。
+
+WV-00は条件付き成功と判定する。
+
+次工程:
+
+WV-01 WebView表示
 
 ### 次アクション
-
-PoC-1e:
-Child Window生成
 
 PoC-1f:
 Dock追従確認

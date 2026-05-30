@@ -88,42 +88,54 @@ Dock 移動後も WebView が正しい位置に表示されること。
 
 - WebView検証仕様見直し
 
-## 中間判定
+## 判定結果
 
 ### 完了
 
 * WV-00-01 Dock Panel矩形取得
 * WV-00-02 Dock移動検知
 * WV-00-03 Dockリサイズ検知
-* WV-00-04 Child Window配置に必要な座標情報取得
+* WV-00-04 Child Window配置およびDock追従
+* WV-00-05 Dock再配置後の追従
 
-### 未完了
+### 確認された課題
 
-* WV-00-05 Dock移動後もWebViewが正しい位置へ追従すること
+* Child WindowがDock UI操作を阻害する
 
-### 実施済みPoC
+### 回避策
 
-* PoC-0 Dock矩形取得
-* PoC-1a ViewportInfo調査（不採用）
-* PoC-1b FrameInfo調査（不採用）
-* PoC-1c CreationContext調査（不採用）
+* Dock操作中のみChild Window非表示
+* Dock操作終了後再表示
+
+確認結果:
+
+* Dock操作正常
+* Child Window正常復帰
+
+### 判定
+
+案B:
+
+egui_dock + Child Window + wry
+
+成立
+
+ただしDock UIとの共存制御が必要。
 
 ### 次工程
 
-* PoC-1d winit Window生成
-* PoC-1e Child Window生成
-* PoC-1f Dock追従確認
+* WV-01 WebView表示
 
 ### 現時点の評価
 
 案A:
-成立可能性低
+不成立
 
 案B:
-成立可能性高
+成立（条件付き）
 
 案C:
-現時点では検討対象外
+未評価
 
 ## 備考
 
