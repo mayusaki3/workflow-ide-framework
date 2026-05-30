@@ -106,6 +106,7 @@ impl TabViewer for ValidationTabViewer {
 
 /// Docking 検証アプリ
 struct DockingValidationApp {
+    window_backend_info: String,
     dock_state: DockState<PanelTab>,
     viewport_info: String,
 }
@@ -117,6 +118,7 @@ impl DockingValidationApp {
             .unwrap_or_else(Self::create_default_layout);
 
         Self {
+            window_backend_info: String::new(),
             dock_state,
             viewport_info: String::new(),
         }
@@ -192,7 +194,7 @@ impl eframe::App for DockingValidationApp {
                 screen_rect.width(),
                 screen_rect.height()
             ));
-            
+
             ui.label(format!(
                 "PixelsPerPoint={:.2}",
                 ctx.pixels_per_point()
@@ -201,6 +203,13 @@ impl eframe::App for DockingValidationApp {
             ui.label(format!(
                 "ViewportRect: {:?}",
                 ctx.viewport_rect()
+            ));
+
+            self.window_backend_info = format!("{:?}", _frame.info());
+
+            ui.label(format!(
+                "FrameInfo={}",
+                self.window_backend_info
             ));
         });
 
