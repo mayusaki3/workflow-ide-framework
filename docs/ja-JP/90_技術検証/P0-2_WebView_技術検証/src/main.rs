@@ -106,21 +106,22 @@ impl TabViewer for ValidationTabViewer {
 
 /// Docking 検証アプリ
 struct DockingValidationApp {
-    window_backend_info: String,
     dock_state: DockState<PanelTab>,
-    viewport_info: String,
 }
 
 impl DockingValidationApp {
     /// 初期化
-    fn new() -> Self {
+    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        println!(
+            "egui_ctx={:?}",
+            _cc.egui_ctx.viewport_id()
+        );
+
         let dock_state = Self::load_layout()
             .unwrap_or_else(Self::create_default_layout);
 
         Self {
-            window_backend_info: String::new(),
             dock_state,
-            viewport_info: String::new(),
         }
     }
 
@@ -182,10 +183,6 @@ impl eframe::App for DockingValidationApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let screen_rect = ctx.input(|i| i.content_rect());
 
-        self.viewport_info = ctx.input(|i| {
-            format!("{:?}", i.viewport())
-        });
-
         egui::TopBottomPanel::top("debug_panel").show(ctx, |ui| {
             ui.label(format!(
                 "ContentRect: x={} y={} w={} h={}",
@@ -203,13 +200,6 @@ impl eframe::App for DockingValidationApp {
             ui.label(format!(
                 "ViewportRect: {:?}",
                 ctx.viewport_rect()
-            ));
-
-            self.window_backend_info = format!("{:?}", _frame.info());
-
-            ui.label(format!(
-                "FrameInfo={}",
-                self.window_backend_info
             ));
         });
 
@@ -233,6 +223,8 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "P0-2 WebView Validation",
         options,
-        Box::new(|_cc| Ok(Box::new(DockingValidationApp::new()))),
+        Box::new(|cc| {
+            Ok(Box::new(DockingValidationApp::new(cc)))
+        }),
     )
 }

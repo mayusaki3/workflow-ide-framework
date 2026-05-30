@@ -55,6 +55,33 @@ ViewportInfo への依存は採用しない。
 
 Child Window の配置計算は winit Window API を利用する。
 
+### PoC-1a ViewportInfo調査
+
+Windows:
+outer_rect取得可能
+
+Ubuntu Desktop:
+outer_rect取得不可 (None)
+
+結論:
+ViewportInfo依存不可
+
+### PoC-1b FrameInfo調査
+
+取得内容:
+cpu_usage のみ
+
+Window座標取得:
+不可
+
+結論:
+FrameInfo依存不可
+
+### 採用方針
+
+Window位置取得は
+winit Window API を利用する。
+
 ### 次アクション
 
 PoC-1b:
