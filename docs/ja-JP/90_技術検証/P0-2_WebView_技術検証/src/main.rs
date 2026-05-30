@@ -50,7 +50,7 @@ impl TabViewer for ValidationTabViewer {
             PanelTab::Status => "Status".into(),
             PanelTab::Viewport => "Viewport".into(),
             PanelTab::Log => "Log".into(),
-        PanelTab::WebViewPlaceholder => "WebView".into(),
+            PanelTab::WebViewPlaceholder => "WebView".into(),
         }
     }
 
@@ -107,6 +107,7 @@ impl TabViewer for ValidationTabViewer {
 /// Docking 検証アプリ
 struct DockingValidationApp {
     dock_state: DockState<PanelTab>,
+    viewport_info: String,
 }
 
 impl DockingValidationApp {
@@ -115,7 +116,10 @@ impl DockingValidationApp {
         let dock_state = Self::load_layout()
             .unwrap_or_else(Self::create_default_layout);
 
-        Self { dock_state }
+        Self {
+            dock_state,
+            viewport_info: String::new(),
+        }
     }
 
     /// 初期 Layout 作成
@@ -176,6 +180,10 @@ impl eframe::App for DockingValidationApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let screen_rect = ctx.input(|i| i.content_rect());
 
+        self.viewport_info = ctx.input(|i| {
+            format!("{:?}", i.viewport())
+        });
+
         egui::TopBottomPanel::top("debug_panel").show(ctx, |ui| {
             ui.label(format!(
                 "ContentRect: x={} y={} w={} h={}",
@@ -187,6 +195,14 @@ impl eframe::App for DockingValidationApp {
             ui.label(format!(
                 "PixelsPerPoint={:.2}",
                 ctx.pixels_per_point()
+            ));
+            ui.label(format!(
+                "ViewportInfo={}",
+                self.viewport_info
+            ));
+            ui.label(format!(
+                "ViewportRect: {:?}",
+                ctx.viewport_rect()
             ));
         });
 
