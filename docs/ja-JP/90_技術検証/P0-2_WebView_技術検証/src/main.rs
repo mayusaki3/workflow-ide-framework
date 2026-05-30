@@ -112,7 +112,19 @@ struct DockingValidationApp {
 
 impl DockingValidationApp {
     /// 初期化
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        println!("PoC-1d start");
+
+        println!(
+            "egui viewport id = {:?}",
+            egui::ViewportId::ROOT
+        );
+
+        println!(
+            "pixels_per_point = {}",
+            cc.egui_ctx.pixels_per_point()
+        );
+
         let dock_state = Self::load_layout()
             .unwrap_or_else(Self::create_default_layout);
 
@@ -176,7 +188,8 @@ impl Drop for DockingValidationApp {
 
 impl eframe::App for DockingValidationApp {
     /// UI 更新
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        let _ = frame;
         let screen_rect = ctx.input(|i| i.content_rect());
 
         egui::TopBottomPanel::top("debug_panel").show(ctx, |ui| {
@@ -197,6 +210,20 @@ impl eframe::App for DockingValidationApp {
                 "ViewportRect: {:?}",
                 ctx.viewport_rect()
             ));
+
+            ui.separator();
+
+            ui.label("PoC-1d");
+            ui.label("Native Window Investigation");
+            ui.label(format!(
+                "ViewportId = {:?}",
+                egui::ViewportId::ROOT
+            ));
+
+            ui.separator();
+
+            ui.label("PoC-1d");
+            ui.label("Winit Window coexist validation");
         });
 
         egui::TopBottomPanel::top("menu_panel").show(ctx, |ui| {
