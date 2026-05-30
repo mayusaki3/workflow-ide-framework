@@ -51,9 +51,9 @@ wry を利用した WebView Support Panel 構造の成立性を確認する。
 ## 完了
 
 * PoC-0 Dock矩形取得
-* PoC-1a ViewportInfo調査
-* PoC-1b FrameInfo調査
-* PoC-1c 親Window取得調査
+* ViewportInfo調査
+* FrameInfo調査
+* CreationContext調査
 
 ## 実施中
 
