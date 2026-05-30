@@ -19,10 +19,11 @@ use eframe::egui;
 use egui_dock::{DockArea, DockState, NodeIndex, TabViewer};
 use serde::{Deserialize, Serialize};
 
+#[cfg(target_os = "windows")]
 use windows::Win32::Foundation::HWND;
-use windows::Win32::UI::WindowsAndMessaging::{
-    GetForegroundWindow,
-};
+
+#[cfg(target_os = "windows")]
+use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
 
 /// Layout 保存先
 const LAYOUT_FILE_PATH: &str = "dock_layout.json";
@@ -225,15 +226,23 @@ impl eframe::App for DockingValidationApp {
                 egui::ViewportId::ROOT
             ));
 
-            if ui.button("PoC-1e GetForegroundWindow").clicked() {
-                unsafe {
-                    let hwnd = GetForegroundWindow();
+            #[cfg(target_os = "windows")]
+            {
+                if ui.button("PoC-1e GetForegroundWindow").clicked() {
+                    unsafe {
+                        let hwnd = GetForegroundWindow();
 
-                    println!(
-                        "PoC-1e foreground hwnd = {:?}",
-                        hwnd
-                    );
+                        println!(
+                            "PoC-1e foreground hwnd = {:?}",
+                            hwnd
+                        );
+                    }
                 }
+            }
+
+            #[cfg(not(target_os = "windows"))]
+            {
+                ui.label("PoC-1e Windows Only");
             }
         });
 
