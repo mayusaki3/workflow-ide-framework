@@ -19,6 +19,11 @@ use eframe::egui;
 use egui_dock::{DockArea, DockState, NodeIndex, TabViewer};
 use serde::{Deserialize, Serialize};
 
+use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetForegroundWindow,
+};
+
 /// Layout 保存先
 const LAYOUT_FILE_PATH: &str = "dock_layout.json";
 
@@ -219,6 +224,17 @@ impl eframe::App for DockingValidationApp {
                 "ViewportId = {:?}",
                 egui::ViewportId::ROOT
             ));
+
+            if ui.button("PoC-1e GetForegroundWindow").clicked() {
+                unsafe {
+                    let hwnd = GetForegroundWindow();
+
+                    println!(
+                        "PoC-1e foreground hwnd = {:?}",
+                        hwnd
+                    );
+                }
+            }
         });
 
         egui::TopBottomPanel::top("menu_panel").show(ctx, |ui| {
