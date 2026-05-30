@@ -31,6 +31,41 @@ P0-2 WebView 技術検証の実施結果を記録する。
 | eframe バージョン | 未記入 |
 | wry バージョン | 未記入 |
 
+## WV-00 Dock埋め込み成立性確認
+
+### 実施結果
+
+| 検証番号     | 結果 | 備考                         |
+| -------- | -- | -------------------------- |
+| WV-00-01 | 成功 | Dock Panel矩形取得成功           |
+| WV-00-02 | 成功 | Dock移動検知成功                 |
+| WV-00-03 | 成功 | Dockリサイズ検知成功               |
+| WV-00-04 | 成功 | Child Window配置に必要な座標情報取得成功 |
+
+### OS別確認結果
+
+| OS             | 結果   | 備考                             |
+| -------------- | ---- | ------------------------------ |
+| Windows        | 成功   | ViewportInfo.outer_rect取得可能    |
+| Ubuntu Desktop | 制約あり | ViewportInfo.outer_rect が None |
+
+### 技術判断
+
+ViewportInfo への依存は採用しない。
+
+Child Window の配置計算は winit Window API を利用する。
+
+### 次アクション
+
+PoC-1b:
+winit Window取得確認
+
+PoC-1c:
+Child Window生成
+
+PoC-1d:
+Dock追従確認
+
 ## 検証結果サマリー
 
 | 検証番号 | 検証項目 | 結果 | 備考 |
