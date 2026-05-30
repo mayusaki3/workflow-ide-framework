@@ -82,6 +82,29 @@ FrameInfo依存不可
 Window位置取得は
 winit Window API を利用する。
 
+### PoC-1c CreationContext調査
+
+取得内容:
+
+* egui_ctx
+* storage
+* integration_info
+
+確認結果:
+
+integration_info から取得できる情報は cpu_usage のみ。
+
+Window座標取得:
+不可
+
+### 判断
+
+CreationContext 経由で Window API へ到達する方式は採用しない。
+
+Cargo 依存関係調査の結果、winit を直接利用可能であることを確認した。
+
+今後は eframe から Window を取得するのではなく、winit を直接利用して Child Window を生成する方針とする。
+
 ### 次アクション
 
 PoC-1b:

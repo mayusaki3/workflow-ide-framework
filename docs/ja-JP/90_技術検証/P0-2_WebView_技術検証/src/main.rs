@@ -113,8 +113,8 @@ impl DockingValidationApp {
     /// 初期化
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         println!(
-            "egui_ctx={:?}",
-            _cc.egui_ctx.viewport_id()
+            "integration_info={:#?}",
+            _cc.integration_info
         );
 
         let dock_state = Self::load_layout()
