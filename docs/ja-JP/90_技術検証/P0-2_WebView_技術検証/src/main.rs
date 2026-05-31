@@ -109,6 +109,7 @@ impl<'a> TabViewer for ValidationTabViewer<'a> {
 struct DockingValidationApp {
     dock_state: DockState<PanelTab>,
     webview_rect: Option<egui::Rect>,
+    last_webview_rect: Option<egui::Rect>,
 }
 
 #[cfg(target_os = "windows")]
@@ -137,6 +138,7 @@ impl DockingValidationApp {
         Self {
             dock_state,
             webview_rect: None,
+            last_webview_rect: None,
         }
     }
 
@@ -356,6 +358,28 @@ impl eframe::App for DockingValidationApp {
 
             DockArea::new(&mut self.dock_state).show_inside(ui, &mut viewer);
         });
+
+        if let Some(rect) = self.webview_rect {
+            let changed = match self.last_webview_rect {
+                Some(old) => {
+                    old.min != rect.min
+                        || old.max != rect.max
+                }
+                None => true,
+            };
+
+            if changed {
+                println!(
+                    "PoC-2e DockRect min=({:.1},{:.1}) max=({:.1},{:.1})",
+                    rect.min.x,
+                    rect.min.y,
+                    rect.max.x,
+                    rect.max.y
+                );
+
+                self.last_webview_rect = Some(rect);
+            }
+        }
 
         #[cfg(target_os = "windows")]
         unsafe {
