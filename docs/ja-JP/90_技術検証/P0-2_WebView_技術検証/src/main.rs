@@ -305,8 +305,11 @@ impl eframe::App for DockingValidationApp {
 
                                     WEBVIEW_CREATED = true;
 
+                                    println!("WV-01 WebView create success");
+
                                     println!(
-                                        "WV-01 WebView create success"
+                                        "WV-01 webview ptr = {:p}",
+                                        WEBVIEW.as_ref().unwrap()
                                     );
                                 }
 
@@ -337,6 +340,21 @@ impl eframe::App for DockingValidationApp {
                         }
                     }
                 }
+
+                if ui.button("PoC-2f WebView Status").clicked() {
+                    unsafe {
+                        println!(
+                            "WEBVIEW_CREATED = {}",
+                            WEBVIEW_CREATED
+                        );
+
+                        println!(
+                            "WEBVIEW exists = {}",
+                            WEBVIEW.is_some()
+                        );
+                    }
+                }
+
             }
 
             #[cfg(not(target_os = "windows"))]
