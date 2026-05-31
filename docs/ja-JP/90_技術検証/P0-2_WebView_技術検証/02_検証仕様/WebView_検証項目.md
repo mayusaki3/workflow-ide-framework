@@ -65,6 +65,15 @@ P0-2 WebView 技術検証において、WebView Support Panel 構造の成立性
 - 検証用 HTML の文字列または UI が確認できること。
 - アプリケーションが異常終了しないこと。
 
+### 検証ケース
+
+| 検証番号 | 検証内容 | 成功条件 |
+|---|---|---|
+| WV-01-01 | WebView生成 | WebView生成成功 |
+| WV-01-02 | URL表示 | example.com表示成功 |
+| WV-01-03 | Hide/Show | 非表示後に正常復帰する |
+| WV-01-04 | Dock追従 | Dock移動・Dockリサイズ後も表示位置が正しい |
+
 ## WV-02 egui 共存
 
 ### 目的

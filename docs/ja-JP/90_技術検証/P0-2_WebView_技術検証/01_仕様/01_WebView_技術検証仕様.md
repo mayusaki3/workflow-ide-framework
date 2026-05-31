@@ -27,6 +27,22 @@ wry を利用した WebView Support Panel の成立性を確認する。
 
 WebView を表示可能であること。
 
+### WV-01-01
+
+WebView を生成できること。
+
+### WV-01-02
+
+固定URLを表示できること。
+
+### WV-01-03
+
+WebView の表示・非表示を切り替えられること。
+
+### WV-01-04
+
+Dock追従中も異常終了しないこと。
+
 ## 3.2 egui coexist
 
 WebView と egui を共存可能であること。
