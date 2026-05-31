@@ -7,7 +7,7 @@ document_type: test_result
 canonical_document: true
 -->
 
-[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WV-02 egui共存
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [WebView 検証結果](./WebView_検証結果.md) > WV-02 egui共存
 
 # WV-02 egui共存
 
@@ -38,4 +38,4 @@ egui UI と WebView の共存可能性を確認する。
 
 ---
 
-[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > WV-02 egui共存
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [WebView 検証結果](./WebView_検証結果.md) > WV-02 egui共存
