@@ -43,15 +43,20 @@ P0-2 WebView 技術検証の実施結果を集約する。
 
 ## 詳細結果
 
-- [00_検証結果サマリー.md](./00_検証結果サマリー.md)
-- [WV-00_Dock埋め込み成立性確認.md](./WV-00_Dock埋め込み成立性確認.md)
 - [WV-01_WebView表示.md](./WV-01_WebView表示.md)
 - [WV-02_egui共存.md](./WV-02_egui共存.md)
-- [WV-03_MultiPanel.md](./WV-03_MultiPanel.md)
-- [WV-04_Focus切替.md](./WV-04_Focus切替.md)
-- [WV-05_Rust→WebView通知.md](./WV-05_Rust→WebView通知.md)
-- [WV-06_WebView→Rust通知.md](./WV-06_WebView→Rust通知.md)
-- [WV-07_CommandBridge.md](./WV-07_CommandBridge.md)
+
+## 未分割の検証結果
+
+### WV-00 Dock埋め込み成立性確認
+
+WV-00 は `02_検証仕様/WV-00_Dock埋め込み成立性確認.md` に判定結果を記録済み。
+
+`03_検証結果/WV-00_Dock埋め込み成立性確認.md` は未作成。
+
+### WV-03 以降
+
+WV-03 から WV-07 は未実施のため、検証結果ファイルは未作成。
 
 ## OS別差異
 
