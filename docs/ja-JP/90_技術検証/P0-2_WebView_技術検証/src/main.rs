@@ -32,10 +32,19 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WS_OVERLAPPEDWINDOW,
 };
 
+#[cfg(target_os = "windows")]
+use wry::WebViewBuilder;
+
 const LAYOUT_FILE_PATH: &str = "dock_layout.json";
 
 #[cfg(target_os = "windows")]
 static mut CHILD_HWND: Option<HWND> = None;
+
+#[cfg(target_os = "windows")]
+static mut WEBVIEW_CREATED: bool = false;
+
+#[cfg(target_os = "windows")]
+static mut WEBVIEW: Option<wry::WebView> = None;
 
 #[derive(Clone, Serialize, Deserialize)]
 enum PanelTab {
@@ -264,6 +273,48 @@ impl eframe::App for DockingValidationApp {
                             }
                             Err(error) => {
                                 println!("PoC-1e CreateWindowExW failed = {:?}", error);
+                            }
+                        }
+                    }
+                }
+
+                if ui.button("WV-01 Create WebView Window").clicked() {
+
+                    unsafe {
+
+                        if WEBVIEW_CREATED {
+
+                            println!("WV-01 already created");
+
+                        } else {
+
+                            println!("WV-01 create start");
+
+                            let result =
+                                WebViewBuilder::new()
+                                    .with_url("https://example.com")
+                                    .build_as_child(frame);
+
+                            match result {
+
+                                Ok(webview) => {
+
+                                    WEBVIEW = Some(webview);
+
+                                    WEBVIEW_CREATED = true;
+
+                                    println!(
+                                        "WV-01 WebView create success"
+                                    );
+                                }
+
+                                Err(error) => {
+
+                                    println!(
+                                        "WV-01 WebView create failed = {:?}",
+                                        error
+                                    );
+                                }
                             }
                         }
                     }

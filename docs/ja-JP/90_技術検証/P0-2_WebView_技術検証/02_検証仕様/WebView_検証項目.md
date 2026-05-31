@@ -74,6 +74,15 @@ P0-2 WebView 技術検証において、WebView Support Panel 構造の成立性
 | WV-01-03 | Hide/Show | 非表示後に正常復帰する |
 | WV-01-04 | Dock追従 | Dock移動・Dockリサイズ後も表示位置が正しい |
 
+### PoC-2c
+
+| 検証番号 | 検証内容 | 成功条件 |
+|---|---|---|
+| PoC-2c-01 | WRY Window生成 | WebView Window生成成功 |
+| PoC-2c-02 | URL表示 | example.com表示成功 |
+| PoC-2c-03 | Dock追従 | Dock移動後も追従 |
+| PoC-2c-04 | Hide/Show | 非表示後正常復帰 |
+
 ## WV-02 egui 共存
 
 ### 目的

@@ -259,14 +259,17 @@ Dock操作中のみWebViewを非表示化する方式は成立可能性が高い
 
 ### 次アクション
 
-WV-01:
-WebView表示
+PoC-2e:
+Dock Panel配置確認
+
+WV-02:
+egui共存確認
 
 ## 検証結果サマリー
 
 | 検証番号 | 検証項目 | 結果 | 備考 |
 |---|---|---|---|
-| WV-01 | WebView 表示 | 未実施 |  |
+| WV-01 | WebView 表示 | 成功 | build_as_child(frame) により表示成功 |
 | WV-02 | egui 共存 | 未実施 |  |
 | WV-03 | Multi Panel | 未実施 |  |
 | WV-04 | Focus 切替 | 未実施 |  |
@@ -278,16 +281,145 @@ WebView表示
 
 ### 実施結果
 
-未実施。
+### PoC-2a wry導入確認
+
+取得内容:
+
+* Cargo.toml
+* wry 0.53.5
+* webview2-com
+
+確認結果:
+
+Windows:
+
+* cargo build 成功
+* wry導入成功
+* webview2-com導入成功
+* eframe 0.33.0 と共存可能
+
+判断:
+
+WV-01を継続可能。
+
+依存関係競合は確認されなかった。
+
+### PoC-2b build_as_child調査
+
+取得内容:
+
+* WebViewBuilder
+* build_as_child
+
+確認結果:
+
+Windows:
+
+* build_as_child 存在確認
+* HWND は HasWindowHandle を実装していない
+
+確認結果:
+
+* HWND → build_as_child は利用不可
+* Child Window HWND を直接親として利用できない
+
+判断:
+
+HWND直結方式は採用しない。
+
+wry が要求する Window Handle 抽象化を利用する方式へ移行する。
+
+### PoC-2c WebViewBuilder調査
+
+取得内容:
+
+* WebViewBuilder::new()
+* with_url()
+
+確認結果:
+
+Windows:
+
+* WebViewBuilder::new() 成功
+* with_url("https://example.com") 成功
+* cargo run 成功
+
+ログ:
+
+WV-01 create start
+WV-01 builder created
+WV-01 PoC-2c ready
+
+確認結果:
+
+* Builder生成成功
+* URL設定成功
+* 実行時異常なし
+
+判断:
+
+wry API利用可能。
+
+WV-01の前提条件は成立した。
+
+次工程:
+
+PoC-2d 実WebView生成確認
+
+### PoC-2d HasWindowHandle調査
+
+目的:
+
+* eframe が提供する HasWindowHandle 実装を利用して WebView を生成可能か確認する
+
+確認内容:
+
+* build_as_child()
+* build()
+* eframe::Frame 利用可否
+* WebView生成可否
+
+成功条件:
+
+* WebView生成成功
+* example.com表示成功
+
+失敗条件:
+
+* HasWindowHandle を利用した WebView生成不可
+
+確認結果:
+
+Windows:
+
+* build_as_child(frame) 成功
+* WebView生成成功
+* example.com表示成功
+* アプリケーション異常終了なし
+
+ログ:
+
+WV-01 create start
+WV-01 WebView create success
+
+判断:
+
+eframe::Frame を利用した WebView生成は可能。
+
+HWND を利用しない方式で WebView表示が成立した。
+
+次工程:
+
+PoC-2e Dock Panel配置確認
 
 ### 検証ケース
 
 | 検証番号 | 結果 | 備考 |
 |---|---|---|
-| WV-01-01 | 未実施 |  |
-| WV-01-02 | 未実施 |  |
-| WV-01-03 | 未実施 |  |
-| WV-01-04 | 未実施 |  |
+| WV-01-01 | 成功 | WebView生成成功 |
+| WV-01-02 | 成功 | example.com表示成功 |
+| WV-01-03 | 成功 | アプリケーション異常終了なし |
+| WV-01-04 | 成功 | build_as_child(frame) 成功 |
 
 ### 確認内容
 
@@ -297,9 +429,36 @@ WebView表示
 
 ### 判定
 
-未判定。
+成功。
+
+以下を確認した。
+
+* build_as_child(frame) 成功
+* WebView生成成功
+* example.com表示成功
+* アプリケーション異常終了なし
+
+WV-01は成功と判定する。
 
 ## WV-02 egui 共存
+
+### PoC-2e Dock配置確認
+
+目的:
+
+* WebViewをDock Panelへ配置可能か確認する
+
+確認内容:
+
+* Dock移動
+* Dockリサイズ
+* Dockタブ切替
+* WebView再配置
+
+成功条件:
+
+* WebViewがDock操作に追従する
+* アプリケーションが異常終了しない
 
 ### 実施結果
 
@@ -406,7 +565,18 @@ WebView表示
 
 ## 課題
 
-未記入。
+### 課題-01
+
+wry 0.53.5 の build_as_child は HasWindowHandle を要求する。
+
+HWND は HasWindowHandle を実装していないため、
+PoC-1e で生成した Child Window HWND を直接利用できない。
+
+### 対応方針
+
+* HWND直結方式は採用しない
+* WRY Overlay方式を継続調査
+* Windows / Linux / macOS 共通方式を優先する
 
 ## 判断
 
@@ -452,8 +622,11 @@ WV-01 WebView表示
 
 ### 次アクション
 
-WV-01:
-WebView表示
+PoC-2e:
+Dock Panel配置確認
+
+WV-02:
+egui共存確認
 
 ---
 
