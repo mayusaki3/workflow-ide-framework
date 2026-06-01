@@ -106,6 +106,13 @@ impl HasWindowHandle for ChildWindowHandle {
 impl<'a> TabViewer for ValidationTabViewer<'a> {
     type Tab = PanelTab;
 
+    fn allowed_in_windows(
+        &self,
+        _tab: &mut Self::Tab,
+    ) -> bool {
+        false
+    }
+
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
         match tab {
             PanelTab::Status => "Status".into(),
