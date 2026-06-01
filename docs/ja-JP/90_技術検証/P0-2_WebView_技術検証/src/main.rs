@@ -35,6 +35,16 @@ use windows::Win32::UI::WindowsAndMessaging::{
 #[cfg(target_os = "windows")]
 use wry::WebViewBuilder;
 
+#[cfg(target_os = "windows")]
+use wry::raw_window_handle::{
+    HasWindowHandle,
+    RawWindowHandle,
+    WindowHandle,
+    Win32WindowHandle,
+};
+
+use std::num::NonZeroIsize;
+
 const LAYOUT_FILE_PATH: &str = "dock_layout.json";
 
 #[cfg(target_os = "windows")]
@@ -54,8 +64,39 @@ enum PanelTab {
     WebViewPlaceholder,
 }
 
+#[cfg(target_os = "windows")]
+struct ChildWindowHandle {
+    hwnd: HWND,
+}
+
 struct ValidationTabViewer<'a> {
     webview_rect: &'a mut Option<egui::Rect>,
+}
+
+#[cfg(target_os = "windows")]
+impl HasWindowHandle for ChildWindowHandle {
+    fn window_handle(
+        &self,
+    ) -> Result<WindowHandle<'_>,
+        wry::raw_window_handle::HandleError
+    > {
+        let hwnd =
+            NonZeroIsize::new(self.hwnd.0 as isize)
+                .ok_or(
+                    wry::raw_window_handle::HandleError::Unavailable
+                )?;
+
+        let mut handle =
+            Win32WindowHandle::new(hwnd);
+
+        unsafe {
+            Ok(
+                WindowHandle::borrow_raw(
+                    RawWindowHandle::Win32(handle)
+                )
+            )
+        }
+    }
 }
 
 impl<'a> TabViewer for ValidationTabViewer<'a> {
@@ -281,8 +322,25 @@ impl eframe::App for DockingValidationApp {
                 }
 
                 if ui.button("WV-01 Create WebView Window").clicked() {
-
+                    
                     unsafe {
+
+                        if CHILD_HWND.is_none() {
+                            println!("PoC-3a CHILD_HWND none");
+                            return;
+                        }
+
+                        let hwnd = CHILD_HWND.unwrap();
+
+                        let child_window =
+                            ChildWindowHandle {
+                                hwnd,
+                            };
+
+                        println!(
+                            "PoC-3a CHILD_HWND = {:?}",
+                            hwnd
+                        );
 
                         if WEBVIEW_CREATED {
 
@@ -295,7 +353,7 @@ impl eframe::App for DockingValidationApp {
                             let result =
                                 WebViewBuilder::new()
                                     .with_url("https://example.com")
-                                    .build_as_child(frame);
+                                    .build_as_child(&child_window);
 
                             match result {
 
@@ -352,6 +410,21 @@ impl eframe::App for DockingValidationApp {
                             "WEBVIEW exists = {}",
                             WEBVIEW.is_some()
                         );
+                    }
+                }
+
+                if ui.button("PoC-2f Dump WebView").clicked() {
+                    unsafe {
+                        if let Some(webview) = WEBVIEW.as_ref() {
+                            println!("PoC-2f WebView exists");
+
+                            println!(
+                                "PoC-2f type = {}",
+                                std::any::type_name_of_val(webview)
+                            );
+                        } else {
+                            println!("PoC-2f WebView none");
+                        }
                     }
                 }
 
