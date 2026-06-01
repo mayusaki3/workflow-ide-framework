@@ -23,12 +23,13 @@ use serde::{Deserialize, Serialize};
 use windows::core::PCWSTR;
 
 #[cfg(target_os = "windows")]
-use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
 
 #[cfg(target_os = "windows")]
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, GetForegroundWindow, GetParent, IsWindow, MoveWindow,
     RegisterClassW, SetParent, ShowWindow, WNDCLASSW, CW_USEDEFAULT, SW_SHOW, SW_HIDE,
+    EnumChildWindows, GetClientRect, WS_CHILD, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_VISIBLE,
     WS_OVERLAPPEDWINDOW,
 };
 
@@ -55,6 +56,9 @@ static mut WEBVIEW_CREATED: bool = false;
 
 #[cfg(target_os = "windows")]
 static mut WEBVIEW: Option<wry::WebView> = None;
+
+#[cfg(target_os = "windows")]
+static mut WEBVIEW_VISIBLE: bool = false;
 
 #[derive(Clone, Serialize, Deserialize)]
 enum PanelTab {
@@ -127,6 +131,12 @@ impl<'a> TabViewer for ValidationTabViewer<'a> {
                 ui.label("Runtime / Event Log 予定領域");
             }
             PanelTab::WebViewPlaceholder => {
+
+                #[cfg(target_os = "windows")]
+                unsafe {
+                    WEBVIEW_VISIBLE = true;
+                }
+
                 ui.heading("WebView Placeholder");
 
                 let rect = ui.max_rect();
@@ -166,6 +176,45 @@ extern "system" fn poc_window_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+}
+
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn resize_child_proc(
+    child_hwnd: HWND,
+    _lparam: LPARAM,
+) -> windows::core::BOOL {
+    println!(
+        "PoC-3c enum child = {:?}",
+        child_hwnd
+    );
+
+    if let Ok(parent_hwnd) = GetParent(child_hwnd) {
+        let mut rect = RECT::default();
+
+        if GetClientRect(parent_hwnd, &mut rect).is_ok() {
+            let width = rect.right - rect.left;
+            let height = rect.bottom - rect.top;
+
+            println!(
+                "PoC-3c resize child={:?} parent={:?} w={} h={}",
+                child_hwnd,
+                parent_hwnd,
+                width,
+                height
+            );
+
+            let _ = MoveWindow(
+                child_hwnd,
+                0,
+                0,
+                width,
+                height,
+                true,
+            );
+        }
+    }
+
+    windows::core::BOOL(1)
 }
 
 impl DockingValidationApp {
@@ -236,6 +285,11 @@ impl eframe::App for DockingValidationApp {
         let _ = frame;
         let screen_rect = ctx.input(|i| i.content_rect());
 
+        #[cfg(target_os = "windows")]
+        unsafe {
+            WEBVIEW_VISIBLE = false;
+        }
+
         egui::TopBottomPanel::top("debug_panel").show(ctx, |ui| {
             ui.label(format!(
                 "ContentRect: x={} y={} w={} h={}",
@@ -283,12 +337,12 @@ impl eframe::App for DockingValidationApp {
                             Default::default(),
                             PCWSTR(class_name.as_ptr()),
                             PCWSTR(window_title.as_ptr()),
-                            WS_OVERLAPPEDWINDOW,
+                            WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
                             CW_USEDEFAULT,
                             CW_USEDEFAULT,
                             600,
                             400,
-                            None,
+                            Some(parent_hwnd),
                             None,
                             None,
                             None,
@@ -416,18 +470,17 @@ impl eframe::App for DockingValidationApp {
                 if ui.button("PoC-2f Dump WebView").clicked() {
                     unsafe {
                         if let Some(webview) = WEBVIEW.as_ref() {
-                            println!("PoC-2f WebView exists");
 
                             println!(
                                 "PoC-2f type = {}",
                                 std::any::type_name_of_val(webview)
                             );
-                        } else {
-                            println!("PoC-2f WebView none");
+
+                            // ↓ここで補完確認用
+                            let _ = webview.url();
                         }
                     }
                 }
-
             }
 
             #[cfg(not(target_os = "windows"))]
@@ -475,6 +528,14 @@ impl eframe::App for DockingValidationApp {
         #[cfg(target_os = "windows")]
         unsafe {
             if let Some(hwnd) = CHILD_HWND {
+
+                if !WEBVIEW_VISIBLE {
+                    let _ = ShowWindow(hwnd, SW_HIDE);
+                    return;
+                }
+
+                let _ = ShowWindow(hwnd, SW_SHOW);
+
                 if let Some(rect) = self.webview_rect {
                     let scale = ctx.pixels_per_point();
 
@@ -490,6 +551,12 @@ impl eframe::App for DockingValidationApp {
                         width,
                         height,
                         true,
+                    );
+
+                    let _ = EnumChildWindows(
+                        Some(hwnd),
+                        Some(resize_child_proc),
+                        LPARAM(0),
                     );
                 }
             }

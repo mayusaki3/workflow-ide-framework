@@ -17,24 +17,80 @@ egui UI と WebView の共存可能性を確認する。
 
 ## 実施結果
 
-未実施。
-
-## 次回検証
-
 ### PoC-2e Dock配置確認
+
+確認項目:
+
+* Dock移動
+* Dockリサイズ
+* Dockタブ切替
+* Floating Panel
+* WebView再配置
+* 入力競合
+
+確認結果:
+
+* Dock移動成功
+* Dockリサイズ成功
+* Dockタブ切替成功
+* WebView Child Window追従成功
+* WebViewリサイズ追従成功
+* WebViewタブ非表示時 Hide 成功
+* 他タブの WebView Panel へのドラッグ成功
+* Dock操作と入力競合は解消
+
+#### 確認された課題
+
+* Floating Panel 表示時にネイティブサーフェスとのZオーダー競合が発生する
+* 本課題は WebView 固有ではなく GPU Viewport 等のネイティブサーフェス全般に共通する
+
+#### 判定
+
+条件付き成功
+
+以下を確認した。
+
+- egui_dock と WebView の共存成立
+- Dock移動成功
+- Dockリサイズ成功
+- Dockタブ切替成功
+- WebView Child Window追従成功
+- WebViewリサイズ追従成功
+- Dock操作との入力競合解消
+
+ただし Child Window Overlay 方式では
+Floating Panel とネイティブサーフェス間の
+Zオーダー課題が残る。
+
+### PoC-2f フローティング禁止方式評価
+
+目的:
+
+Floating Panel を禁止することで
+Child Window Overlay 方式の
+Zオーダー課題を回避可能か確認する。
 
 確認事項:
 
-- Dock移動
-- Dockリサイズ
-- Dockタブ切替
-- Floating Dock
-- WebView再配置
-- 入力競合
+- フローティング無効化可否
+- Dock移動への影響
+- UXへの影響
+- GPU Viewportへの適用可能性
 
-## 判定
+#### 確認された課題
+未確認
 
-未判定。
+#### 判定
+未実施
+
+## 次工程
+
+### WV-03 複数WebView
+
+確認事項:
+
+- WebView + GPU Viewport
+- 複数ネイティブサーフェス配置
 
 ---
 
