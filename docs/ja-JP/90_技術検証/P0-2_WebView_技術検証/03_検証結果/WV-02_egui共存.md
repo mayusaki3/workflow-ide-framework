@@ -78,14 +78,40 @@ Zオーダー課題を回避可能か確認する。
 - GPU Viewportへの適用可能性
 
 #### 確認された課題
-未確認
+なし
 
 #### 判定
-未実施
+成功
+
+#### 設計メモ
+
+PoC-2f により、egui_dock では TabViewer の `allowed_in_windows()` を利用することで Floating Panel を禁止できることを確認した。
+
+本検証で確認された Floating Panel とネイティブサーフェス間の Z オーダー課題は、WebView 固有の問題ではなく、Child Window Overlay 方式を利用するネイティブサーフェス全般に共通する課題である。
+
+対象例:
+
+* WebView
+* GPU Viewport
+* Video Surface
+* DirectX Surface
+* Vulkan Surface
+
+そのため Workflow IDE Framework では以下の設計方針を候補とする。
+
+* 通常の egui Panel は Floating Panel を許可する
+* ネイティブサーフェスを含む Panel を使用する場合は Panel を Dock 内のみ許可する
+
+期待効果:
+
+* Floating Panel とネイティブサーフェス間の Z オーダー競合回避
+* Child Window Overlay 方式の継続利用
+* GPU Viewport 等への横展開
+* UI 操作性の維持
 
 ## 次工程
 
-### WV-03 複数WebView
+### WV-03 複数WebView (WebView + GPU Viewport)
 
 確認事項:
 
