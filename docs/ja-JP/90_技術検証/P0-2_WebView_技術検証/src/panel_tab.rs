@@ -12,8 +12,6 @@ use eframe::egui;
 use egui_dock::TabViewer;
 use serde::{Deserialize, Serialize};
 
-use crate::platform;
-
 /// P0-2 WebView 技術検証で使用する Dock Panel タブ。
 #[derive(Clone, Serialize, Deserialize)]
 pub enum PanelTab {
@@ -26,9 +24,22 @@ pub enum PanelTab {
 /// egui_dock のタブ描画担当。
 ///
 /// `webview_rect` には WebView Placeholder Panel の矩形を記録する。
-/// Windows では、この矩形を Child Window Overlay の配置に使用する。
+/// `active_panel_rects` には現在描画されたPanelコンテンツ矩形を記録する。
+///
+/// Windows では、`webview_rect` を Child Window Overlay の配置に使用し、
+/// `active_panel_rects` をタブドラッグ候補判定の近似に使用する。
 pub struct ValidationTabViewer<'a> {
     pub webview_rect: &'a mut Option<egui::Rect>,
+    pub active_panel_rects: &'a mut Vec<egui::Rect>,
+}
+
+impl<'a> ValidationTabViewer<'a> {
+    /// 現在描画中のPanelコンテンツ矩形を記録する。
+    fn register_active_panel_rect(&mut self, ui: &egui::Ui) -> egui::Rect {
+        let rect = ui.max_rect();
+        self.active_panel_rects.push(rect);
+        rect
+    }
 }
 
 impl<'a> TabViewer for ValidationTabViewer<'a> {
@@ -48,6 +59,8 @@ impl<'a> TabViewer for ValidationTabViewer<'a> {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        let rect = self.register_active_panel_rect(ui);
+
         match tab {
             PanelTab::Status => {
                 ui.heading("Workflow IDE Framework");
@@ -65,7 +78,6 @@ impl<'a> TabViewer for ValidationTabViewer<'a> {
             PanelTab::WebViewPlaceholder => {
                 ui.heading("WebView Placeholder");
 
-                let rect = ui.max_rect();
                 *self.webview_rect = Some(rect);
 
                 ui.separator();
