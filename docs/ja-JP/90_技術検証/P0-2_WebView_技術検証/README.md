@@ -30,41 +30,13 @@ wry を利用した WebView Support Panel 構造の成立性を確認する。
 
 * [WebView 技術検証仕様](01_仕様/01_WebView_技術検証仕様.md)
 
-## 検証仕様
+## 検証内容/検証結果
 
-* [WebView 検証項目](02_検証仕様/WebView_検証項目.md)
-* [WebView 検証ケース](02_検証仕様/01_検証ケース.md)
-* [WV-00 Dock埋め込み成立性確認](02_検証仕様/WV-00_Dock埋め込み成立性確認.md)
-
-## 検証結果
-
-* [WebView 検証結果](03_検証結果/WebView_検証結果.md)
-
-## 技術検証資料
-
-* [PoC-0 Dock矩形取得](04_PoC/PoC-0_Dock矩形取得.md)
-* [PoC-1c 親Window取得](04_PoC/PoC-1c_親Window取得.md)
-* [PoC-1d winit Window生成](04_PoC/PoC-1d_winit_Window生成.md)
-
-# 4. 現在の進捗
-
-## 完了
-
-* PoC-0 Dock矩形取得
-* ViewportInfo調査
-* FrameInfo調査
-* CreationContext調査
+* [検証目次](./02_検証/検証目次.md)
 
 ## 実施中
 
-* WV-00 Dock埋め込み成立性確認
-
-## 次工程
-
-* PoC-1d winit Window生成
-* PoC-1e Child Window生成
-* PoC-1f Dock追従確認
-* WV-01 WebView表示
+* WV-03	Linux egui共存
 
 ---
 
