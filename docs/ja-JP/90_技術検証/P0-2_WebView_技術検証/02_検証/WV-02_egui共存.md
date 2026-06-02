@@ -115,9 +115,8 @@ PoC-2f により、egui_dock の `allowed_in_windows()` を利用して Floating
 
 ### 後続検証
 
-- Linux検証
-- macOS検証
-- WV-03 複数NativeSurface
+- WV-03 Linux egui共存
+- WV-04 macOS egui共存
 
 ## WV評価
 
@@ -166,35 +165,36 @@ Workflow IDE Framework では以下を設計方針候補とする。
 
 ## 次工程
 
-### Linux検証
+### WV-03 Linux egui共存
 
 確認事項
 
 - cargo build
 - アプリ起動
-- Dock動作
+- Dock矩形取得
+- Dock移動
+- Dockリサイズ
 - WebView生成
+- URL表示
+- タブ切替
+- Child Window追従
+- Floating禁止方式
 - WebKitGTK依存確認
 
-### macOS検証
+### WV-04 macOS egui共存
 
 確認事項
 
 - cargo build
 - アプリ起動
-- Dock動作
+- Dock矩形取得
+- Dock移動
+- Dockリサイズ
 - WebView生成
-
-### WV-03 複数NativeSurface
-
-確認事項
-
-- WebView + GPU Viewport
-- 複数ネイティブサーフェス配置
-- Dock移動追従
-- Dockリサイズ追従
+- URL表示
 - タブ切替
-- 入力競合
+- Child Window追従
+- Floating禁止方式
 
 ## 備考
 

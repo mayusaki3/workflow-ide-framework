@@ -1,0 +1,233 @@
+<!--
+HLDocS:LLM-MANAGED
+lang: ja-JP
+canonical_title: WV-03 Linux egui共存
+document_type: note
+canonical_document: true
+-->
+
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [検証目次](./検証目次.md) > WV-03 Linux egui共存
+
+# WV-03 Linux egui共存
+
+## 目的
+
+Linux 環境において、WV-00 ～ WV-02 で Windows 上で成立した構成が同様に成立することを確認する。
+
+本検証では Linux 上で egui_dock、eframe および wry を組み合わせた WebView Support Panel 構成の成立性を確認する。
+
+本検証の結果を基に macOS 検証へ進む。
+
+## 前提条件
+
+### WV-00
+
+確認済み事項
+
+- Dock矩形取得
+- Dock移動検知
+- Dockリサイズ検知
+- Child Window Overlay方式成立
+
+### WV-01
+
+確認済み事項
+
+- WebView生成成功
+- URL表示成功
+- build_as_child方式成立
+
+### WV-02
+
+確認済み事項
+
+- egui共存成立
+- Dock移動成功
+- Dockリサイズ成功
+- Dockタブ切替成功
+- Floating禁止方式成立
+
+### 対象環境
+
+OS
+
+- Ubuntu LTS
+- Fedora
+- その他主要Linuxディストリビューション
+
+対象ライブラリ
+
+- eframe
+- egui
+- egui_dock
+- wry
+
+## PoC
+
+### 検証内容
+
+#### WV-03-01 Linuxビルド
+
+確認項目
+
+- cargo check
+- cargo build
+- 依存解決
+
+#### WV-03-02 Linux起動
+
+確認項目
+
+- アプリ起動
+- Dock表示
+- 異常終了有無
+
+#### WV-03-03 Dock共存
+
+確認項目
+
+- Dock移動
+- Dockリサイズ
+- Dockタブ切替
+
+#### WV-03-04 WebView表示
+
+確認項目
+
+- WebView生成
+- URL表示
+- Child Window表示
+
+#### WV-03-05 Child Window追従
+
+確認項目
+
+- Dock移動追従
+- Dockリサイズ追従
+- タブ切替追従
+
+#### WV-03-06 Floating禁止方式
+
+確認項目
+
+- allowed_in_windows()
+- Floating禁止
+- Dock操作への影響
+
+### 実施結果
+
+#### WV-03-01 Linuxビルド
+
+確認結果
+
+- 未実施
+
+判定
+
+- 未判定
+
+#### WV-03-02 Linux起動
+
+確認結果
+
+- 未実施
+
+判定
+
+- 未判定
+
+#### WV-03-03 Dock共存
+
+確認結果
+
+- 未実施
+
+判定
+
+- 未判定
+
+#### WV-03-04 WebView表示
+
+確認結果
+
+- 未実施
+
+判定
+
+- 未判定
+
+#### WV-03-05 Child Window追従
+
+確認結果
+
+- 未実施
+
+判定
+
+- 未判定
+
+#### WV-03-06 Floating禁止方式
+
+確認結果
+
+- 未実施
+
+判定
+
+- 未判定
+
+### 評価
+
+未実施
+
+### 後続検証
+
+- WV-04 macOS egui共存
+
+## WV評価
+
+### 判定
+
+未判定
+
+### 根拠
+
+未実施
+
+## 次工程
+
+### WV-04 macOS egui共存
+
+確認事項
+
+- cargo build
+- アプリ起動
+- Dock矩形取得
+- Dock移動
+- Dockリサイズ
+- WebView生成
+- URL表示
+- Child Window追従
+- Floating禁止方式
+
+## 備考
+
+Linux では wry が WebKitGTK に依存する。
+
+事前に以下の導入を確認すること。
+
+Ubuntu系
+
+```bash
+sudo apt install \
+  libwebkit2gtk-4.1-dev \
+  libgtk-3-dev \
+  build-essential \
+  pkg-config
+```
+
+本検証では WebView の成立性だけでなく、Workflow IDE Framework の Support Panel 実装方式として Linux 上で継続採用可能かを評価対象とする。
+
+---
+
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [検証目次](./検証目次.md) > WV-03 Linux egui共存
