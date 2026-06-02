@@ -33,6 +33,7 @@ pub struct DockingValidationApp {
     last_webview_rect: Option<egui::Rect>,
     active_panel_rects: Vec<egui::Rect>,
     dock_tab_drag_candidate: bool,
+    webview_tab_visible: bool,
     debug_show_native_surface: bool,
 }
 
@@ -75,6 +76,7 @@ impl DockingValidationApp {
             last_webview_rect: None,
             active_panel_rects: Vec::new(),
             dock_tab_drag_candidate: false,
+            webview_tab_visible: false,
             debug_show_native_surface: true,
         }
     }
@@ -150,6 +152,10 @@ impl DockingValidationApp {
     /// egui_dock がタブドラッグ時に設定する `CursorIcon::Grabbing` が出ている場合のみ。
     fn should_show_native_surface(&self, ctx: &egui::Context) -> bool {
         if !self.debug_show_native_surface {
+            return false;
+        }
+
+        if !self.webview_tab_visible {
             return false;
         }
 
@@ -245,11 +251,13 @@ impl eframe::App for DockingValidationApp {
         });
 
         self.active_panel_rects.clear();
+        self.webview_tab_visible = false;
 
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut viewer = ValidationTabViewer {
                 webview_rect: &mut self.webview_rect,
                 active_panel_rects: &mut self.active_panel_rects,
+                webview_tab_visible: &mut self.webview_tab_visible,
             };
 
             DockArea::new(&mut self.dock_state).show_inside(ui, &mut viewer);

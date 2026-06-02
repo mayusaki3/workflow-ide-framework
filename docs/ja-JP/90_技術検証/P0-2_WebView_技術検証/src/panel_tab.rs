@@ -31,6 +31,7 @@ pub enum PanelTab {
 pub struct ValidationTabViewer<'a> {
     pub webview_rect: &'a mut Option<egui::Rect>,
     pub active_panel_rects: &'a mut Vec<egui::Rect>,
+    pub webview_tab_visible: &'a mut bool,
 }
 
 impl<'a> ValidationTabViewer<'a> {
@@ -79,6 +80,7 @@ impl<'a> TabViewer for ValidationTabViewer<'a> {
                 ui.heading("WebView Placeholder");
 
                 *self.webview_rect = Some(rect);
+                *self.webview_tab_visible = true;
 
                 ui.separator();
                 ui.label(format!("x={:.1} y={:.1}", rect.min.x, rect.min.y));
