@@ -100,6 +100,7 @@ OS
 - WebView生成
 - URL表示
 - Child Window表示
+- Child Window初期配置（起動時非表示→表示）
 
 #### WV-03-05 Child Window追従
 
