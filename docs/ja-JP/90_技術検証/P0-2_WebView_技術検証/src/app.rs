@@ -292,7 +292,7 @@ impl eframe::App for DockingValidationApp {
             }
 
             if rect.width() > 10.0 && rect.height() > 10.0 {
-                platform::ensure_webview_initialized();
+                platform::ensure_webview_initialized(Some(rect), ctx.pixels_per_point());
             }
         }
 

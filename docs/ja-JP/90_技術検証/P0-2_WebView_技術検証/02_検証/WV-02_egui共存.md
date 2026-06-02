@@ -76,6 +76,12 @@ WV-01 により以下を確認済みである。
 - WebViewタブ非表示時 Hide 成功
 - 他タブの WebView Panel へのドラッグ成功
 - Dock操作と入力競合は解消
+- WebView Panel へのタブドラッグ時のみ WebView Hide 成功
+- タブドラッグ終了後の表示復元成功
+- WebView非アクティブ時 Hide 成功
+- WebViewアクティブ時 Show 成功
+- 初回表示時の左上フラッシュ解消
+- Child Window 初期配置後に WebView生成する方式成立
 
 確認された課題
 
@@ -113,6 +119,12 @@ egui_dock と WebView の共存は成立した。
 
 PoC-2f により、egui_dock の `allowed_in_windows()` を利用して Floating Panel を禁止できることを確認したため、本課題は回避可能と判断する。
 
+また、WebView Panel へのタブドラッグ時にのみ Child Window を退避し、
+配置完了後はアクティブタブ状態に応じて表示制御できることを確認した。
+
+さらに Child Window を DockRect へ配置後に WebView を生成する方式により、
+初回表示時のネイティブサーフェスのフラッシュを解消できることを確認した。
+
 ### 後続検証
 
 - WV-03 Linux egui共存
@@ -122,7 +134,7 @@ PoC-2f により、egui_dock の `allowed_in_windows()` を利用して Floating
 
 ### 判定
 
-条件付き成功
+成功
 
 ### 根拠
 
@@ -136,10 +148,17 @@ PoC-2f により、egui_dock の `allowed_in_windows()` を利用して Floating
 - WebViewリサイズ追従成功
 - Dock操作との入力競合解消
 - Floating禁止方式成立
+- WebView Panel へのタブドラッグ時のみ Hide 成功
+- アクティブタブ判定成功
+- 非アクティブタブ時 Hide 成功
+- 初回表示時のフラッシュ解消
+- Child Window 初期配置方式成立
 
 ### 制約
 
-Child Window Overlay 方式を利用するネイティブサーフェスは Floating Panel と共存できない。
+- Child Window Overlay 方式を利用するネイティブサーフェスは Floating Panel と共存できない。
+- ネイティブサーフェスはアクティブタブ時のみ表示する
+- タブドラッグ中は一時退避が必要
 
 対象例
 
@@ -155,6 +174,9 @@ Workflow IDE Framework では以下を設計方針候補とする。
 
 - 通常の egui Panel は Floating Panel を許可する
 - ネイティブサーフェスを含む Panel は Dock 内のみ許可する
+- ネイティブサーフェスはアクティブタブ時のみ表示する
+- タブドラッグ中はネイティブサーフェスを一時退避する
+- Child Window は DockRect 配置後に生成する
 
 期待効果
 

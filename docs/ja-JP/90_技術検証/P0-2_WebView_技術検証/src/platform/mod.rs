@@ -31,7 +31,7 @@ pub fn reset_webview_visible() {}
 
 /// 非Windows環境では WebView / Child Window 初期化は行わない。
 #[cfg(not(target_os = "windows"))]
-pub fn ensure_webview_initialized() {}
+pub fn ensure_webview_initialized(_initial_rect: Option<egui::Rect>, _scale: f32) {}
 
 #[cfg(not(target_os = "windows"))]
 pub fn set_root_hwnd(_hwnd: isize) {}

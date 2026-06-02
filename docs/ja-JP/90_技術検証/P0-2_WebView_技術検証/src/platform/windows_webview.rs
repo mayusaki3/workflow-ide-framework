@@ -48,10 +48,13 @@ pub fn set_root_hwnd(hwnd: HWND) {
     }
 }
 
-pub fn ensure_webview_initialized() {
+pub fn ensure_webview_initialized(
+    initial_rect: Option<egui::Rect>,
+    scale: f32,
+) {
     unsafe {
         if CHILD_HWND.is_none() {
-            create_child_window();
+            create_child_window(initial_rect, scale);
         }
 
         if !WEBVIEW_CREATED {
@@ -141,7 +144,7 @@ unsafe extern "system" fn resize_child_proc(
     windows::core::BOOL(1)
 }
 
-fn create_child_window() {
+fn create_child_window(initial_rect: Option<egui::Rect>, scale: f32) {
     unsafe {
         let class_name = to_wide("PoC1EWindowClass");
         let window_title = to_wide("PoC-1e Child Test Window");
@@ -161,15 +164,26 @@ fn create_child_window() {
 
         println!("WV-02 Parent HWND = {:?}", parent_hwnd);
 
+        let (x, y, width, height) = initial_rect
+            .map(|rect| {
+                (
+                    (rect.min.x * scale) as i32,
+                    (rect.min.y * scale) as i32,
+                    (rect.width() * scale) as i32,
+                    (rect.height() * scale) as i32,
+                )
+            })
+            .unwrap_or((0, 0, 1, 1));
+
         let hwnd = CreateWindowExW(
             Default::default(),
             PCWSTR(class_name.as_ptr()),
             PCWSTR(window_title.as_ptr()),
             WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            600,
-            400,
+            x,
+            y,
+            width,
+            height,
             Some(parent_hwnd),
             None,
             None,
