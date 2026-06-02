@@ -63,8 +63,6 @@ impl<'a> TabViewer for ValidationTabViewer<'a> {
                 ui.label("Runtime / Event Log 予定領域");
             }
             PanelTab::WebViewPlaceholder => {
-                platform::mark_webview_visible();
-
                 ui.heading("WebView Placeholder");
 
                 let rect = ui.max_rect();

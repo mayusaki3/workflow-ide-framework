@@ -16,11 +16,17 @@ use crate::layout_storage;
 use crate::panel_tab::{PanelTab, ValidationTabViewer};
 use crate::platform;
 
+use raw_window_handle::{
+    HasWindowHandle,
+    RawWindowHandle,
+};
+
 /// P0-2 WebView 技術検証アプリ。
 pub struct DockingValidationApp {
     dock_state: DockState<PanelTab>,
     webview_rect: Option<egui::Rect>,
     last_webview_rect: Option<egui::Rect>,
+    debug_show_native_surface: bool,
 }
 
 impl DockingValidationApp {
@@ -34,6 +40,21 @@ impl DockingValidationApp {
     ///
     /// 初期化済みの `DockingValidationApp`。
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        if let Ok(window_handle) = cc.window_handle() {
+            match window_handle.as_raw() {
+                RawWindowHandle::Win32(handle) => {
+                    let hwnd = windows::Win32::Foundation::HWND(
+                        handle.hwnd.get() as *mut core::ffi::c_void
+                    );
+
+                    platform::set_root_hwnd(hwnd);
+                }
+                _ => {
+                    println!("WV-02 non Win32 window handle");
+                }
+            }
+        }
+
         println!("PoC-1d start");
         println!("egui viewport id = {:?}", egui::ViewportId::ROOT);
         println!("pixels_per_point = {}", cc.egui_ctx.pixels_per_point());
@@ -45,6 +66,7 @@ impl DockingValidationApp {
             dock_state,
             webview_rect: None,
             last_webview_rect: None,
+            debug_show_native_surface: true,
         }
     }
 }
@@ -59,8 +81,6 @@ impl eframe::App for DockingValidationApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let _ = frame;
         let screen_rect = ctx.input(|i| i.content_rect());
-
-        platform::reset_webview_visible();
 
         egui::TopBottomPanel::top("debug_panel").show(ctx, |ui| {
             ui.label(format!(
@@ -79,7 +99,10 @@ impl eframe::App for DockingValidationApp {
             ui.label("Native Window Investigation");
             ui.label(format!("ViewportId = {:?}", egui::ViewportId::ROOT));
 
-            platform::render_debug_controls(ui);
+            ui.checkbox(
+                &mut self.debug_show_native_surface,
+                "Debug: Show Native Surface",
+            );
         });
 
         egui::TopBottomPanel::top("menu_panel").show(ctx, |ui| {
@@ -115,6 +138,25 @@ impl eframe::App for DockingValidationApp {
             }
         }
 
-        platform::sync_child_window(ctx, self.webview_rect);
+        if let Some(rect) = self.webview_rect {
+            if rect.width() > 10.0 && rect.height() > 10.0 {
+                platform::ensure_webview_initialized();
+            }
+        }
+
+        let should_show_native_surface =
+            self.debug_show_native_surface;
+
+        if let Some(rect) = self.webview_rect {
+            if rect.width() > 10.0 && rect.height() > 10.0 {
+                platform::ensure_webview_initialized();
+            }
+        }
+
+        platform::sync_child_window(
+            ctx,
+            self.webview_rect,
+            should_show_native_surface,
+        );
     }
 }

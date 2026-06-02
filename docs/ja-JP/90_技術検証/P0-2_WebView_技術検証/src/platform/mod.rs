@@ -13,9 +13,8 @@ mod windows_webview;
 
 #[cfg(target_os = "windows")]
 pub use windows_webview::{
-    mark_webview_visible,
-    render_debug_controls,
-    reset_webview_visible,
+    ensure_webview_initialized,
+    set_root_hwnd,
     sync_child_window,
 };
 
@@ -30,16 +29,18 @@ pub fn mark_webview_visible() {}
 #[cfg(not(target_os = "windows"))]
 pub fn reset_webview_visible() {}
 
-/// 非Windows環境向けのデバッグUI。
+/// 非Windows環境では WebView / Child Window 初期化は行わない。
 #[cfg(not(target_os = "windows"))]
-pub fn render_debug_controls(ui: &mut egui::Ui) {
-    ui.label("PoC-1e Windows Only");
-}
+pub fn ensure_webview_initialized() {}
+
+#[cfg(not(target_os = "windows"))]
+pub fn set_root_hwnd(_hwnd: isize) {}
 
 /// 非Windows環境では Child Window 追従処理は行わない。
 #[cfg(not(target_os = "windows"))]
 pub fn sync_child_window(
     _ctx: &egui::Context,
     _webview_rect: Option<egui::Rect>,
+    _should_show_native_surface: bool,
 ) {
 }
