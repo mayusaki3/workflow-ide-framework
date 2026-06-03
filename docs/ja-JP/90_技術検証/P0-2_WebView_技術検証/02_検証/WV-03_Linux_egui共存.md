@@ -221,8 +221,11 @@ Wayland WebView表示
 
 次候補:
 
-* Linux版は eframe 継続を諦め、tao/wry/GTKベースのウィンドウ構成を WV-04 として検証する（以降の検証はスキップ）
+次候補:
+
+* tao/wry/GTK構成を WV-04 として検証する（以降の検証はスキップ）
 * または WebView を別プロセス/別ウィンドウ化して、IDE側では Support Panel として抽象化する
+* eframe 継続可否は WV-04 の結果を踏まえて判断する
 
 #### WV-03-05 Child Window追従
 
