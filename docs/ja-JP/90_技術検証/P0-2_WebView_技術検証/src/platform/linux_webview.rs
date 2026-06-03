@@ -1,62 +1,67 @@
-//! Linux向け WebView / Child Surface PoC処理。
+//! Linux向け WebView / GTK Fixed PoC処理。
 //!
 //! 役割:
-//! - Linux(Wayland/X11)環境で wry の `build_as_child()` を使用して WebView を生成する。
-//! - egui_dock の WebView Panel 矩形に合わせて WebView の bounds を更新する。
+//! - Windows版 `windows_webview.rs` と同じ公開I/Fで Linux 側の実装可否を検証する。
+//! - Linux(Wayland/X11)では `build_as_child()` を使用せず、`build_gtk()` を使用する。
+//! - GTK Window / root_fixed / child_fixed / WebView の構成で、Child Window相当の
+//!   表示・非表示・移動・リサイズを検証する。
 //!
 //! 注意:
 //! - P0-2 WebView 技術検証用のPoCコード。
-//! - WV-03-04 では Windows版と同じ platform API を維持し、上位層へOS差異を見せない。
-//! - Linuxでは `WebView::set_bounds()` によりDock矩形追従を検証する。
+//! - 現行 eframe Root Window から GTK Container を取得する経路は確認できていない。
+//! - そのため本ファイルでは、Linux側の同一I/F実装可能性を確認するため、
+//!   GTK側に検証用Windowを生成して `build_gtk()` を検証する。
+//! - 本番仕様化時には、本検証結果をもとに Platform 仕様・設計・テストへ戻す。
 
 use eframe::{egui, CreationContext};
-use wry::dpi::{LogicalPosition, LogicalSize};
-use wry::raw_window_handle::{
-    HasWindowHandle, RawWindowHandle, WindowHandle,
+use gtk::prelude::*;
+use wry::{
+    dpi::{LogicalPosition, LogicalSize},
+    Rect, WebViewBuilder, WebViewBuilderExtUnix,
 };
-use wry::{Rect, WebViewBuilder};
 
-static mut ROOT_HANDLE: Option<RawWindowHandle> = None;
+static mut GTK_WINDOW: Option<gtk::Window> = None;
+static mut ROOT_FIXED: Option<gtk::Fixed> = None;
+static mut CHILD_FIXED: Option<gtk::Fixed> = None;
 static mut WEBVIEW_CREATED: bool = false;
 static mut WEBVIEW: Option<wry::WebView> = None;
 
-/// 保存済みの RawWindowHandle を wry の親Windowとして渡すためのラッパー。
-struct RootWindowHandle {
-    raw_window_handle: RawWindowHandle,
-}
-
-impl HasWindowHandle for RootWindowHandle {
-    fn window_handle(
-        &self,
-    ) -> Result<WindowHandle<'_>, wry::raw_window_handle::HandleError> {
-        unsafe {
-            Ok(WindowHandle::borrow_raw(self.raw_window_handle))
-        }
-    }
-}
-
-/// eframe の作成コンテキストから Root Window Handle を取得する。
+/// Linux側の Root Window 相当を初期化する。
 ///
 /// # 役割
 ///
-/// - App層から Linux 固有の Window Handle 取得処理を分離する。
-/// - 取得した Root Window Handle を WebView の親として保持する。
+/// - Windows版の `initialize_root_window()` と同じ呼び出し口を維持する。
+/// - Linux版では GTK を初期化し、検証用 GTK Window と root_fixed を生成する。
 ///
 /// # 注意点
 ///
-/// - Linux向けPoC処理である。
-/// - Wayland / X11 の差異は wry / raw-window-handle 側に委ねる。
-pub fn initialize_root_window(cc: &CreationContext<'_>) {
-    if let Ok(window_handle) = cc.window_handle() {
-        let raw = window_handle.as_raw();
-
-        unsafe {
-            ROOT_HANDLE = Some(raw);
+/// - eframe の CreationContext は、現時点では GTK Container 取得に使用しない。
+/// - GTK初期化済みでない場合、`build_gtk()` が panic するため、ここで `gtk::init()` を行う。
+pub fn initialize_root_window(_cc: &CreationContext<'_>) {
+    unsafe {
+        if GTK_WINDOW.is_some() {
+            return;
         }
 
-        println!("WV-03 Linux Root Window Handle = {:?}", raw);
-    } else {
-        println!("WV-03 Linux Root Window Handle unavailable");
+        if let Err(error) = gtk::init() {
+            println!("WV-04 Linux gtk::init failed = {:?}", error);
+            return;
+        }
+
+        let window = gtk::Window::new(gtk::WindowType::Toplevel);
+        window.set_title("WV-04 Linux GTK WebView Host");
+        window.set_default_size(800, 600);
+
+        let root_fixed = gtk::Fixed::new();
+        root_fixed.set_size_request(800, 600);
+
+        window.add(&root_fixed);
+        window.show_all();
+
+        GTK_WINDOW = Some(window);
+        ROOT_FIXED = Some(root_fixed);
+
+        println!("WV-04 Linux GTK root window initialized");
     }
 }
 
@@ -67,10 +72,11 @@ pub fn initialize_root_window(cc: &CreationContext<'_>) {
 /// * `initial_rect` - WebView Panel の初期矩形。
 /// * `scale` - egui の pixels_per_point。
 ///
-/// # 注意点
+/// # 役割
 ///
-/// - Linux版の初期PoCでは、Child Surface相当として wry の `build_as_child()` を使用する。
-/// - 初期表示時の左上フラッシュを避けるため、生成時に `with_bounds()` を設定する。
+/// - Windows版の `ensure_webview_initialized()` と同じ呼び出し口を維持する。
+/// - Linux版では root_fixed 配下に child_fixed を作成し、その配下へ `build_gtk()` で
+///   WebView を生成する。
 pub fn ensure_webview_initialized(
     initial_rect: Option<egui::Rect>,
     scale: f32,
@@ -80,42 +86,50 @@ pub fn ensure_webview_initialized(
             return;
         }
 
-        let Some(root_handle) = ROOT_HANDLE else {
-            println!("WV-03 Linux Root Window Handle not initialized");
+        let Some(root_fixed) = ROOT_FIXED.as_ref() else {
+            println!("WV-04 Linux ROOT_FIXED not initialized");
             return;
         };
 
-        let Some(rect) = initial_rect else {
-            println!("WV-03 Linux initial rect none");
-            return;
-        };
+        let (x, y, width, height) = initial_rect
+            .map(|rect| rect_to_i32_bounds(rect, scale))
+            .unwrap_or((0, 0, 800, 600));
 
-        let parent = RootWindowHandle {
-            raw_window_handle: root_handle,
-        };
+        let child_fixed = gtk::Fixed::new();
+        child_fixed.set_size_request(width, height);
 
-        let bounds = rect_to_wry_bounds(rect, scale);
+        root_fixed.put(&child_fixed, x, y);
+        child_fixed.show_all();
+        root_fixed.show_all();
+
+        let bounds = Rect {
+            position: LogicalPosition::new(0, 0).into(),
+            size: LogicalSize::new(width as u32, height as u32).into(),
+        };
 
         let result = WebViewBuilder::new()
             .with_bounds(bounds)
             .with_url("https://example.com")
-            .build_as_child(&parent);
+            .build_gtk(&child_fixed);
 
         match result {
             Ok(webview) => {
+                CHILD_FIXED = Some(child_fixed);
                 WEBVIEW = Some(webview);
                 WEBVIEW_CREATED = true;
 
-                println!("WV-03 Linux WebView create success");
+                println!("WV-04 Linux WebView create success");
             }
             Err(error) => {
-                println!("WV-03 Linux WebView create failed = {:?}", error);
+                println!("WV-04 Linux WebView create failed = {:?}", error);
             }
         }
+
+        flush_gtk_events();
     }
 }
 
-/// WebView の表示位置・サイズ・表示状態を同期する。
+/// Child Surface 相当の表示位置・サイズ・表示状態を同期する。
 ///
 /// # 引数
 ///
@@ -123,47 +137,79 @@ pub fn ensure_webview_initialized(
 /// * `webview_rect` - WebView Panel の現在矩形。
 /// * `should_show_native_surface` - Native Surface を表示すべきか。
 ///
-/// # 注意点
+/// # 役割
 ///
-/// - 初期PoCでは Hide/Show の完全制御よりも、WebView生成とbounds追従を優先する。
-/// - wry 0.53.5 の Linux では `set_bounds()` による手動追従が必要である。
+/// - Windows版の `sync_child_window()` と同じ呼び出し口を維持する。
+/// - Linux版では `root_fixed.move_()` と `child_fixed.set_size_request()` により、
+///   Child Window相当領域を移動・リサイズする。
 pub fn sync_child_window(
     ctx: &egui::Context,
     webview_rect: Option<egui::Rect>,
     should_show_native_surface: bool,
 ) {
     unsafe {
-        let Some(webview) = WEBVIEW.as_ref() else {
+        let Some(root_fixed) = ROOT_FIXED.as_ref() else {
+            return;
+        };
+
+        let Some(child_fixed) = CHILD_FIXED.as_ref() else {
             return;
         };
 
         if !should_show_native_surface {
-            let _ = webview.set_bounds(Rect {
-                position: LogicalPosition::new(0.0, 0.0).into(),
-                size: LogicalSize::new(1.0, 1.0).into(),
-            });
+            child_fixed.hide();
+            flush_gtk_events();
             return;
         }
 
-        if let Some(rect) = webview_rect {
-            let bounds = rect_to_wry_bounds(rect, ctx.pixels_per_point());
+        child_fixed.show();
 
-            if let Err(error) = webview.set_bounds(bounds) {
-                println!("WV-03 Linux WebView set_bounds failed = {:?}", error);
-            }
+        if let Some(rect) = webview_rect {
+            let (x, y, width, height) =
+                rect_to_i32_bounds(rect, ctx.pixels_per_point());
+
+            root_fixed.move_(child_fixed, x, y);
+            child_fixed.set_size_request(width, height);
+
+            println!(
+                "WV-04 Linux sync child surface x={} y={} w={} h={}",
+                x, y, width, height
+            );
         }
+
+        root_fixed.show_all();
+        flush_gtk_events();
     }
 }
 
-/// egui のRectを wry のRectへ変換する。
-fn rect_to_wry_bounds(rect: egui::Rect, scale: f32) -> Rect {
-    let x = (rect.min.x * scale) as f64;
-    let y = (rect.min.y * scale) as f64;
-    let width = (rect.width() * scale) as f64;
-    let height = (rect.height() * scale) as f64;
+/// egui の Rect を GTK 用の整数座標へ変換する。
+///
+/// # 注意点
+///
+/// - Wayland環境で異常に大きいサイズが GTK/GDK クラッシュを誘発したため、
+///   技術検証用に最小・最大値を制限する。
+fn rect_to_i32_bounds(rect: egui::Rect, scale: f32) -> (i32, i32, i32, i32) {
+    let x = (rect.min.x * scale) as i32;
+    let y = (rect.min.y * scale) as i32;
+    let width = (rect.width() * scale) as i32;
+    let height = (rect.height() * scale) as i32;
 
-    Rect {
-        position: LogicalPosition::new(x, y).into(),
-        size: LogicalSize::new(width, height).into(),
+    (
+        x.max(0).min(16_000),
+        y.max(0).min(16_000),
+        width.max(1).min(16_000),
+        height.max(1).min(16_000),
+    )
+}
+
+/// GTKイベントを処理する。
+///
+/// # 役割
+///
+/// - eframe/winit 側のイベントループ内で GTK 側の表示更新を進める。
+/// - 技術検証用の簡易処理。
+fn flush_gtk_events() {
+    while gtk::events_pending() {
+        gtk::main_iteration_do(false);
     }
 }
