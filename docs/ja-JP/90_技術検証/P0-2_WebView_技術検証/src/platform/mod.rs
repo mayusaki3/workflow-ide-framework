@@ -1,8 +1,9 @@
 //! Platform固有処理の公開口。
 //!
 //! 役割:
-//! - Windows固有の Child Window / WebView 処理を呼び出す。
-//! - 非Windows環境では同じ関数シグネチャのスタブを提供する。
+//! - OS固有の Child Window / WebView 処理を呼び出す。
+//! - Windows / Linux では OS別の実装を使用する。
+//! - その他の環境では同じ関数シグネチャのスタブを提供する。
 //!
 //! 注意:
 //! - P0-2 WebView 技術検証用のPoCコード。
@@ -10,6 +11,9 @@
 
 #[cfg(target_os = "windows")]
 mod windows_webview;
+
+#[cfg(target_os = "linux")]
+mod linux_webview;
 
 #[cfg(target_os = "windows")]
 pub use windows_webview::{
@@ -19,30 +23,26 @@ pub use windows_webview::{
     sync_child_window,
 };
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "linux")]
+pub use linux_webview::{
+    ensure_webview_initialized,
+    initialize_root_window,
+    sync_child_window,
+};
+
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 use eframe::egui;
 
-/// 非Windows環境では Root Window 初期化は行わない。
-#[cfg(not(target_os = "windows"))]
+/// 非Windows/Linux環境では Root Window 初期化は行わない。
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 pub fn initialize_root_window(_cc: &eframe::CreationContext<'_>) {}
 
-/// 非Windows環境では WebView表示フラグ更新は行わない。
-#[cfg(not(target_os = "windows"))]
-pub fn mark_webview_visible() {}
-
-/// 非Windows環境では WebView表示フラグ初期化は行わない。
-#[cfg(not(target_os = "windows"))]
-pub fn reset_webview_visible() {}
-
-/// 非Windows環境では WebView / Child Window 初期化は行わない。
-#[cfg(not(target_os = "windows"))]
+/// 非Windows/Linux環境では WebView / Child Window 初期化は行わない。
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 pub fn ensure_webview_initialized(_initial_rect: Option<egui::Rect>, _scale: f32) {}
 
-#[cfg(not(target_os = "windows"))]
-pub fn set_root_hwnd(_hwnd: isize) {}
-
-/// 非Windows環境では Child Window 追従処理は行わない。
-#[cfg(not(target_os = "windows"))]
+/// 非Windows/Linux環境では Child Window 追従処理は行わない。
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 pub fn sync_child_window(
     _ctx: &egui::Context,
     _webview_rect: Option<egui::Rect>,

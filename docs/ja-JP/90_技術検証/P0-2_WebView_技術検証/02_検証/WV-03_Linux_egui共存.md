@@ -102,6 +102,20 @@ OS
 - Child Window表示
 - Child Window初期配置（起動時非表示→表示）
 
+確認方針
+
+- Windows と同じく、Root Window 配下に Child Window 相当のネイティブサーフェスを生成し、その配下へ WebView を配置する。
+- Linux では Child Window 相当として GTK Widget を使用する。
+- WebView を Root Window へ直接配置する方式、または egui 内へ直接埋め込む方式は、本検証の合格条件とはしない。
+
+合格条件
+
+- Root Window 相当の親ウィンドウを取得できること。
+- Child Window 相当の GTK Widget を生成できること。
+- Child Window 相当の GTK Widget 配下へ WebKit WebView を配置できること。
+- WebView で URL を表示できること。
+- WebView 初期表示時に意図しない左上表示やフラッシュが発生しないこと。
+
 #### WV-03-05 Child Window追従
 
 確認項目
