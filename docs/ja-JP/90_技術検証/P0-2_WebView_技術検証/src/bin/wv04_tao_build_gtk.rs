@@ -107,7 +107,7 @@ fn main() -> wry::Result<()> {
     event_loop.run(move |event, _, control_flow| {
         use gtk::prelude::*;
 
-        *control_flow = ControlFlow::Wait;
+        *control_flow = ControlFlow::Poll;
 
         while let Ok(command) = rx.try_recv() {
             match command {
