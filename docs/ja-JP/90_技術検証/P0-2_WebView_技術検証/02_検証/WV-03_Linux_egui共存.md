@@ -204,13 +204,24 @@ sudo apt install \
 
 #### WV-03-04 WebView表示
 
-確認結果
+Wayland WebView表示
 
-- 未実施
+結果:
 
-判定
+* build_as_child() は X11 専用のため Wayland では UnsupportedWindowHandle。
+* build_gtk() は Wayland/X11 共通の公式推奨方式。
+* ただし build_gtk() には GTK Container が必要。
+* eframe 0.33.0 から GTK Container を取得する公開APIは確認できない。
+* そのため eframe + Wayland 構成で wry を同一ウィンドウ内へ埋め込む方式は、現時点では成立しない。
 
-- 未判定
+判定:
+
+* 不合格
+
+次候補:
+
+* Linux版は eframe 継続を諦め、tao/wry/GTKベースのウィンドウ構成を検証する
+* または WebView を別プロセス/別ウィンドウ化して、IDE側では Support Panel として抽象化する
 
 #### WV-03-05 Child Window追従
 
