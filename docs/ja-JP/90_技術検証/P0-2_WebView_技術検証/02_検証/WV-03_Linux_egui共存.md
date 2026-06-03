@@ -221,8 +221,6 @@ Wayland WebView表示
 
 次候補:
 
-次候補:
-
 * tao/wry/GTK構成を WV-04 として検証する（以降の検証はスキップ）
 * または WebView を別プロセス/別ウィンドウ化して、IDE側では Support Panel として抽象化する
 * eframe 継続可否は WV-04 の結果を踏まえて判断する
