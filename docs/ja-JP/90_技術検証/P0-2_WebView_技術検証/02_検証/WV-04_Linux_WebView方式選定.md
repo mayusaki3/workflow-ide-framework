@@ -222,11 +222,21 @@ tao + wry(build_gtk)
 
 確認結果
 
-- 未実施
+- tao + gtk::Fixed + wry build_gtk() 構成で WebView 生成に成功
+- Wayland環境で URL表示に成功
+- WebView::set_bounds() の呼び出し自体は成功
+- 起動後に set_bounds() で位置・サイズ変更を行ったが、画面上の WebView は移動・縮小しなかった
+- restore 操作でも画面上の変化は確認できなかった
 
 判定
 
-- 未判定
+- 不合格
+
+備考
+
+- build_gtk() による初期配置は成立する
+- 後続の set_bounds() が Wayland + GTK 経路で実反映されるかは確認できなかった
+- 次候補として gtk::Fixed.move_() / remove + put / WebView再生成方式を検証する
 
 ### WV-04-04 方式評価
 
