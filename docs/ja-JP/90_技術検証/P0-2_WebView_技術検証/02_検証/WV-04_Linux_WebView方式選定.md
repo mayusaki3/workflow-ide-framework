@@ -207,11 +207,16 @@ tao + wry(build_gtk)
 
 確認結果
 
-- 未実施
+- Wayland環境で実行成功
+- WebView生成成功
+- URL表示成功
+- GTK Fixed生成成功
+- build_gtk成功
+- UnsupportedWindowHandle発生なし
 
 判定
 
-- 未判定
+- 合格
 
 ### WV-04-03 Child Surface追従
 
