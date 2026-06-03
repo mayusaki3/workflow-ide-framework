@@ -2,7 +2,7 @@
 
 use std::num::NonZeroIsize;
 
-use eframe::egui;
+use eframe::{egui, CreationContext};
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -19,6 +19,34 @@ static mut ROOT_HWND: Option<HWND> = None;
 static mut CHILD_HWND: Option<HWND> = None;
 static mut WEBVIEW_CREATED: bool = false;
 static mut WEBVIEW: Option<wry::WebView> = None;
+
+/// eframe の作成コンテキストから Windows Root HWND を取得する。
+///
+/// # 役割
+///
+/// - App層から Windows 固有の HWND 取得処理を分離する。
+/// - 取得した Root HWND を Child Window / WebView の親として保持する。
+///
+/// # 注意点
+///
+/// - Windows専用処理である。
+/// - 非Windows環境では platform/mod.rs のスタブが呼ばれる。
+pub fn initialize_root_window(cc: &CreationContext<'_>) {
+    if let Ok(window_handle) = cc.window_handle() {
+        match window_handle.as_raw() {
+            RawWindowHandle::Win32(handle) => {
+                let hwnd = HWND(
+                    handle.hwnd.get() as *mut core::ffi::c_void,
+                );
+
+                set_root_hwnd(hwnd);
+            }
+            _ => {
+                println!("WV-02 non Win32 window handle");
+            }
+        }
+    }
+}
 
 struct ChildWindowHandle {
     hwnd: HWND,

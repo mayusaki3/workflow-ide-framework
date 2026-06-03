@@ -14,12 +14,17 @@ mod windows_webview;
 #[cfg(target_os = "windows")]
 pub use windows_webview::{
     ensure_webview_initialized,
+    initialize_root_window,
     set_root_hwnd,
     sync_child_window,
 };
 
 #[cfg(not(target_os = "windows"))]
 use eframe::egui;
+
+/// 非Windows環境では Root Window 初期化は行わない。
+#[cfg(not(target_os = "windows"))]
+pub fn initialize_root_window(_cc: &eframe::CreationContext<'_>) {}
 
 /// 非Windows環境では WebView表示フラグ更新は行わない。
 #[cfg(not(target_os = "windows"))]

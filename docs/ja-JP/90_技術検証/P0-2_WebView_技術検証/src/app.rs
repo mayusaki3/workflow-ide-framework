@@ -16,7 +16,6 @@ use crate::layout_storage;
 use crate::panel_tab::{PanelTab, ValidationTabViewer};
 use crate::platform;
 
-use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 /// egui_dock 0.18.0 の既定タブバー高さ。
 ///
@@ -48,20 +47,7 @@ impl DockingValidationApp {
     ///
     /// 初期化済みの `DockingValidationApp`。
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        if let Ok(window_handle) = cc.window_handle() {
-            match window_handle.as_raw() {
-                RawWindowHandle::Win32(handle) => {
-                    let hwnd = windows::Win32::Foundation::HWND(
-                        handle.hwnd.get() as *mut core::ffi::c_void,
-                    );
-
-                    platform::set_root_hwnd(hwnd);
-                }
-                _ => {
-                    println!("WV-02 non Win32 window handle");
-                }
-            }
-        }
+        platform::initialize_root_window(cc);
 
         println!("PoC-1d start");
         println!("egui viewport id = {:?}", egui::ViewportId::ROOT);
