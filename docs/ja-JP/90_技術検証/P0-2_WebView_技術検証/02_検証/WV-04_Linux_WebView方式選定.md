@@ -135,7 +135,7 @@ tao + wry(build_gtk)
 - 非公開API依存となる
 - OS依存コードを Framework 上位層へ露出させる必要がある
 
-### WV-04-02 build_gtk生成
+### WV-04-02 tao + wry(build_gtk)
 
 確認項目
 
@@ -183,13 +183,27 @@ tao + wry(build_gtk)
 
 確認結果
 
-- 未実施
+- eframe 0.33.0 は winit 0.30.13 ベースで動作する
+- eframe ソース内に GTK Widget 取得機構は確認できなかった
+- winit ソース内に GTK Widget 取得機構は確認できなかった
+- wry build_gtk() は GTK Widget を必要とする
+- eframe → GTK Container の到達経路は確認できなかった
+
+結果
+- build_gtk() は gtk::Container を要求する
+- eframe から gtk::Container を取得する経路を確認できなかった
+- winit から gtk::Container を取得する経路を確認できなかった
 
 判定
 
-- 未判定
+- 不合格
 
-### WV-04-02 build_gtk生成
+備考
+
+- 候補A（eframe + wry(build_gtk)）は棄却する
+- 以降は候補B（tao + wry(build_gtk)）を検証対象とする
+
+### WV-04-02 tao + wry(build_gtk)
 
 確認結果
 
