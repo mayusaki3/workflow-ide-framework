@@ -129,11 +129,34 @@ OS
 
 確認結果
 
-- 未実施
+* Windows依存コード（windows crate参照）の platform 層移動後、Linux ビルドへ進行可能であることを確認。
+* Ubuntu 26.04 LTS 環境において、初回ビルド時に以下の pkg-config 解決エラーを確認。
+
+  * glib-2.0
+  * gobject-2.0
+  * gio-2.0
+  * gdk-3.0
+* 原因は Linux 開発パッケージ未導入であり、アプリケーションコードの問題ではなかった。
+* 以下パッケージ導入後、依存解決エラーは解消した。
+
+```bash
+sudo apt install \
+  build-essential \
+  pkg-config \
+  libglib2.0-dev \
+  libgio-2.0-dev \
+  libgtk-3-dev \
+  libwebkit2gtk-4.1-dev
+```
 
 判定
 
-- 未判定
+* 合格
+
+備考
+
+* Linux 版 wry は WebKitGTK / GTK3 / GLib 開発パッケージへの依存がある。
+* Ubuntu の標準インストール状態では不足する場合があるため、検証開始前に導入確認を推奨する。
 
 #### WV-03-02 Linux起動
 
@@ -187,7 +210,13 @@ OS
 
 ### 評価
 
-未実施
+WV-03-01 Linuxビルドは合格。
+
+Windows依存コードの platform 層移動後、
+Linuxビルド環境での依存解決まで確認した。
+
+ただし、WV-03-02以降は未実施であり、
+WV-03全体の判定は保留とする。
 
 ### 後続検証
 
@@ -201,7 +230,10 @@ OS
 
 ### 根拠
 
-未実施
+WV-03-01 Linuxビルドは合格。
+
+WV-03-02 Linux起動以降の検証が未実施のため、
+WV-03全体としては未判定。
 
 ## 次工程
 
@@ -229,10 +261,12 @@ Ubuntu系
 
 ```bash
 sudo apt install \
-  libwebkit2gtk-4.1-dev \
-  libgtk-3-dev \
   build-essential \
-  pkg-config
+  pkg-config \
+  libglib2.0-dev \
+  libgio-2.0-dev \
+  libgtk-3-dev \
+  libwebkit2gtk-4.1-dev
 ```
 
 本検証では WebView の成立性だけでなく、Workflow IDE Framework の Support Panel 実装方式として Linux 上で継続採用可能かを評価対象とする。
