@@ -208,11 +208,12 @@ Wayland WebView表示
 
 結果:
 
-* build_as_child() は X11 専用のため Wayland では UnsupportedWindowHandle。
-* build_gtk() は Wayland/X11 共通の公式推奨方式。
-* ただし build_gtk() には GTK Container が必要。
-* eframe 0.33.0 から GTK Container を取得する公開APIは確認できない。
-* そのため eframe + Wayland 構成で wry を同一ウィンドウ内へ埋め込む方式は、現時点では成立しない。
+* build_as_child() による WebView生成を試行
+* Wayland環境で UnsupportedWindowHandle を確認
+* wry 0.53.5 ソース調査を実施
+* build_as_child() は X11専用であることを確認
+* build_gtk() が Wayland/X11 共通方式であることを確認
+* eframe から GTK Container を取得する方法は確認できなかった
 
 判定:
 
@@ -220,7 +221,7 @@ Wayland WebView表示
 
 次候補:
 
-* Linux版は eframe 継続を諦め、tao/wry/GTKベースのウィンドウ構成を検証する
+* Linux版は eframe 継続を諦め、tao/wry/GTKベースのウィンドウ構成を WV-04 として検証する（以降の検証はスキップ）
 * または WebView を別プロセス/別ウィンドウ化して、IDE側では Support Panel として抽象化する
 
 #### WV-03-05 Child Window追従
@@ -252,44 +253,30 @@ Linuxビルド環境での依存解決まで確認した。
 
 WV-03-02 Linux起動は合格。
 WV-03-03 Dock共存は合格。
+WV-03-04 WebView表示は不合格。
 
-ただし、WV-03-04以降は未実施であり、
-WV-03全体の判定は保留とする。
+WV-03全体の判定は不合格とする。
 
 ### 後続検証
 
-- WV-04 macOS egui共存
+- WV-04 Linux WebView方式選定
 
 ## WV評価
 
 ### 判定
 
-未判定
+不合格
 
 ### 根拠
 
 WV-03-01 Linuxビルドは合格。
 WV-03-02 Linux起動は合格。
 WV-03-03 Dock共存は合格。
-
-WV-03-04 以降の検証が未実施のため、
-WV-03全体としては未判定。
+WV-03-04 WebView表示は不合格。
 
 ## 次工程
 
-### WV-04 macOS egui共存
-
-確認事項
-
-- cargo build
-- アプリ起動
-- Dock矩形取得
-- Dock移動
-- Dockリサイズ
-- WebView生成
-- URL表示
-- Child Window追従
-- Floating禁止方式
+### WV-04 Linux WebView方式選定
 
 ## 備考
 
