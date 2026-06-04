@@ -1,17 +1,16 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! 役割:
-//! - Windows版 `windows_webview.rs` と同じ公開I/Fで Linux 側の実装可否を検証する。
-//! - Linux(Wayland/X11)では `build_as_child()` を使用せず、`build_gtk()` を使用する。
-//! - GTK Window / root_fixed / child_fixed / WebView の構成で、Child Window相当の
-//!   表示・非表示・移動・リサイズを検証する。
+//! WV-04-06
 //!
-//! 注意:
-//! - P0-2 WebView 技術検証用のPoCコード。
-//! - 現行 eframe Root Window から GTK Container を取得する経路は確認できていない。
-//! - そのため本ファイルでは、Linux側の同一I/F実装可能性を確認するため、
-//!   GTK側に検証用Windowを生成して `build_gtk()` を検証する。
-//! - 本番仕様化時には、本検証結果をもとに Platform 仕様・設計・テストへ戻す。
+//! 前回(WV-04-05)
+//! - build_gtk() 成功
+//! - move_() 成功
+//! - set_size_request() 成功
+//!
+//! 今回(WV-04-06)
+//! - 前回同期状態を保持
+//! - 状態変化時のみ GTK 更新
+//! - eframe / GTK のイベントループ競合を抑制
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -26,17 +25,17 @@ static mut CHILD_FIXED: Option<gtk::Fixed> = None;
 static mut WEBVIEW_CREATED: bool = false;
 static mut WEBVIEW: Option<wry::WebView> = None;
 
-/// Linux側の Root Window 相当を初期化する。
-///
-/// # 役割
-///
-/// - Windows版の `initialize_root_window()` と同じ呼び出し口を維持する。
-/// - Linux版では GTK を初期化し、検証用 GTK Window と root_fixed を生成する。
-///
-/// # 注意点
-///
-/// - eframe の CreationContext は、現時点では GTK Container 取得に使用しない。
-/// - GTK初期化済みでない場合、`build_gtk()` が panic するため、ここで `gtk::init()` を行う。
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct SurfaceState {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    visible: bool,
+}
+
+static mut LAST_SURFACE_STATE: Option<SurfaceState> = None;
+
 pub fn initialize_root_window(_cc: &CreationContext<'_>) {
     unsafe {
         if GTK_WINDOW.is_some() {
@@ -65,18 +64,6 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
     }
 }
 
-/// WebView が未生成であれば生成する。
-///
-/// # 引数
-///
-/// * `initial_rect` - WebView Panel の初期矩形。
-/// * `scale` - egui の pixels_per_point。
-///
-/// # 役割
-///
-/// - Windows版の `ensure_webview_initialized()` と同じ呼び出し口を維持する。
-/// - Linux版では root_fixed 配下に child_fixed を作成し、その配下へ `build_gtk()` で
-///   WebView を生成する。
 pub fn ensure_webview_initialized(
     initial_rect: Option<egui::Rect>,
     scale: f32,
@@ -129,23 +116,9 @@ pub fn ensure_webview_initialized(
     }
 }
 
-/// Child Surface 相当の表示位置・サイズ・表示状態を同期する。
-///
-/// WV-04-05
-///
-/// GTK Fixed の move_() と set_size_request() が
-/// 実際に WebView へ反映されるかを確認するため、
-/// egui座標を無視して強制的に
-///
-/// x=0
-/// y=0
-/// w=200
-/// h=100
-///
-/// へ移動する。
 pub fn sync_child_window(
     _ctx: &egui::Context,
-    _webview_rect: Option<egui::Rect>,
+    webview_rect: Option<egui::Rect>,
     should_show_native_surface: bool,
 ) {
     unsafe {
@@ -157,26 +130,52 @@ pub fn sync_child_window(
             return;
         };
 
-        if !should_show_native_surface {
+        let (x, y, width, height) = webview_rect
+            .map(|r| rect_to_i32_bounds(r, 1.0))
+            .unwrap_or((0, 0, 800, 600));
+
+        let new_state = SurfaceState {
+            x,
+            y,
+            width,
+            height,
+            visible: should_show_native_surface,
+        };
+
+        if LAST_SURFACE_STATE == Some(new_state) {
+            return;
+        }
+
+        LAST_SURFACE_STATE = Some(new_state);
+
+        if !new_state.visible {
             child_fixed.hide();
+
+            println!("WV-04-06 hide child surface");
+
             flush_gtk_events();
             return;
         }
 
         child_fixed.show();
 
-        //
-        // WV-04-05 強制移動テスト
-        //
-        root_fixed.move_(child_fixed, 0, 0);
+        root_fixed.move_(
+            child_fixed,
+            new_state.x,
+            new_state.y,
+        );
 
-        //
-        // WV-04-05 強制サイズ変更
-        //
-        child_fixed.set_size_request(200, 100);
+        child_fixed.set_size_request(
+            new_state.width,
+            new_state.height,
+        );
 
         println!(
-            "WV-04-05 TEST move child surface x=0 y=0 w=200 h=100"
+            "WV-04-06 sync child surface x={} y={} w={} h={}",
+            new_state.x,
+            new_state.y,
+            new_state.width,
+            new_state.height
         );
 
         root_fixed.show_all();
@@ -185,13 +184,10 @@ pub fn sync_child_window(
     }
 }
 
-/// egui の Rect を GTK 用の整数座標へ変換する。
-///
-/// # 注意点
-///
-/// - Wayland環境で異常に大きいサイズが GTK/GDK クラッシュを誘発したため、
-///   技術検証用に最小・最大値を制限する。
-fn rect_to_i32_bounds(rect: egui::Rect, scale: f32) -> (i32, i32, i32, i32) {
+fn rect_to_i32_bounds(
+    rect: egui::Rect,
+    scale: f32,
+) -> (i32, i32, i32, i32) {
     let x = (rect.min.x * scale) as i32;
     let y = (rect.min.y * scale) as i32;
     let width = (rect.width() * scale) as i32;
@@ -205,12 +201,6 @@ fn rect_to_i32_bounds(rect: egui::Rect, scale: f32) -> (i32, i32, i32, i32) {
     )
 }
 
-/// GTKイベントを処理する。
-///
-/// # 役割
-///
-/// - eframe/winit 側のイベントループ内で GTK 側の表示更新を進める。
-/// - 技術検証用の簡易処理。
 fn flush_gtk_events() {
     while gtk::events_pending() {
         gtk::main_iteration_do(false);
