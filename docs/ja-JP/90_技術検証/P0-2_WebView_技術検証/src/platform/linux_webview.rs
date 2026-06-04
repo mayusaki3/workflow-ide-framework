@@ -1,17 +1,18 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-07-05
+//! WV-07-06
 //!
 //! 役割:
-//! - WV-07-05で確認した GTK Dummy Widget 構成を維持する。
-//! - 初期配置時のみ GTK Host Window の move_(), resize() を実行する。
-//! - 実行中の Host Window move_(), resize() を停止し、応答なしの主因が同期処理か GTK Window 自体かを切り分ける。
+//! - GTK Host Window のみを生成し、Child Widget を生成しない。
+//! - GTK Toplevel Window 単体で応答なしが発生するか確認する。
+//! - 応答なしの主因が GTK Window 自体か、Child Widget / gtk::Fixed 側かを切り分ける。
 //!
 //! 注意:
 //! - 技術検証用コード。
 //! - GDK_BACKEND=x11 での実行を前提とする。
-//! - WV-07-05では WebViewBuilder::build_gtk() を呼び出さない。
-//! - WV-07-05では sync_child_window() 内の GTK Host Window move_(), resize() を実行しない。
+//! - WV-07-06では WebViewBuilder::build_gtk() を呼び出さない。
+//! - WV-07-06では Dummy GTK Widget も生成しない。
+//! - WV-07-06では sync_child_window() 内の GTK Host Window move_(), resize() を実行しない。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -29,7 +30,7 @@ const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
 
 /// GTKイベント flush の最小間隔。
 ///
-/// WV-07-05:
+/// WV-07-06:
 /// - GTKイベントポンプ頻度を最大2回/秒に制限する。
 const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
 
@@ -55,7 +56,7 @@ struct SurfaceState {
 /// - Host Window 自体を Dock Panel に重ねるため、装飾とタスクバー表示を抑制する。
 ///
 /// 注意:
-/// - WV-07-05では GDK_BACKEND=x11 での実行を前提とする。
+/// - WV-07-06では GDK_BACKEND=x11 での実行を前提とする。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -69,12 +70,12 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         }
 
         if let Err(error) = gtk::init() {
-            println!("WV-07-05 Linux gtk::init failed = {:?}", error);
+            println!("WV-07-06 Linux gtk::init failed = {:?}", error);
             return;
         }
 
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
-        window.set_title("WV-07-05 Linux GTK WebView Host");
+        window.set_title("WV-07-06 Linux GTK WebView Host");
         window.set_default_size(800, 600);
         window.set_decorated(false);
         window.set_skip_taskbar_hint(true);
@@ -89,7 +90,7 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         GTK_WINDOW = Some(window);
         ROOT_FIXED = Some(root_fixed);
 
-        println!("WV-07-05 Linux GTK host window initialized");
+        println!("WV-07-06 Linux GTK host window initialized");
     }
 }
 
@@ -119,7 +120,7 @@ pub fn ensure_webview_initialized(
         }
 
         let Some(root_fixed) = ROOT_FIXED.as_ref() else {
-            println!("WV-07-05 Linux ROOT_FIXED not initialized");
+            println!("WV-07-06 Linux ROOT_FIXED not initialized");
             return;
         };
 
@@ -127,11 +128,7 @@ pub fn ensure_webview_initialized(
             .map(|rect| rect_to_i32_bounds(rect, scale))
             .unwrap_or((0, 0, 800, 600));
 
-        let child_fixed = gtk::Fixed::new();
-        child_fixed.set_size_request(width, height);
-
-        root_fixed.put(&child_fixed, 0, 0);
-        child_fixed.show_all();
+        root_fixed.set_size_request(width, height);
         root_fixed.show_all();
 
         if let Some(window) = GTK_WINDOW.as_ref() {
@@ -139,24 +136,17 @@ pub fn ensure_webview_initialized(
             window.resize(width, height);
         }
 
+        WEBVIEW_CREATED = true;
+
         println!(
-            "WV-07-05 Linux initial host window sync x={} y={} w={} h={}",
+            "WV-07-06 Linux host window only initialized x={} y={} w={} h={}",
             x,
             y,
             width,
             height
         );
 
-        let dummy_label = gtk::Label::new(Some("WV-07-05 Dummy GTK Widget"));
-        child_fixed.put(&dummy_label, 0, 0);
-        dummy_label.show();
-
-        CHILD_FIXED = Some(child_fixed);
-        WEBVIEW_CREATED = true;
-
-        println!("WV-07-05 Linux Dummy GTK Widget create success");
-
-        flush_gtk_events_bounded("after Dummy GTK Widget initialize");
+        flush_gtk_events_bounded("after Host Window only initialize");
     }
 }
 
@@ -186,7 +176,7 @@ pub fn sync_child_window(
         };
 
         let Some(child_fixed) = CHILD_FIXED.as_ref() else {
-            flush_gtk_events_throttled("sync_child_window no child");
+            flush_gtk_events_throttled("sync_child_window host window only");
             return;
         };
 
@@ -219,7 +209,7 @@ pub fn sync_child_window(
 
         if let Some(_window) = GTK_WINDOW.as_ref() {
             println!(
-                "WV-07-05 Linux runtime host window move/resize skipped x={} y={} w={} h={}",
+                "WV-07-06 Linux runtime host window move/resize skipped x={} y={} w={} h={}",
                 new_state.x,
                 new_state.y,
                 new_state.width,
@@ -244,7 +234,7 @@ pub fn sync_child_window(
         );
 
         println!(
-            "WV-07-05 Linux sync host window x={} y={} w={} h={}",
+            "WV-07-06 Linux sync host window x={} y={} w={} h={}",
             new_state.x,
             new_state.y,
             new_state.width,
@@ -309,7 +299,7 @@ fn flush_gtk_events_bounded(label: &str) {
 
     if count > 0 || remaining {
         println!(
-            "WV-07-05 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
+            "WV-07-06 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
             label,
             count,
             remaining
