@@ -1,6 +1,6 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-05-01 ～ WV-05-04
+//! WV-05-05
 //!
 //! 役割:
 //! - WV-04で選定した build_gtk() + gtk::Fixed 方式を維持する。
@@ -9,9 +9,10 @@
 //!
 //! 注意:
 //! - 技術検証用コード。
-//! - WV-05では配置方式を変更しない。
-//! - build_gtk(), move_(), set_size_request() の検証済み経路を維持する。
-//! - flush_gtk_events() は WebView生成直後のみ実行する。
+//! - WV-05-01版では idle_add_local() と flush_gtk_events() の組み合わせにより、
+//!   flush_gtk_events() が戻らなくなる問題を確認した。
+//! - WV-05-05では idle_add_local() を使用せず、timeout_add_local() を使用する。
+//! - flush_gtk_events() は上限回数付きで実行する。
 
 use eframe::{egui, CreationContext};
 use gtk::glib::{self, ControlFlow};
@@ -27,18 +28,20 @@ static mut ROOT_FIXED: Option<gtk::Fixed> = None;
 static mut CHILD_FIXED: Option<gtk::Fixed> = None;
 static mut WEBVIEW_CREATED: bool = false;
 static mut WEBVIEW: Option<wry::WebView> = None;
-static mut GTK_IDLE_LOG_INSTALLED: bool = false;
+static mut GTK_TIMER_LOG_INSTALLED: bool = false;
 static mut LAST_SURFACE_STATE: Option<SurfaceState> = None;
 static mut LAST_EFRAME_ALIVE_LOG_AT: Option<Instant> = None;
-static mut LAST_GTK_FLUSH_LOG_AT: Option<Instant> = None;
+
+/// GTKイベント flush の最大処理回数。
+///
+/// 役割:
+/// - GTKイベント処理が無限ループ化することを防ぐ。
+const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
 
 /// Native Surface の同期状態。
 ///
 /// 役割:
 /// - 前回同期状態と比較し、不要な GTK Widget 操作を抑制する。
-///
-/// 注意:
-/// - WV-05では状態差分同期の挙動を維持する。
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct SurfaceState {
     x: i32,
@@ -55,11 +58,8 @@ struct SurfaceState {
 /// - WebViewを配置するための GTK Window と gtk::Fixed を生成する。
 /// - WV-05用に MainContext 所有状態をログ出力する。
 ///
-/// 注意:
-/// - eframe側の Window には埋め込まず、WV-04で選定した独立 GTK Host Window 方式を維持する。
-///
 /// 引数:
-/// - _cc: eframe生成コンテキスト。Linux WV-05では直接使用しない。
+/// - _cc: eframe生成コンテキスト。
 ///
 /// 戻り値:
 /// - なし。
@@ -79,7 +79,7 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
 
         log_main_context_state("after gtk::init");
 
-        install_gtk_idle_logger();
+        install_gtk_timer_logger();
 
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
         window.set_title("WV-05 Linux GTK WebView Host");
@@ -105,10 +105,6 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
 /// - gtk::Fixed 上に Child Surface 用 gtk::Fixed を配置する。
 /// - wry build_gtk() で WebView を生成する。
 /// - WebView生成前後の MainContext 所有状態をログ出力する。
-///
-/// 注意:
-/// - WV-05では build_gtk() / with_bounds() / with_url() の流れを変更しない。
-/// - WebView生成済みの場合は再生成しない。
 ///
 /// 引数:
 /// - initial_rect: 初期配置矩形。
@@ -180,7 +176,7 @@ pub fn ensure_webview_initialized(
             }
         }
 
-        flush_gtk_events();
+        flush_gtk_events_bounded("after WebView initialize");
         println!("WV-05 Linux ensure_webview_initialized end");
     }
 }
@@ -190,14 +186,9 @@ pub fn ensure_webview_initialized(
 /// 役割:
 /// - eframe側の update() から呼ばれることで eframe alive を確認する。
 /// - WebView用 Child Surface の表示、移動、サイズ変更を行う。
-/// - 状態変化がない場合は GTK Widget 操作を行わない。
-///
-/// 注意:
-/// - WV-05では eframe alive ログを追加する。
-/// - 毎フレーム GTKイベントを flush しない方針を維持する。
 ///
 /// 引数:
-/// - _ctx: egui コンテキスト。WV-05では直接使用しない。
+/// - _ctx: egui コンテキスト。
 /// - webview_rect: WebView配置矩形。
 /// - should_show_native_surface: Native Surface を表示する場合 true。
 ///
@@ -239,9 +230,7 @@ pub fn sync_child_window(
 
         if !new_state.visible {
             child_fixed.hide();
-
             println!("WV-05 Linux hide child surface");
-
             return;
         }
 
@@ -272,10 +261,6 @@ pub fn sync_child_window(
 
 /// egui矩形を GTK / wry 用 i32 境界値へ変換する。
 ///
-/// 役割:
-/// - egui座標をスケール適用後の整数座標へ変換する。
-/// - 極端な値を制限し、GTK側へ不正に大きい値を渡さない。
-///
 /// 引数:
 /// - rect: egui矩形。
 /// - scale: スケール値。
@@ -299,42 +284,36 @@ fn rect_to_i32_bounds(
     )
 }
 
-/// GTKイベントを現在処理可能な範囲だけ処理する。
+/// GTKイベントを上限付きで処理する。
 ///
 /// 役割:
 /// - WebView生成直後に保留中の GTKイベントを処理する。
-/// - WV-05では毎フレーム呼び出しは行わない。
+/// - idle source 等により無限ループ化することを防ぐ。
 ///
-/// 注意:
-/// - 応答停止の主因ではないことを WV-04 で確認済み。
+/// 引数:
+/// - label: ログ識別名。
 ///
 /// 戻り値:
 /// - なし。
-fn flush_gtk_events() {
+fn flush_gtk_events_bounded(label: &str) {
     let mut count = 0;
 
-    while gtk::events_pending() {
+    while gtk::events_pending() && count < GTK_FLUSH_MAX_ITERATIONS {
         gtk::main_iteration_do(false);
         count += 1;
     }
 
-    unsafe {
-        let now = Instant::now();
-        let should_log = LAST_GTK_FLUSH_LOG_AT
-            .map(|last| now.duration_since(last) >= Duration::from_secs(1))
-            .unwrap_or(true);
+    let remaining = gtk::events_pending();
 
-        if should_log {
-            LAST_GTK_FLUSH_LOG_AT = Some(now);
-            println!("WV-05 Linux flush_gtk_events processed={}", count);
-        }
-    }
+    println!(
+        "WV-05 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
+        label,
+        count,
+        remaining
+    );
 }
 
 /// GTK MainContext の所有状態をログ出力する。
-///
-/// 役割:
-/// - WebView生成前後で MainContext を現在スレッドが所有しているか確認する。
 ///
 /// 引数:
 /// - label: ログ識別名。
@@ -352,50 +331,35 @@ fn log_main_context_state(label: &str) {
     );
 }
 
-/// GTK idle ロガーを登録する。
+/// GTK timer ロガーを登録する。
 ///
 /// 役割:
 /// - GTK MainContext が継続して処理されているか確認する。
-///
-/// 注意:
-/// - 1回だけ登録する。
-/// - ログは1秒間隔程度に抑制する。
+/// - idle_add_local() は flush_gtk_events() と組み合わせると常時 pending になり得るため使用しない。
 ///
 /// 戻り値:
 /// - なし。
-fn install_gtk_idle_logger() {
+fn install_gtk_timer_logger() {
     unsafe {
-        if GTK_IDLE_LOG_INSTALLED {
+        if GTK_TIMER_LOG_INSTALLED {
             return;
         }
 
-        GTK_IDLE_LOG_INSTALLED = true;
+        GTK_TIMER_LOG_INSTALLED = true;
     }
 
-    let mut last_log_at = Instant::now();
-
-    glib::idle_add_local(move || {
-        let now = Instant::now();
-
-        if now.duration_since(last_log_at) >= Duration::from_secs(1) {
-            last_log_at = now;
-            println!("WV-05 Linux GTK alive");
-        }
-
+    glib::timeout_add_local(Duration::from_secs(1), || {
+        println!("WV-05 Linux GTK timer alive");
         ControlFlow::Continue
     });
 
-    println!("WV-05 Linux GTK idle logger installed");
+    println!("WV-05 Linux GTK timer logger installed");
 }
 
 /// eframe 側 update 継続状態をログ出力する。
 ///
 /// 役割:
 /// - sync_child_window() が継続して呼ばれているか確認する。
-/// - eframeイベントループ停止の有無を切り分ける。
-///
-/// 注意:
-/// - ログは1秒間隔程度に抑制する。
 ///
 /// 戻り値:
 /// - なし。
