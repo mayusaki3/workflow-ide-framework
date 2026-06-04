@@ -1,20 +1,21 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-06-01
+//! WV-06-02
 //!
 //! 役割:
 //! - WV-04で選定した build_gtk() + gtk::Fixed 方式を維持する。
-//! - WV-05で使用したイベントループ計測コードを除去する。
-//! - GTKイベントポンプを停止し、WebKitGTKの動作継続可否を確認する。
+//! - GTKイベントポンプを維持したまま、GTK Host Window の show_all() を停止する。
+//! - GTK Host Window の表示が build_gtk() / WebView 表示に必須か確認する。
 //!
 //! 注意:
 //! - 技術検証用コード。
 //! - build_gtk(), move_(), set_size_request() の検証済み経路を維持する。
-//! - build_gtk(), move_(), set_size_request() の検証済み経路を維持する。
-//! - WV-06-01では sync_child_window() からの GTKイベント処理を停止する。
+//! - GTKイベント処理は上限付き、かつスロットリング付きで実行する。
+//! - WV-06-02では window.show_all() を実行しない。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
+use std::time::{Duration, Instant};
 use wry::{
     dpi::{LogicalPosition, LogicalSize},
     Rect, WebViewBuilder, WebViewBuilderExtUnix,
@@ -26,9 +27,13 @@ static mut CHILD_FIXED: Option<gtk::Fixed> = None;
 static mut WEBVIEW_CREATED: bool = false;
 static mut WEBVIEW: Option<wry::WebView> = None;
 static mut LAST_SURFACE_STATE: Option<SurfaceState> = None;
+static mut LAST_GTK_FLUSH_AT: Option<Instant> = None;
 
 /// GTKイベント flush の最大処理回数。
 const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
+
+/// GTKイベント flush の最小間隔。
+const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Native Surface の同期状態。
 ///
@@ -48,10 +53,11 @@ struct SurfaceState {
 /// 役割:
 /// - GTKを初期化する。
 /// - WebViewを配置するための GTK Window と gtk::Fixed を生成する。
-/// - WV-06検証の基準構成として、WV-05で成立確認済みの表示構成を維持する。
+/// - GTK Host Window の表示を行わず、WebView生成と表示が成立するか確認する。
 ///
 /// 注意:
-/// - WV-06-00では計測コードのみ除去し、Host Window構成は変更しない。
+/// - WV-06-02では window.show_all() を実行しない。
+/// - GTKイベントポンプは維持する。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -70,19 +76,20 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         }
 
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
-        window.set_title("WV-06 Linux GTK WebView Host");
+        window.set_title("WV-06-02 Linux GTK WebView Host");
         window.set_default_size(800, 600);
 
         let root_fixed = gtk::Fixed::new();
         root_fixed.set_size_request(800, 600);
 
         window.add(&root_fixed);
-        window.show_all();
+
+        println!("WV-06-02 Linux skip window.show_all()");
 
         GTK_WINDOW = Some(window);
         ROOT_FIXED = Some(root_fixed);
 
-        println!("WV-06 Linux GTK root window initialized");
+        println!("WV-06-02 Linux GTK root window initialized without show_all");
     }
 }
 
@@ -288,20 +295,31 @@ fn flush_gtk_events_bounded(label: &str) {
     }
 }
 
-/// GTKイベントの低頻度処理を停止する。
+/// GTKイベントを低頻度で処理する。
 ///
 /// 役割:
-/// - WV-06-01では、eframe 側から GTK / WebKitGTK のイベントを供給しない。
-/// - WebView表示や GTK Host Window の挙動がどう変化するか確認する。
+/// - eframe / winit を停止させずに GTK / WebKitGTK のイベントを継続処理する。
+/// - GTK Host Window の応答停止を防げるか確認する。
 ///
 /// 引数:
-/// - _label: ログ識別名。WV-06-01では使用しない。
+/// - label: ログ識別名。
 ///
 /// 戻り値:
 /// - なし。
-fn flush_gtk_events_throttled(_label: &str) {
-    // WV-06-01:
-    // GTKイベントポンプ停止検証。
-    // WebView生成直後の flush_gtk_events_bounded() は維持し、
-    // sync_child_window() 経由の継続的な GTKイベント処理のみ停止する。
+fn flush_gtk_events_throttled(label: &str) {
+    unsafe {
+        let now = Instant::now();
+
+        let should_flush = LAST_GTK_FLUSH_AT
+            .map(|last| now.duration_since(last) >= GTK_FLUSH_INTERVAL)
+            .unwrap_or(true);
+
+        if !should_flush {
+            return;
+        }
+
+        LAST_GTK_FLUSH_AT = Some(now);
+    }
+
+    flush_gtk_events_bounded(label);
 }
