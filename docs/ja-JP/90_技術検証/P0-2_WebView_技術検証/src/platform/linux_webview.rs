@@ -131,20 +131,21 @@ pub fn ensure_webview_initialized(
 
 /// Child Surface 相当の表示位置・サイズ・表示状態を同期する。
 ///
-/// # 引数
+/// WV-04-05
 ///
-/// * `ctx` - egui Context。
-/// * `webview_rect` - WebView Panel の現在矩形。
-/// * `should_show_native_surface` - Native Surface を表示すべきか。
+/// GTK Fixed の move_() と set_size_request() が
+/// 実際に WebView へ反映されるかを確認するため、
+/// egui座標を無視して強制的に
 ///
-/// # 役割
+/// x=0
+/// y=0
+/// w=200
+/// h=100
 ///
-/// - Windows版の `sync_child_window()` と同じ呼び出し口を維持する。
-/// - Linux版では `root_fixed.move_()` と `child_fixed.set_size_request()` により、
-///   Child Window相当領域を移動・リサイズする。
+/// へ移動する。
 pub fn sync_child_window(
-    ctx: &egui::Context,
-    webview_rect: Option<egui::Rect>,
+    _ctx: &egui::Context,
+    _webview_rect: Option<egui::Rect>,
     should_show_native_surface: bool,
 ) {
     unsafe {
@@ -164,20 +165,22 @@ pub fn sync_child_window(
 
         child_fixed.show();
 
-        if let Some(rect) = webview_rect {
-            let (x, y, width, height) =
-                rect_to_i32_bounds(rect, ctx.pixels_per_point());
+        //
+        // WV-04-05 強制移動テスト
+        //
+        root_fixed.move_(child_fixed, 0, 0);
 
-            root_fixed.move_(child_fixed, x, y);
-            child_fixed.set_size_request(width, height);
+        //
+        // WV-04-05 強制サイズ変更
+        //
+        child_fixed.set_size_request(200, 100);
 
-            println!(
-                "WV-04 Linux sync child surface x={} y={} w={} h={}",
-                x, y, width, height
-            );
-        }
+        println!(
+            "WV-04-05 TEST move child surface x=0 y=0 w=200 h=100"
+        );
 
         root_fixed.show_all();
+
         flush_gtk_events();
     }
 }
