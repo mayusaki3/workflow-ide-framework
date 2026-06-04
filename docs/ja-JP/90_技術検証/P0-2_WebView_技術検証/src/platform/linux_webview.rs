@@ -1,11 +1,11 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-05-06
+//! WV-06-00
 //!
 //! 役割:
 //! - WV-04で選定した build_gtk() + gtk::Fixed 方式を維持する。
-//! - WebKitGTK と eframe のイベントループ共存状態をログで確認する。
-//! - eframe / winit を止めずに GTK / WebKitGTK のイベントを低頻度で処理する。
+//! - WV-05で使用したイベントループ計測コードを除去する。
+//! - WV-06 GTK Host Window最小構成検証の基準コードとする。
 //!
 //! 注意:
 //! - 技術検証用コード。
@@ -13,7 +13,6 @@
 //! - GTKイベント処理は上限付き、かつスロットリング付きで実行する。
 
 use eframe::{egui, CreationContext};
-use gtk::glib::{self, ControlFlow};
 use gtk::prelude::*;
 use std::time::{Duration, Instant};
 use wry::{
@@ -26,9 +25,7 @@ static mut ROOT_FIXED: Option<gtk::Fixed> = None;
 static mut CHILD_FIXED: Option<gtk::Fixed> = None;
 static mut WEBVIEW_CREATED: bool = false;
 static mut WEBVIEW: Option<wry::WebView> = None;
-static mut GTK_TIMER_LOG_INSTALLED: bool = false;
 static mut LAST_SURFACE_STATE: Option<SurfaceState> = None;
-static mut LAST_EFRAME_ALIVE_LOG_AT: Option<Instant> = None;
 static mut LAST_GTK_FLUSH_AT: Option<Instant> = None;
 
 /// GTKイベント flush の最大処理回数。
@@ -55,7 +52,10 @@ struct SurfaceState {
 /// 役割:
 /// - GTKを初期化する。
 /// - WebViewを配置するための GTK Window と gtk::Fixed を生成する。
-/// - MainContext 所有状態をログ出力する。
+/// - WV-06検証の基準構成として、WV-05で成立確認済みの表示構成を維持する。
+///
+/// 注意:
+/// - WV-06-00では計測コードのみ除去し、Host Window構成は変更しない。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -65,23 +65,16 @@ struct SurfaceState {
 pub fn initialize_root_window(_cc: &CreationContext<'_>) {
     unsafe {
         if GTK_WINDOW.is_some() {
-            println!("WV-05 Linux GTK root window already initialized");
             return;
         }
-
-        println!("WV-05 Linux initialize_root_window begin");
 
         if let Err(error) = gtk::init() {
-            println!("WV-05 Linux gtk::init failed = {:?}", error);
+            println!("WV-06 Linux gtk::init failed = {:?}", error);
             return;
         }
 
-        log_main_context_state("after gtk::init");
-
-        install_gtk_timer_logger();
-
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
-        window.set_title("WV-05 Linux GTK WebView Host");
+        window.set_title("WV-06 Linux GTK WebView Host");
         window.set_default_size(800, 600);
 
         let root_fixed = gtk::Fixed::new();
@@ -93,8 +86,7 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         GTK_WINDOW = Some(window);
         ROOT_FIXED = Some(root_fixed);
 
-        println!("WV-05 Linux GTK root window initialized");
-        log_main_context_state("after GTK root window initialized");
+        println!("WV-06 Linux GTK root window initialized");
     }
 }
 
@@ -103,7 +95,10 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
 /// 役割:
 /// - gtk::Fixed 上に Child Surface 用 gtk::Fixed を配置する。
 /// - wry build_gtk() で WebView を生成する。
-/// - WebView生成前後の MainContext 所有状態をログ出力する。
+///
+/// 注意:
+/// - WebView生成済みの場合は再生成しない。
+/// - WV-06-00では build_gtk() の成立経路を変更しない。
 ///
 /// 引数:
 /// - initial_rect: 初期配置矩形。
@@ -120,22 +115,14 @@ pub fn ensure_webview_initialized(
             return;
         }
 
-        println!("WV-05 Linux ensure_webview_initialized begin");
-        log_main_context_state("before WebView initialize");
-
         let Some(root_fixed) = ROOT_FIXED.as_ref() else {
-            println!("WV-05 Linux ROOT_FIXED not initialized");
+            println!("WV-06 Linux ROOT_FIXED not initialized");
             return;
         };
 
         let (x, y, width, height) = initial_rect
             .map(|rect| rect_to_i32_bounds(rect, scale))
             .unwrap_or((0, 0, 800, 600));
-
-        println!(
-            "WV-05 Linux initial child surface bounds x={} y={} w={} h={} scale={}",
-            x, y, width, height, scale
-        );
 
         let child_fixed = gtk::Fixed::new();
         child_fixed.set_size_request(width, height);
@@ -144,21 +131,15 @@ pub fn ensure_webview_initialized(
         child_fixed.show_all();
         root_fixed.show_all();
 
-        log_main_context_state("before build_gtk");
-
         let bounds = Rect {
             position: LogicalPosition::new(0, 0).into(),
             size: LogicalSize::new(width as u32, height as u32).into(),
         };
 
-        println!("WV-05 Linux build_gtk begin");
-
         let result = WebViewBuilder::new()
             .with_bounds(bounds)
             .with_url("https://example.com")
             .build_gtk(&child_fixed);
-
-        println!("WV-05 Linux build_gtk returned");
 
         match result {
             Ok(webview) => {
@@ -166,25 +147,22 @@ pub fn ensure_webview_initialized(
                 WEBVIEW = Some(webview);
                 WEBVIEW_CREATED = true;
 
-                println!("WV-05 Linux WebView create success");
-                log_main_context_state("after WebView create success");
+                println!("WV-06 Linux WebView create success");
             }
             Err(error) => {
-                println!("WV-05 Linux WebView create failed = {:?}", error);
-                log_main_context_state("after WebView create failed");
+                println!("WV-06 Linux WebView create failed = {:?}", error);
             }
         }
 
         flush_gtk_events_bounded("after WebView initialize");
-        println!("WV-05 Linux ensure_webview_initialized end");
     }
 }
 
 /// Linux向け Child Surface 追従処理。
 ///
 /// 役割:
-/// - eframe側の update() から呼ばれることで eframe alive を確認する。
 /// - WebView用 Child Surface の表示、移動、サイズ変更を行う。
+/// - 状態変化がない場合は GTK Widget 操作を抑制する。
 /// - GTK / WebKitGTK 側イベントを低頻度・上限付きで処理する。
 ///
 /// 引数:
@@ -200,8 +178,6 @@ pub fn sync_child_window(
     should_show_native_surface: bool,
 ) {
     unsafe {
-        log_eframe_alive();
-
         let Some(root_fixed) = ROOT_FIXED.as_ref() else {
             flush_gtk_events_throttled("sync_child_window no root");
             return;
@@ -233,7 +209,6 @@ pub fn sync_child_window(
 
         if !new_state.visible {
             child_fixed.hide();
-            println!("WV-05 Linux hide child surface");
             flush_gtk_events_throttled("sync_child_window hidden");
             return;
         }
@@ -251,14 +226,6 @@ pub fn sync_child_window(
             new_state.height,
         );
 
-        println!(
-            "WV-05 Linux sync child surface x={} y={} w={} h={}",
-            new_state.x,
-            new_state.y,
-            new_state.width,
-            new_state.height
-        );
-
         root_fixed.show_all();
 
         flush_gtk_events_throttled("sync_child_window changed");
@@ -266,6 +233,10 @@ pub fn sync_child_window(
 }
 
 /// egui矩形を GTK / wry 用 i32 境界値へ変換する。
+///
+/// 役割:
+/// - egui座標をスケール適用後の整数座標へ変換する。
+/// - 極端な値を制限し、GTK側へ不正に大きい値を渡さない。
 ///
 /// 引数:
 /// - rect: egui矩形。
@@ -311,12 +282,14 @@ fn flush_gtk_events_bounded(label: &str) {
 
     let remaining = gtk::events_pending();
 
-    println!(
-        "WV-05 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
-        label,
-        count,
-        remaining
-    );
+    if count > 0 || remaining {
+        println!(
+            "WV-06 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
+            label,
+            count,
+            remaining
+        );
+    }
 }
 
 /// GTKイベントを低頻度で処理する。
@@ -346,72 +319,4 @@ fn flush_gtk_events_throttled(label: &str) {
     }
 
     flush_gtk_events_bounded(label);
-}
-
-/// GTK MainContext の所有状態をログ出力する。
-///
-/// 引数:
-/// - label: ログ識別名。
-///
-/// 戻り値:
-/// - なし。
-fn log_main_context_state(label: &str) {
-    let context = glib::MainContext::default();
-    let is_owner = context.is_owner();
-
-    println!(
-        "WV-05 Linux MainContext label={} is_owner={}",
-        label,
-        is_owner
-    );
-}
-
-/// GTK timer ロガーを登録する。
-///
-/// 役割:
-/// - GTK MainContext が継続して処理されているか確認する。
-///
-/// 注意:
-/// - idle_add_local() は使用しない。
-/// - timeout_add_local() により、GTK側イベント処理が進む場合だけ timer alive が出る。
-///
-/// 戻り値:
-/// - なし。
-fn install_gtk_timer_logger() {
-    unsafe {
-        if GTK_TIMER_LOG_INSTALLED {
-            return;
-        }
-
-        GTK_TIMER_LOG_INSTALLED = true;
-    }
-
-    glib::timeout_add_local(Duration::from_secs(1), || {
-        println!("WV-05 Linux GTK timer alive");
-        ControlFlow::Continue
-    });
-
-    println!("WV-05 Linux GTK timer logger installed");
-}
-
-/// eframe 側 update 継続状態をログ出力する。
-///
-/// 役割:
-/// - sync_child_window() が継続して呼ばれているか確認する。
-///
-/// 戻り値:
-/// - なし。
-fn log_eframe_alive() {
-    unsafe {
-        let now = Instant::now();
-
-        let should_log = LAST_EFRAME_ALIVE_LOG_AT
-            .map(|last| now.duration_since(last) >= Duration::from_secs(1))
-            .unwrap_or(true);
-
-        if should_log {
-            LAST_EFRAME_ALIVE_LOG_AT = Some(now);
-            println!("WV-05 Linux eframe alive");
-        }
-    }
 }
