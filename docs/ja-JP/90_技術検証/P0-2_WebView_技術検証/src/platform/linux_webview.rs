@@ -1,16 +1,17 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-04-06
+//! WV-04-07
 //!
-//! 前回(WV-04-05)
+//! 前回(WV-04-06)
 //! - build_gtk() 成功
 //! - move_() 成功
 //! - set_size_request() 成功
+//! - 状態変化時のみ同期
+//! - ただし UI 応答停止は継続
 //!
-//! 今回(WV-04-06)
-//! - 前回同期状態を保持
-//! - 状態変化時のみ GTK 更新
-//! - eframe / GTK のイベントループ競合を抑制
+//! 今回(WV-04-07)
+//! - flush_gtk_events() を sync_child_window() から除去
+//! - GTKイベント処理が応答停止原因か切り分ける
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -151,9 +152,8 @@ pub fn sync_child_window(
         if !new_state.visible {
             child_fixed.hide();
 
-            println!("WV-04-06 hide child surface");
+            println!("WV-04-07 hide child surface");
 
-            flush_gtk_events();
             return;
         }
 
@@ -171,7 +171,7 @@ pub fn sync_child_window(
         );
 
         println!(
-            "WV-04-06 sync child surface x={} y={} w={} h={}",
+            "WV-04-07 sync child surface x={} y={} w={} h={}",
             new_state.x,
             new_state.y,
             new_state.width,
@@ -179,8 +179,6 @@ pub fn sync_child_window(
         );
 
         root_fixed.show_all();
-
-        flush_gtk_events();
     }
 }
 

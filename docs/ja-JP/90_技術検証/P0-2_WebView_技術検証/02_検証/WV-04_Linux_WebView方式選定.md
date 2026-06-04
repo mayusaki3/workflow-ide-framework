@@ -203,6 +203,45 @@ tao + wry(build_gtk)
 - 候補A（eframe + wry(build_gtk)）は棄却する
 - 以降は候補B（tao + wry(build_gtk)）を検証対象とする
 
+### WV-04-05 GTK Fixed強制移動検証
+
+確認結果
+
+* gtk::Fixed::move_() による位置変更成功
+* gtk::Fixed::set_size_request() によるサイズ変更成功
+* build_gtk() で生成した WebView が GTK Fixed の移動・リサイズへ追従することを確認
+* WV-04-03 で不成立だった WebView::set_bounds() の代替方式として成立
+
+判定
+
+* 合格
+
+備考
+
+* Wayland環境において build_gtk() + gtk::Fixed 構成は実用可能
+* Child Surface の位置変更は set_bounds() ではなく GTK Widget 制御で行う
+* Linux実装候補として採用継続
+
+### WV-04-06 状態変化同期検証
+
+確認結果
+
+* 毎フレーム同期を廃止
+* Dock矩形変更時のみ同期する方式へ変更
+* move_() / set_size_request() は正常動作
+* ログ大量出力は解消
+* ただしアプリケーション応答停止は継続
+
+判定
+
+* 部分合格
+
+備考
+
+* 応答停止の主因は毎フレーム同期ではない
+* GTKイベント処理またはイベントループ統合方式に原因がある可能性が高い
+* WV-04-07 にて flush_gtk_events() の影響を検証する
+
 ### WV-04-02 tao + wry(build_gtk)
 
 確認結果
@@ -238,7 +277,54 @@ tao + wry(build_gtk)
 - 後続の set_bounds() が Wayland + GTK 経路で実反映されるかは確認できなかった
 - 次候補として gtk::Fixed.move_() / remove + put / WebView再生成方式を検証する
 
+### WV-04-05 GTK Fixed強制移動検証
+
+確認結果
+
+* gtk::Fixed::move_() による位置変更成功
+* gtk::Fixed::set_size_request() によるサイズ変更成功
+* build_gtk() で生成した WebView が GTK Fixed の移動・リサイズへ追従することを確認
+* WV-04-03 で不成立だった WebView::set_bounds() の代替方式として成立
+
+判定
+
+* 合格
+
+備考
+
+* Wayland環境において build_gtk() + gtk::Fixed 構成は実用可能
+* Child Surface の位置変更は set_bounds() ではなく GTK Widget 制御で行う
+* Linux実装候補として採用継続
+
+### WV-04-06 状態変化同期検証
+
+確認結果
+
+* 毎フレーム同期を廃止
+* Dock矩形変更時のみ同期する方式へ変更
+* move_() / set_size_request() は正常動作
+* ログ大量出力は解消
+* ただしアプリケーション応答停止は継続
+
+判定
+
+* 部分合格
+
+備考
+
+* 応答停止の主因は毎フレーム同期ではない
+* GTKイベント処理またはイベントループ統合方式に原因がある可能性が高い
+* WV-04-07 にて flush_gtk_events() の影響を検証する
+
 ### WV-04-04 方式評価
+
+暫定評価
+
+* build_as_child() は Wayland環境で不成立
+* build_gtk() は成立
+* gtk::Fixed による移動・リサイズは成立
+* Windows版と同等の公開I/Fを維持可能
+* Linux版実装候補は build_gtk() + gtk::Fixed 方式を第一候補とする
 
 確認結果
 
