@@ -1,9 +1,9 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-07-02
+//! WV-07-03
 //!
 //! 役割:
-//! - WV-07-02で確認した GTK Host Window 位置・サイズ同期方式を維持する。
+//! - WV-07-03で確認した GTK Host Window 位置・サイズ同期方式を維持する。
 //! - WebKitGTK / wry WebView を生成せず、GTK Dummy Widget のみを配置する。
 //! - 応答なしの主因が WebKitGTK / wry 側か、GTK Host Window同期側かを切り分ける。
 //!
@@ -11,7 +11,7 @@
 //! - 技術検証用コード。
 //! - GDK_BACKEND=x11 での実行を前提とする。
 //! - GTK Host Window の move_(), resize(), gtk::Fixed, set_size_request() の同期経路は維持する。
-//! - WV-07-02では WebViewBuilder::build_gtk() を呼び出さない。
+//! - WV-07-03では WebViewBuilder::build_gtk() を呼び出さない。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -52,7 +52,7 @@ struct SurfaceState {
 /// - Host Window 自体を Dock Panel に重ねるため、装飾とタスクバー表示を抑制する。
 ///
 /// 注意:
-/// - WV-07-02では GDK_BACKEND=x11 での実行を前提とする。
+/// - WV-07-03では GDK_BACKEND=x11 での実行を前提とする。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -66,12 +66,12 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         }
 
         if let Err(error) = gtk::init() {
-            println!("WV-07-02 Linux gtk::init failed = {:?}", error);
+            println!("WV-07-03 Linux gtk::init failed = {:?}", error);
             return;
         }
 
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
-        window.set_title("WV-07-02 Linux GTK WebView Host");
+        window.set_title("WV-07-03 Linux GTK WebView Host");
         window.set_default_size(800, 600);
         window.set_decorated(false);
         window.set_skip_taskbar_hint(true);
@@ -86,7 +86,7 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         GTK_WINDOW = Some(window);
         ROOT_FIXED = Some(root_fixed);
 
-        println!("WV-07-02 Linux GTK host window initialized");
+        println!("WV-07-03 Linux GTK host window initialized");
     }
 }
 
@@ -116,7 +116,7 @@ pub fn ensure_webview_initialized(
         }
 
         let Some(root_fixed) = ROOT_FIXED.as_ref() else {
-            println!("WV-07-02 Linux ROOT_FIXED not initialized");
+            println!("WV-07-03 Linux ROOT_FIXED not initialized");
             return;
         };
 
@@ -137,23 +137,23 @@ pub fn ensure_webview_initialized(
         }
 
         println!(
-            "WV-07-02 Linux initial host window sync x={} y={} w={} h={}",
+            "WV-07-03 Linux initial host window sync x={} y={} w={} h={}",
             x,
             y,
             width,
             height
         );
 
-        let dummy_label = gtk::Label::new(Some("WV-07-02 Dummy GTK Widget"));
+        let dummy_label = gtk::Label::new(Some("WV-07-03 Dummy GTK Widget"));
         child_fixed.put(&dummy_label, 0, 0);
         dummy_label.show();
 
         CHILD_FIXED = Some(child_fixed);
         WEBVIEW_CREATED = true;
 
-        println!("WV-07-02 Linux Dummy GTK Widget create success");
+        println!("WV-07-03 Linux Dummy GTK Widget create success");
 
-        flush_gtk_events_bounded("after Dummy GTK Widget initialize");
+        println!("WV-07-03 Linux GTK event pump skipped after Dummy GTK Widget initialize");
     }
 }
 
@@ -178,12 +178,12 @@ pub fn sync_child_window(
 ) {
     unsafe {
         let Some(root_fixed) = ROOT_FIXED.as_ref() else {
-            flush_gtk_events_throttled("sync_child_window no root");
+            println!("WV-07-03 Linux sync_child_window no root");
             return;
         };
 
         let Some(child_fixed) = CHILD_FIXED.as_ref() else {
-            flush_gtk_events_throttled("sync_child_window no child");
+            println!("WV-07-03 Linux sync_child_window no child");
             return;
         };
 
@@ -200,7 +200,6 @@ pub fn sync_child_window(
         };
 
         if LAST_SURFACE_STATE == Some(new_state) {
-            flush_gtk_events_throttled("sync_child_window unchanged");
             return;
         }
 
@@ -208,7 +207,7 @@ pub fn sync_child_window(
 
         if !new_state.visible {
             child_fixed.hide();
-            flush_gtk_events_throttled("sync_child_window hidden");
+            println!("WV-07-03 Linux sync_child_window hidden");
             return;
         }
 
@@ -236,7 +235,7 @@ pub fn sync_child_window(
         );
 
         println!(
-            "WV-07-02 Linux sync host window x={} y={} w={} h={}",
+            "WV-07-03 Linux sync host window x={} y={} w={} h={}",
             new_state.x,
             new_state.y,
             new_state.width,
@@ -245,7 +244,7 @@ pub fn sync_child_window(
 
         root_fixed.show_all();
 
-        flush_gtk_events_throttled("sync_child_window changed");
+        println!("WV-07-03 Linux GTK event pump skipped after sync_child_window changed");
     }
 }
 
@@ -290,23 +289,10 @@ fn rect_to_i32_bounds(
 /// 戻り値:
 /// - なし。
 fn flush_gtk_events_bounded(label: &str) {
-    let mut count = 0;
-
-    while gtk::events_pending() && count < GTK_FLUSH_MAX_ITERATIONS {
-        gtk::main_iteration_do(false);
-        count += 1;
-    }
-
-    let remaining = gtk::events_pending();
-
-    if count > 0 || remaining {
-        println!(
-            "WV-07-02 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
-            label,
-            count,
-            remaining
-        );
-    }
+    println!(
+        "WV-07-03 Linux flush_gtk_events_bounded skipped label={}",
+        label
+    );
 }
 
 /// GTKイベントを低頻度で処理する。
@@ -321,19 +307,8 @@ fn flush_gtk_events_bounded(label: &str) {
 /// 戻り値:
 /// - なし。
 fn flush_gtk_events_throttled(label: &str) {
-    unsafe {
-        let now = Instant::now();
-
-        let should_flush = LAST_GTK_FLUSH_AT
-            .map(|last| now.duration_since(last) >= GTK_FLUSH_INTERVAL)
-            .unwrap_or(true);
-
-        if !should_flush {
-            return;
-        }
-
-        LAST_GTK_FLUSH_AT = Some(now);
-    }
-
-    flush_gtk_events_bounded(label);
+    println!(
+        "WV-07-03 Linux flush_gtk_events_throttled skipped label={}",
+        label
+    );
 }
