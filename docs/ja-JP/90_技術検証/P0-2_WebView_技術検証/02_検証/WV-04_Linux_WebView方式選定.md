@@ -168,7 +168,33 @@ tao + wry(build_gtk)
 - 非アクティブ時に退避できること
 - Windows版と同等の抽象化が可能であること
 
-### WV-04-04 方式評価
+### WV-04-04 GTK Fixed強制移動検証
+
+確認項目
+
+- gtk::Fixed::move_() による位置変更
+- gtk::Fixed::set_size_request() によるサイズ変更
+- build_gtk() で生成した WebView が GTK Fixed の移動・リサイズへ追従することを確認
+- WV-04-03 で不成立だった WebView::set_bounds() の代替方式として成立
+
+### WV-04-05 状態変化同期検証
+
+確認項目
+
+- 毎フレーム同期を廃止
+- Dock矩形変更時のみ同期する方式へ変更
+- move_() / set_size_request() は正常動作
+- ログ大量出力は解消
+
+### WV-04-06 flush_gtk_events切り分け
+
+確認項目
+
+- sync_child_window() から flush_gtk_events() を除去
+- 応答停止は継続
+- build_gtk() による WebView生成後に停止することを確認
+
+### WV-04-07 方式評価
 
 確認項目
 
@@ -202,45 +228,6 @@ tao + wry(build_gtk)
 
 - 候補A（eframe + wry(build_gtk)）は棄却する
 - 以降は候補B（tao + wry(build_gtk)）を検証対象とする
-
-### WV-04-05 GTK Fixed強制移動検証
-
-確認結果
-
-* gtk::Fixed::move_() による位置変更成功
-* gtk::Fixed::set_size_request() によるサイズ変更成功
-* build_gtk() で生成した WebView が GTK Fixed の移動・リサイズへ追従することを確認
-* WV-04-03 で不成立だった WebView::set_bounds() の代替方式として成立
-
-判定
-
-* 合格
-
-備考
-
-* Wayland環境において build_gtk() + gtk::Fixed 構成は実用可能
-* Child Surface の位置変更は set_bounds() ではなく GTK Widget 制御で行う
-* Linux実装候補として採用継続
-
-### WV-04-06 状態変化同期検証
-
-確認結果
-
-* 毎フレーム同期を廃止
-* Dock矩形変更時のみ同期する方式へ変更
-* move_() / set_size_request() は正常動作
-* ログ大量出力は解消
-* ただしアプリケーション応答停止は継続
-
-判定
-
-* 部分合格
-
-備考
-
-* 応答停止の主因は毎フレーム同期ではない
-* GTKイベント処理またはイベントループ統合方式に原因がある可能性が高い
-* WV-04-07 にて flush_gtk_events() の影響を検証する
 
 ### WV-04-02 tao + wry(build_gtk)
 
@@ -277,7 +264,7 @@ tao + wry(build_gtk)
 - 後続の set_bounds() が Wayland + GTK 経路で実反映されるかは確認できなかった
 - 次候補として gtk::Fixed.move_() / remove + put / WebView再生成方式を検証する
 
-### WV-04-05 GTK Fixed強制移動検証
+### WV-04-04 GTK Fixed強制移動検証
 
 確認結果
 
@@ -296,7 +283,7 @@ tao + wry(build_gtk)
 * Child Surface の位置変更は set_bounds() ではなく GTK Widget 制御で行う
 * Linux実装候補として採用継続
 
-### WV-04-06 状態変化同期検証
+### WV-04-05 状態変化同期検証
 
 確認結果
 
@@ -316,7 +303,25 @@ tao + wry(build_gtk)
 * GTKイベント処理またはイベントループ統合方式に原因がある可能性が高い
 * WV-04-07 にて flush_gtk_events() の影響を検証する
 
-### WV-04-04 方式評価
+### WV-04-06 flush_gtk_events切り分け
+
+確認結果
+
+* sync_child_window() から flush_gtk_events() を除去
+* 応答停止は継続
+* build_gtk() による WebView生成後に停止することを確認
+
+判定
+
+* 合格
+
+備考
+
+* flush_gtk_events() は主因ではない
+* 問題は WebKitGTK と eframe のイベントループ統合にある可能性が高い
+* WV-05 にて継続調査する
+
+### WV-04-07 方式評価
 
 暫定評価
 
@@ -326,47 +331,95 @@ tao + wry(build_gtk)
 * Windows版と同等の公開I/Fを維持可能
 * Linux版実装候補は build_gtk() + gtk::Fixed 方式を第一候補とする
 
-確認結果
-
-- 未実施
-
-判定
-
-- 未判定
-
 ## 評価
 
-未実施
+### 方式評価
+
+候補A（eframe + build_gtk）
+
+評価
+
+* eframe から GTK Container を取得できず不成立
+
+候補B（tao + build_gtk）
+
+評価
+
+* Wayland環境で成立
+* WebView生成成功
+* URL表示成功
+* GTK Fixed配置成功
+* Child Surface移動成功
+* Child Surfaceリサイズ成功
+
+候補C（別Window方式）
+
+評価
+
+* 検証不要
+* 候補B成立により採用見送り
+
+候補D（別Process方式）
+
+評価
+
+* 検証不要
+* 候補B成立により採用見送り
+
+### 結論
+
+Linux版標準方式として以下を採用する。
+
+* wry build_gtk()
+* gtk::Fixed
+* gtk::Fixed::move_()
+* gtk::Fixed::set_size_request()
+
+Windows版との公開I/F共通化は可能と判断する。
+
+なお、
+
+* WebKitGTKイベントループ統合
+* eframe共存時の応答性
+
+については別検証へ切り出す。
 
 ## WV評価
 
 ### 判定
 
-未判定
+合格
 
 ### 根拠
 
-未実施
+以下を確認した。
+
+* Wayland環境で build_gtk() 成功
+* WebView生成成功
+* URL表示成功
+* gtk::Fixed への配置成功
+* gtk::Fixed::move_() 成功
+* gtk::Fixed::set_size_request() 成功
+* Windows版と同等I/F維持可能
+
+Linux版の配置方式選定という目的は達成した。
 
 ## 次工程
 
-### WV-05 macOS WebView共存
+### WV-05 Linux WebKitGTKイベントループ統合
+
+確認事項
+
+* eframe と WebKitGTK のイベントループ共存
+* 応答停止原因の特定
+* GTK main loop 統合方式
+* Linux版 Framework 実装方式の確定
 
 ## 備考
 
-Linux版は
-「Framework利用者がOS差異を意識しない」
-ことを合格条件とする。
+WV-04 は配置方式選定検証である。
 
-内部実装は、
-
-- Child Window
-- GTK Container
-- Native Surface
-
-のいずれでもよい。
-
-重要なのは Framework 外部仕様の統一である。
+応答停止問題は配置方式の問題ではなく、イベントループ統合問題として扱う。
 
 ---
 
