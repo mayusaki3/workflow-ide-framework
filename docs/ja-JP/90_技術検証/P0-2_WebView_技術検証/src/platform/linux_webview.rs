@@ -1,18 +1,16 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-05-05
+//! WV-05-06
 //!
 //! 役割:
 //! - WV-04で選定した build_gtk() + gtk::Fixed 方式を維持する。
 //! - WebKitGTK と eframe のイベントループ共存状態をログで確認する。
-//! - 応答停止が GTK / eframe / WebKit Process のどこで発生しているかを切り分ける。
+//! - eframe / winit を止めずに GTK / WebKitGTK のイベントを低頻度で処理する。
 //!
 //! 注意:
 //! - 技術検証用コード。
-//! - WV-05-01版では idle_add_local() と flush_gtk_events() の組み合わせにより、
-//!   flush_gtk_events() が戻らなくなる問題を確認した。
-//! - WV-05-05では idle_add_local() を使用せず、timeout_add_local() を使用する。
-//! - flush_gtk_events() は上限回数付きで実行する。
+//! - build_gtk(), move_(), set_size_request() の検証済み経路を維持する。
+//! - GTKイベント処理は上限付き、かつスロットリング付きで実行する。
 
 use eframe::{egui, CreationContext};
 use gtk::glib::{self, ControlFlow};
@@ -31,12 +29,13 @@ static mut WEBVIEW: Option<wry::WebView> = None;
 static mut GTK_TIMER_LOG_INSTALLED: bool = false;
 static mut LAST_SURFACE_STATE: Option<SurfaceState> = None;
 static mut LAST_EFRAME_ALIVE_LOG_AT: Option<Instant> = None;
+static mut LAST_GTK_FLUSH_AT: Option<Instant> = None;
 
 /// GTKイベント flush の最大処理回数。
-///
-/// 役割:
-/// - GTKイベント処理が無限ループ化することを防ぐ。
 const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
+
+/// GTKイベント flush の最小間隔。
+const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Native Surface の同期状態。
 ///
@@ -56,7 +55,7 @@ struct SurfaceState {
 /// 役割:
 /// - GTKを初期化する。
 /// - WebViewを配置するための GTK Window と gtk::Fixed を生成する。
-/// - WV-05用に MainContext 所有状態をログ出力する。
+/// - MainContext 所有状態をログ出力する。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -186,6 +185,7 @@ pub fn ensure_webview_initialized(
 /// 役割:
 /// - eframe側の update() から呼ばれることで eframe alive を確認する。
 /// - WebView用 Child Surface の表示、移動、サイズ変更を行う。
+/// - GTK / WebKitGTK 側イベントを低頻度・上限付きで処理する。
 ///
 /// 引数:
 /// - _ctx: egui コンテキスト。
@@ -203,10 +203,12 @@ pub fn sync_child_window(
         log_eframe_alive();
 
         let Some(root_fixed) = ROOT_FIXED.as_ref() else {
+            flush_gtk_events_throttled("sync_child_window no root");
             return;
         };
 
         let Some(child_fixed) = CHILD_FIXED.as_ref() else {
+            flush_gtk_events_throttled("sync_child_window no child");
             return;
         };
 
@@ -223,6 +225,7 @@ pub fn sync_child_window(
         };
 
         if LAST_SURFACE_STATE == Some(new_state) {
+            flush_gtk_events_throttled("sync_child_window unchanged");
             return;
         }
 
@@ -231,6 +234,7 @@ pub fn sync_child_window(
         if !new_state.visible {
             child_fixed.hide();
             println!("WV-05 Linux hide child surface");
+            flush_gtk_events_throttled("sync_child_window hidden");
             return;
         }
 
@@ -256,6 +260,8 @@ pub fn sync_child_window(
         );
 
         root_fixed.show_all();
+
+        flush_gtk_events_throttled("sync_child_window changed");
     }
 }
 
@@ -287,8 +293,8 @@ fn rect_to_i32_bounds(
 /// GTKイベントを上限付きで処理する。
 ///
 /// 役割:
-/// - WebView生成直後に保留中の GTKイベントを処理する。
-/// - idle source 等により無限ループ化することを防ぐ。
+/// - WebView生成直後など、明示的に GTK イベントを処理する。
+/// - pending が残っていても上限回数で打ち切る。
 ///
 /// 引数:
 /// - label: ログ識別名。
@@ -313,6 +319,35 @@ fn flush_gtk_events_bounded(label: &str) {
     );
 }
 
+/// GTKイベントを低頻度で処理する。
+///
+/// 役割:
+/// - eframe / winit を停止させずに GTK / WebKitGTK のイベントを継続処理する。
+/// - GTK Host Window の応答停止を防げるか確認する。
+///
+/// 引数:
+/// - label: ログ識別名。
+///
+/// 戻り値:
+/// - なし。
+fn flush_gtk_events_throttled(label: &str) {
+    unsafe {
+        let now = Instant::now();
+
+        let should_flush = LAST_GTK_FLUSH_AT
+            .map(|last| now.duration_since(last) >= GTK_FLUSH_INTERVAL)
+            .unwrap_or(true);
+
+        if !should_flush {
+            return;
+        }
+
+        LAST_GTK_FLUSH_AT = Some(now);
+    }
+
+    flush_gtk_events_bounded(label);
+}
+
 /// GTK MainContext の所有状態をログ出力する。
 ///
 /// 引数:
@@ -335,7 +370,10 @@ fn log_main_context_state(label: &str) {
 ///
 /// 役割:
 /// - GTK MainContext が継続して処理されているか確認する。
-/// - idle_add_local() は flush_gtk_events() と組み合わせると常時 pending になり得るため使用しない。
+///
+/// 注意:
+/// - idle_add_local() は使用しない。
+/// - timeout_add_local() により、GTK側イベント処理が進む場合だけ timer alive が出る。
 ///
 /// 戻り値:
 /// - なし。
