@@ -1,17 +1,16 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-06-03
+//! WV-06-04
 //!
 //! 役割:
 //! - WV-04で選定した build_gtk() + gtk::Fixed 方式を維持する。
-//! - GTK Host Window を表示したまま 1x1 に縮小し、応答なし発生条件を確認する。
-//! - GTKイベントポンプは維持する。
+//! - GTK Host Window を表示したまま、通常アプリWindow扱いから外せるか確認する。
+//! - GNOME / Mutter の「応答なし」判定が GTK Window の通常トップレベル公開に依存するか検証する。
 //!
 //! 注意:
 //! - 技術検証用コード。
 //! - build_gtk(), move_(), set_size_request() の検証済み経路を維持する。
 //! - GTKイベント処理は上限付き、かつスロットリング付きで実行する。
-//! - WV-06-03では Host Window 表示あり / 1x1 構成を検証する。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -53,10 +52,11 @@ struct SurfaceState {
 /// 役割:
 /// - GTKを初期化する。
 /// - WebViewを配置するための GTK Window と gtk::Fixed を生成する。
-/// - WV-06検証の基準構成として、WV-05で成立確認済みの表示構成を維持する。
+/// - GTK Host Window を表示する。
+/// - Window Manager から通常アプリWindowとして扱われにくくする設定を適用する。
 ///
 /// 注意:
-/// - WV-06-00では計測コードのみ除去し、Host Window構成は変更しない。
+/// - WV-06-04では Host Window を表示したまま、装飾・タスクバー・ページャ表示を抑制する。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -70,16 +70,24 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         }
 
         if let Err(error) = gtk::init() {
-            println!("WV-06 Linux gtk::init failed = {:?}", error);
+            println!("WV-06-04 Linux gtk::init failed = {:?}", error);
             return;
         }
 
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
-        window.set_title("WV-06-03 Linux GTK WebView Host 1x1");
-        window.set_default_size(1, 1);
+        window.set_title("WV-06-04 Linux GTK WebView Host Utility");
+        window.set_default_size(800, 600);
+
+        // WV-06-04
+        // GTK Host Window を表示したまま、通常アプリWindow扱いから外せるか確認する。
+        // GNOME / Mutter の「応答なし」判定が通常トップレベル公開に依存するか切り分ける。
+        window.set_decorated(false);
+        window.set_skip_taskbar_hint(true);
+        window.set_skip_pager_hint(true);
+        window.set_focus_on_map(false);
 
         let root_fixed = gtk::Fixed::new();
-        root_fixed.set_size_request(1, 1);
+        root_fixed.set_size_request(800, 600);
 
         window.add(&root_fixed);
         window.show_all();
@@ -87,7 +95,7 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         GTK_WINDOW = Some(window);
         ROOT_FIXED = Some(root_fixed);
 
-        println!("WV-06-03 Linux GTK root window initialized 1x1");
+        println!("WV-06-04 Linux GTK root window initialized as utility-like window");
     }
 }
 
@@ -117,7 +125,7 @@ pub fn ensure_webview_initialized(
         }
 
         let Some(root_fixed) = ROOT_FIXED.as_ref() else {
-            println!("WV-06 Linux ROOT_FIXED not initialized");
+            println!("WV-06-04 Linux ROOT_FIXED not initialized");
             return;
         };
 
@@ -148,10 +156,10 @@ pub fn ensure_webview_initialized(
                 WEBVIEW = Some(webview);
                 WEBVIEW_CREATED = true;
 
-                println!("WV-06-03 Linux WebView create success");
+                println!("WV-06-04 Linux WebView create success");
             }
             Err(error) => {
-                println!("WV-06-03 Linux WebView create failed = {:?}", error);
+                println!("WV-06-04 Linux WebView create failed = {:?}", error);
             }
         }
 
@@ -285,7 +293,7 @@ fn flush_gtk_events_bounded(label: &str) {
 
     if count > 0 || remaining {
         println!(
-            "WV-06-03 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
+            "WV-06-04 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
             label,
             count,
             remaining
