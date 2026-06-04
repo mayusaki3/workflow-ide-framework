@@ -1,20 +1,20 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-06-00
+//! WV-06-01
 //!
 //! 役割:
 //! - WV-04で選定した build_gtk() + gtk::Fixed 方式を維持する。
 //! - WV-05で使用したイベントループ計測コードを除去する。
-//! - WV-06 GTK Host Window最小構成検証の基準コードとする。
+//! - GTKイベントポンプを停止し、WebKitGTKの動作継続可否を確認する。
 //!
 //! 注意:
 //! - 技術検証用コード。
 //! - build_gtk(), move_(), set_size_request() の検証済み経路を維持する。
-//! - GTKイベント処理は上限付き、かつスロットリング付きで実行する。
+//! - build_gtk(), move_(), set_size_request() の検証済み経路を維持する。
+//! - WV-06-01では sync_child_window() からの GTKイベント処理を停止する。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
-use std::time::{Duration, Instant};
 use wry::{
     dpi::{LogicalPosition, LogicalSize},
     Rect, WebViewBuilder, WebViewBuilderExtUnix,
@@ -26,13 +26,9 @@ static mut CHILD_FIXED: Option<gtk::Fixed> = None;
 static mut WEBVIEW_CREATED: bool = false;
 static mut WEBVIEW: Option<wry::WebView> = None;
 static mut LAST_SURFACE_STATE: Option<SurfaceState> = None;
-static mut LAST_GTK_FLUSH_AT: Option<Instant> = None;
 
 /// GTKイベント flush の最大処理回数。
 const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
-
-/// GTKイベント flush の最小間隔。
-const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Native Surface の同期状態。
 ///
@@ -292,31 +288,20 @@ fn flush_gtk_events_bounded(label: &str) {
     }
 }
 
-/// GTKイベントを低頻度で処理する。
+/// GTKイベントの低頻度処理を停止する。
 ///
 /// 役割:
-/// - eframe / winit を停止させずに GTK / WebKitGTK のイベントを継続処理する。
-/// - GTK Host Window の応答停止を防げるか確認する。
+/// - WV-06-01では、eframe 側から GTK / WebKitGTK のイベントを供給しない。
+/// - WebView表示や GTK Host Window の挙動がどう変化するか確認する。
 ///
 /// 引数:
-/// - label: ログ識別名。
+/// - _label: ログ識別名。WV-06-01では使用しない。
 ///
 /// 戻り値:
 /// - なし。
-fn flush_gtk_events_throttled(label: &str) {
-    unsafe {
-        let now = Instant::now();
-
-        let should_flush = LAST_GTK_FLUSH_AT
-            .map(|last| now.duration_since(last) >= GTK_FLUSH_INTERVAL)
-            .unwrap_or(true);
-
-        if !should_flush {
-            return;
-        }
-
-        LAST_GTK_FLUSH_AT = Some(now);
-    }
-
-    flush_gtk_events_bounded(label);
+fn flush_gtk_events_throttled(_label: &str) {
+    // WV-06-01:
+    // GTKイベントポンプ停止検証。
+    // WebView生成直後の flush_gtk_events_bounded() は維持し、
+    // sync_child_window() 経由の継続的な GTKイベント処理のみ停止する。
 }
