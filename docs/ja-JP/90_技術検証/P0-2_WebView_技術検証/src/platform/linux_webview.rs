@@ -1,17 +1,17 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-06-02
+//! WV-06-03
 //!
 //! 役割:
 //! - WV-04で選定した build_gtk() + gtk::Fixed 方式を維持する。
-//! - GTKイベントポンプを維持したまま、GTK Host Window の show_all() を停止する。
-//! - GTK Host Window の表示が build_gtk() / WebView 表示に必須か確認する。
+//! - GTK Host Window を表示したまま 1x1 に縮小し、応答なし発生条件を確認する。
+//! - GTKイベントポンプは維持する。
 //!
 //! 注意:
 //! - 技術検証用コード。
 //! - build_gtk(), move_(), set_size_request() の検証済み経路を維持する。
 //! - GTKイベント処理は上限付き、かつスロットリング付きで実行する。
-//! - WV-06-02では window.show_all() を実行しない。
+//! - WV-06-03では Host Window 表示あり / 1x1 構成を検証する。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -53,11 +53,10 @@ struct SurfaceState {
 /// 役割:
 /// - GTKを初期化する。
 /// - WebViewを配置するための GTK Window と gtk::Fixed を生成する。
-/// - GTK Host Window の表示を行わず、WebView生成と表示が成立するか確認する。
+/// - WV-06検証の基準構成として、WV-05で成立確認済みの表示構成を維持する。
 ///
 /// 注意:
-/// - WV-06-02では window.show_all() を実行しない。
-/// - GTKイベントポンプは維持する。
+/// - WV-06-00では計測コードのみ除去し、Host Window構成は変更しない。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -76,20 +75,19 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         }
 
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
-        window.set_title("WV-06-02 Linux GTK WebView Host");
-        window.set_default_size(800, 600);
+        window.set_title("WV-06-03 Linux GTK WebView Host 1x1");
+        window.set_default_size(1, 1);
 
         let root_fixed = gtk::Fixed::new();
-        root_fixed.set_size_request(800, 600);
+        root_fixed.set_size_request(1, 1);
 
         window.add(&root_fixed);
-
-        println!("WV-06-02 Linux skip window.show_all()");
+        window.show_all();
 
         GTK_WINDOW = Some(window);
         ROOT_FIXED = Some(root_fixed);
 
-        println!("WV-06-02 Linux GTK root window initialized without show_all");
+        println!("WV-06-03 Linux GTK root window initialized 1x1");
     }
 }
 
@@ -150,10 +148,10 @@ pub fn ensure_webview_initialized(
                 WEBVIEW = Some(webview);
                 WEBVIEW_CREATED = true;
 
-                println!("WV-06 Linux WebView create success");
+                println!("WV-06-03 Linux WebView create success");
             }
             Err(error) => {
-                println!("WV-06 Linux WebView create failed = {:?}", error);
+                println!("WV-06-03 Linux WebView create failed = {:?}", error);
             }
         }
 
@@ -287,7 +285,7 @@ fn flush_gtk_events_bounded(label: &str) {
 
     if count > 0 || remaining {
         println!(
-            "WV-06 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
+            "WV-06-03 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
             label,
             count,
             remaining
