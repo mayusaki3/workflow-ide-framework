@@ -105,7 +105,7 @@ GTKイベントループ継続状態を確認する。
 
 以下を登録する。
 
-* glib::idle_add_local()
+* glib::timeout_add_local()
 
 定期ログ出力を行う。
 
@@ -172,11 +172,95 @@ eframeイベントループ継続状態を確認する。
 
 ## 結果
 
-未実施
+完了
+
+### WV-05-01 MainContext所有状態確認
+
+結果
+
+* 成功
+
+確認内容
+
+* WebView生成前後で `glib::MainContext::default().is_owner()` が `true` であることを確認した。
+
+判定
+
+* GTK MainContext所有スレッド不一致は主因ではない。
+
+### WV-05-02 GTKイベント継続確認
+
+結果
+
+* 成功
+
+確認内容
+
+* `glib::timeout_add_local()` による `GTK timer alive` が継続出力されることを確認した。
+
+判定
+
+* GTK MainContext は継続駆動できている。
+
+### WV-05-03 eframeイベント継続確認
+
+結果
+
+* 成功
+
+確認内容
+
+* `sync_child_window()` 経由で `eframe alive` が継続出力されることを確認した。
+
+判定
+
+* eframe / winit EventLoop は継続動作している。
+
+### WV-05-04 応答停止箇所特定
+
+結果
+
+* 条件付き成功
+
+確認内容
+
+* `build_gtk()` は成功する。
+* WebView表示は成功する。
+* eframe alive は継続する。
+* GTK timer alive は継続する。
+* ただし GTK Host Window には Ubuntu 側で「応答がありません」と表示される。
+
+判定
+
+* プロセス停止ではない。
+* eframe停止ではない。
+* GTK MainContext停止ではない。
+* WebKitGTK停止ではない。
+* 残課題は、GTK独立トップレベルウィンドウと eframeトップレベルウィンドウの共存構成にある可能性が高い。
 
 ## 結論
 
-未実施
+WV-05 Linux WebKitGTKイベントループ統合は、条件付き成功とする。
+
+確認できた事項
+
+* `build_gtk()` による WebView生成は成立する。
+* WebView表示は成立する。
+* eframe / winit EventLoop は継続動作する。
+* GTK MainContext は継続駆動できる。
+* 上限付き GTKイベント処理により、eframe と GTK の双方を停止させずに動作させられる。
+
+判定
+
+* 応答停止問題の主因は、イベントループ統合そのものではない。
+* 主因候補は、GTK Host Window を独立トップレベルとして生成している構成である。
+
+次工程
+
+* GTK Host Window が必須か確認する。
+* build_gtk() が要求する最小 GTK Widget 構成を確認する。
+* GTK Window を生成しない構成が可能か確認する。
+* GTK Host Window の所有関係を調査する。
 
 ---
 
