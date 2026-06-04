@@ -1,16 +1,17 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-06-05
+//! WV-06-06
 //!
 //! 役割:
 //! - WV-04で選定した build_gtk() + gtk::Fixed 方式を維持する。
-//! - GTK Host Window を gtk::WindowType::Popup として生成し、GNOME / Mutter の「応答なし」判定を回避できるか確認する。
-//! - GTKイベント処理を維持したまま、Host Window の Window Manager 管理対象性を切り分ける。
+//! - GTK Host Window への入力イベントが応答なし発生条件か確認する。
+//! - WebView配置先の Child Surface を非感応にし、WebKitGTK へ入力イベントが届く経路を遮断する。
 //!
 //! 注意:
 //! - 技術検証用コード。
 //! - build_gtk(), move_(), set_size_request() の検証済み経路を維持する。
 //! - GTKイベント処理は上限付き、かつスロットリング付きで実行する。
+//! - WV-06-06では Host Window表示と GTKイベントポンプは維持する。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -53,9 +54,10 @@ struct SurfaceState {
 /// - GTKを初期化する。
 /// - WebViewを配置するための GTK Window と gtk::Fixed を生成する。
 /// - GTK Host Window を Popup Window として生成する。
+/// - WV-06-06では入力イベント遮断検証のため、Host Window表示構成は維持する。
 ///
 /// 注意:
-/// - WV-06-05では Host Window を表示するが、通常の Toplevel Window ではなく Popup Window を使用する。
+/// - WV-06-06では Host Window を表示し、WebView配置先の Child Surface を非感応にする。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -69,12 +71,12 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         }
 
         if let Err(error) = gtk::init() {
-            println!("WV-06-05 Linux gtk::init failed = {:?}", error);
+            println!("WV-06-06 Linux gtk::init failed = {:?}", error);
             return;
         }
 
         let window = gtk::Window::new(gtk::WindowType::Popup);
-        window.set_title("WV-06-05 Linux GTK WebView Host Popup");
+        window.set_title("WV-06-06 Linux GTK WebView Host Popup Input Disabled");
         window.set_default_size(800, 600);
 
         let root_fixed = gtk::Fixed::new();
@@ -86,7 +88,7 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         GTK_WINDOW = Some(window);
         ROOT_FIXED = Some(root_fixed);
 
-        println!("WV-06-05 Linux GTK popup root window initialized");
+        println!("WV-06-06 Linux GTK popup root window initialized");
     }
 }
 
@@ -116,7 +118,7 @@ pub fn ensure_webview_initialized(
         }
 
         let Some(root_fixed) = ROOT_FIXED.as_ref() else {
-            println!("WV-06-05 Linux ROOT_FIXED not initialized");
+            println!("WV-06-06 Linux ROOT_FIXED not initialized");
             return;
         };
 
@@ -127,9 +129,17 @@ pub fn ensure_webview_initialized(
         let child_fixed = gtk::Fixed::new();
         child_fixed.set_size_request(width, height);
 
+        // WV-06-06
+        // WebView配置先の Child Surface を非感応にし、
+        // Host Window上の入力イベントが WebKitGTK へ届く経路を遮断する。
+        child_fixed.set_sensitive(false);
+        child_fixed.set_can_focus(false);
+
         root_fixed.put(&child_fixed, x, y);
         child_fixed.show_all();
         root_fixed.show_all();
+
+        println!("WV-06-06 Linux child surface input disabled");
 
         let bounds = Rect {
             position: LogicalPosition::new(0, 0).into(),
@@ -147,10 +157,10 @@ pub fn ensure_webview_initialized(
                 WEBVIEW = Some(webview);
                 WEBVIEW_CREATED = true;
 
-                println!("WV-06-05 Linux WebView create success");
+                println!("WV-06-06 Linux WebView create success");
             }
             Err(error) => {
-                println!("WV-06-05 Linux WebView create failed = {:?}", error);
+                println!("WV-06-06 Linux WebView create failed = {:?}", error);
             }
         }
 
@@ -284,7 +294,7 @@ fn flush_gtk_events_bounded(label: &str) {
 
     if count > 0 || remaining {
         println!(
-            "WV-06-05 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
+            "WV-06-06 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
             label,
             count,
             remaining
