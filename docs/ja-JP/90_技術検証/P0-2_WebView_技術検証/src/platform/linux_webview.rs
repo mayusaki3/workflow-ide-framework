@@ -1,31 +1,26 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-07-01
+//! WV-07-02
 //!
 //! 役割:
-//! - WV-04で選定した build_gtk() + gtk::Fixed 方式を維持する。
-//! - GDK_BACKEND=x11 前提で、GTK Host Window 自体を Dock Panel 位置へ同期する。
-//! - Windows版と同等の「別Native WindowをPanelへ重ねる方式」の成立性を確認する。
+//! - WV-07-02で確認した GTK Host Window 位置・サイズ同期方式を維持する。
+//! - WebKitGTK / wry WebView を生成せず、GTK Dummy Widget のみを配置する。
+//! - 応答なしの主因が WebKitGTK / wry 側か、GTK Host Window同期側かを切り分ける。
 //!
 //! 注意:
 //! - 技術検証用コード。
-//! - build_gtk(), gtk::Fixed, move_(), set_size_request() の検証済み経路を維持する。
-//! - GTKイベント処理は上限付き、かつスロットリング付きで実行する。
-//! - WV-07-01では Child Surface ではなく Host Window の位置・サイズ同期を優先して確認する。
+//! - GDK_BACKEND=x11 での実行を前提とする。
+//! - GTK Host Window の move_(), resize(), gtk::Fixed, set_size_request() の同期経路は維持する。
+//! - WV-07-02では WebViewBuilder::build_gtk() を呼び出さない。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
 use std::time::{Duration, Instant};
-use wry::{
-    dpi::{LogicalPosition, LogicalSize},
-    Rect, WebViewBuilder, WebViewBuilderExtUnix,
-};
 
 static mut GTK_WINDOW: Option<gtk::Window> = None;
 static mut ROOT_FIXED: Option<gtk::Fixed> = None;
 static mut CHILD_FIXED: Option<gtk::Fixed> = None;
 static mut WEBVIEW_CREATED: bool = false;
-static mut WEBVIEW: Option<wry::WebView> = None;
 static mut LAST_SURFACE_STATE: Option<SurfaceState> = None;
 static mut LAST_GTK_FLUSH_AT: Option<Instant> = None;
 
@@ -57,7 +52,7 @@ struct SurfaceState {
 /// - Host Window 自体を Dock Panel に重ねるため、装飾とタスクバー表示を抑制する。
 ///
 /// 注意:
-/// - WV-07-01では GDK_BACKEND=x11 での実行を前提とする。
+/// - WV-07-02では GDK_BACKEND=x11 での実行を前提とする。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -71,12 +66,12 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         }
 
         if let Err(error) = gtk::init() {
-            println!("WV-07-01 Linux gtk::init failed = {:?}", error);
+            println!("WV-07-02 Linux gtk::init failed = {:?}", error);
             return;
         }
 
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
-        window.set_title("WV-07-01 Linux GTK WebView Host");
+        window.set_title("WV-07-02 Linux GTK WebView Host");
         window.set_default_size(800, 600);
         window.set_decorated(false);
         window.set_skip_taskbar_hint(true);
@@ -91,7 +86,7 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         GTK_WINDOW = Some(window);
         ROOT_FIXED = Some(root_fixed);
 
-        println!("WV-07-01 Linux GTK host window initialized");
+        println!("WV-07-02 Linux GTK host window initialized");
     }
 }
 
@@ -121,7 +116,7 @@ pub fn ensure_webview_initialized(
         }
 
         let Some(root_fixed) = ROOT_FIXED.as_ref() else {
-            println!("WV-07-01 Linux ROOT_FIXED not initialized");
+            println!("WV-07-02 Linux ROOT_FIXED not initialized");
             return;
         };
 
@@ -142,37 +137,23 @@ pub fn ensure_webview_initialized(
         }
 
         println!(
-            "WV-07-01 Linux initial host window sync x={} y={} w={} h={}",
+            "WV-07-02 Linux initial host window sync x={} y={} w={} h={}",
             x,
             y,
             width,
             height
         );
 
-        let bounds = Rect {
-            position: LogicalPosition::new(0, 0).into(),
-            size: LogicalSize::new(width as u32, height as u32).into(),
-        };
+        let dummy_label = gtk::Label::new(Some("WV-07-02 Dummy GTK Widget"));
+        child_fixed.put(&dummy_label, 0, 0);
+        dummy_label.show();
 
-        let result = WebViewBuilder::new()
-            .with_bounds(bounds)
-            .with_url("https://example.com")
-            .build_gtk(&child_fixed);
+        CHILD_FIXED = Some(child_fixed);
+        WEBVIEW_CREATED = true;
 
-        match result {
-            Ok(webview) => {
-                CHILD_FIXED = Some(child_fixed);
-                WEBVIEW = Some(webview);
-                WEBVIEW_CREATED = true;
+        println!("WV-07-02 Linux Dummy GTK Widget create success");
 
-                println!("WV-07-01 Linux WebView create success");
-            }
-            Err(error) => {
-                println!("WV-07-01 Linux WebView create failed = {:?}", error);
-            }
-        }
-
-        flush_gtk_events_bounded("after WebView initialize");
+        flush_gtk_events_bounded("after Dummy GTK Widget initialize");
     }
 }
 
@@ -255,7 +236,7 @@ pub fn sync_child_window(
         );
 
         println!(
-            "WV-07-01 Linux sync host window x={} y={} w={} h={}",
+            "WV-07-02 Linux sync host window x={} y={} w={} h={}",
             new_state.x,
             new_state.y,
             new_state.width,
@@ -320,7 +301,7 @@ fn flush_gtk_events_bounded(label: &str) {
 
     if count > 0 || remaining {
         println!(
-            "WV-07-01 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
+            "WV-07-02 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
             label,
             count,
             remaining
