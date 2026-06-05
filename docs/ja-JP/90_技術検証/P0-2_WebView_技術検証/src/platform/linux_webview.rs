@@ -1,19 +1,17 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-07-07
+//! WV-08-01
 //!
 //! 役割:
-//! - GTK Host Window のみを生成し、Child Widget を生成しない構成を維持する。
-//! - GTKイベントポンプを完全停止し、gtk::events_pending() / gtk::main_iteration_do(false) が応答なしの主因か確認する。
-//! - 応答なしの主因が GTKイベントポンプか、GTK Toplevel Window 自体かを切り分ける。
+//! - GTK処理を完全に無効化する。
+//! - PoC-2e / egui_dock / eframe のみで応答なしが発生するか確認する。
+//! - 応答なしの主因が GTK統合層か、Hyper-V + Ubuntu + eframe/winit 側かを切り分ける。
 //!
 //! 注意:
 //! - 技術検証用コード。
-//! - GDK_BACKEND=x11 での実行を前提とする。
-//! - WV-07-07では WebViewBuilder::build_gtk() を呼び出さない。
-//! - WV-07-07では Dummy GTK Widget も生成しない。
-//! - WV-07-07では sync_child_window() 内の GTK Host Window move_(), resize() を実行しない。
-//! - WV-07-07では GTKイベントポンプを実行しない。
+//! - WV-08-01では gtk::init() を呼び出さない。
+//! - WV-08-01では GTK Host Window を生成しない。
+//! - WV-08-01では WebView / Dummy GTK Widget / GTKイベントポンプを使用しない。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -31,7 +29,7 @@ const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
 
 /// GTKイベント flush の最小間隔。
 ///
-/// WV-07-07:
+/// WV-08-01:
 /// - GTKイベントポンプ頻度を最大2回/秒に制限する。
 const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
 
@@ -57,7 +55,7 @@ struct SurfaceState {
 /// - Host Window 自体を Dock Panel に重ねるため、装飾とタスクバー表示を抑制する。
 ///
 /// 注意:
-/// - WV-07-07では GDK_BACKEND=x11 での実行を前提とする。
+/// - WV-08-01では GDK_BACKEND=x11 での実行を前提とする。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -65,34 +63,7 @@ struct SurfaceState {
 /// 戻り値:
 /// - なし。
 pub fn initialize_root_window(_cc: &CreationContext<'_>) {
-    unsafe {
-        if GTK_WINDOW.is_some() {
-            return;
-        }
-
-        if let Err(error) = gtk::init() {
-            println!("WV-07-07 Linux gtk::init failed = {:?}", error);
-            return;
-        }
-
-        let window = gtk::Window::new(gtk::WindowType::Toplevel);
-        window.set_title("WV-07-07 Linux GTK WebView Host");
-        window.set_default_size(800, 600);
-        window.set_decorated(false);
-        window.set_skip_taskbar_hint(true);
-        window.set_skip_pager_hint(true);
-
-        let root_fixed = gtk::Fixed::new();
-        root_fixed.set_size_request(800, 600);
-
-        window.add(&root_fixed);
-        window.show_all();
-
-        GTK_WINDOW = Some(window);
-        ROOT_FIXED = Some(root_fixed);
-
-        println!("WV-07-07 Linux GTK host window initialized");
-    }
+    println!("WV-08-01 GTK disabled");
 }
 
 /// Linux向け WebView を初期化する。
@@ -112,43 +83,10 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
 /// 戻り値:
 /// - なし。
 pub fn ensure_webview_initialized(
-    initial_rect: Option<egui::Rect>,
-    scale: f32,
+    _initial_rect: Option<egui::Rect>,
+    _scale: f32,
 ) {
-    unsafe {
-        if WEBVIEW_CREATED {
-            return;
-        }
-
-        let Some(root_fixed) = ROOT_FIXED.as_ref() else {
-            println!("WV-07-07 Linux ROOT_FIXED not initialized");
-            return;
-        };
-
-        let (x, y, width, height) = initial_rect
-            .map(|rect| rect_to_i32_bounds(rect, scale))
-            .unwrap_or((0, 0, 800, 600));
-
-        root_fixed.set_size_request(width, height);
-        root_fixed.show_all();
-
-        if let Some(window) = GTK_WINDOW.as_ref() {
-            window.move_(x, y);
-            window.resize(width, height);
-        }
-
-        WEBVIEW_CREATED = true;
-
-        println!(
-            "WV-07-07 Linux host window only initialized x={} y={} w={} h={}",
-            x,
-            y,
-            width,
-            height
-        );
-
-        flush_gtk_events_bounded("after Host Window only initialize");
-    }
+    println!("WV-08-01 ensure_webview_initialized skipped");
 }
 
 /// Linux向け Child Surface 追従処理。
@@ -167,85 +105,9 @@ pub fn ensure_webview_initialized(
 /// - なし。
 pub fn sync_child_window(
     _ctx: &egui::Context,
-    webview_rect: Option<egui::Rect>,
-    should_show_native_surface: bool,
+    _webview_rect: Option<egui::Rect>,
+    _should_show_native_surface: bool,
 ) {
-    unsafe {
-        let Some(root_fixed) = ROOT_FIXED.as_ref() else {
-            flush_gtk_events_throttled("sync_child_window no root");
-            return;
-        };
-
-        let Some(child_fixed) = CHILD_FIXED.as_ref() else {
-            flush_gtk_events_throttled("sync_child_window host window only");
-            return;
-        };
-
-        let (x, y, width, height) = webview_rect
-            .map(|r| rect_to_i32_bounds(r, 1.0))
-            .unwrap_or((0, 0, 800, 600));
-
-        let new_state = SurfaceState {
-            x,
-            y,
-            width,
-            height,
-            visible: should_show_native_surface,
-        };
-
-        if LAST_SURFACE_STATE == Some(new_state) {
-            flush_gtk_events_throttled("sync_child_window unchanged");
-            return;
-        }
-
-        LAST_SURFACE_STATE = Some(new_state);
-
-        if !new_state.visible {
-            child_fixed.hide();
-            flush_gtk_events_throttled("sync_child_window hidden");
-            return;
-        }
-
-        child_fixed.show();
-
-        if let Some(_window) = GTK_WINDOW.as_ref() {
-            println!(
-                "WV-07-07 Linux runtime host window move/resize skipped x={} y={} w={} h={}",
-                new_state.x,
-                new_state.y,
-                new_state.width,
-                new_state.height
-            );
-        }
-
-        root_fixed.move_(
-            child_fixed,
-            0,
-            0,
-        );
-
-        root_fixed.set_size_request(
-            new_state.width,
-            new_state.height,
-        );
-
-        child_fixed.set_size_request(
-            new_state.width,
-            new_state.height,
-        );
-
-        println!(
-            "WV-07-07 Linux sync host window x={} y={} w={} h={}",
-            new_state.x,
-            new_state.y,
-            new_state.width,
-            new_state.height
-        );
-
-        root_fixed.show_all();
-
-        flush_gtk_events_throttled("sync_child_window changed");
-    }
 }
 
 /// egui矩形を GTK / wry 用 i32 境界値へ変換する。
@@ -290,7 +152,7 @@ fn rect_to_i32_bounds(
 /// - なし。
 fn flush_gtk_events_bounded(label: &str) {
     println!(
-        "WV-07-07 Linux GTK event pump disabled label={}",
+        "WV-08-01 Linux GTK event pump disabled label={}",
         label
     );
 }
