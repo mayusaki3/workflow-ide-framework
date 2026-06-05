@@ -1,18 +1,19 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-07-06
+//! WV-07-07
 //!
 //! 役割:
-//! - GTK Host Window のみを生成し、Child Widget を生成しない。
-//! - GTK Toplevel Window 単体で応答なしが発生するか確認する。
-//! - 応答なしの主因が GTK Window 自体か、Child Widget / gtk::Fixed 側かを切り分ける。
+//! - GTK Host Window のみを生成し、Child Widget を生成しない構成を維持する。
+//! - GTKイベントポンプを完全停止し、gtk::events_pending() / gtk::main_iteration_do(false) が応答なしの主因か確認する。
+//! - 応答なしの主因が GTKイベントポンプか、GTK Toplevel Window 自体かを切り分ける。
 //!
 //! 注意:
 //! - 技術検証用コード。
 //! - GDK_BACKEND=x11 での実行を前提とする。
-//! - WV-07-06では WebViewBuilder::build_gtk() を呼び出さない。
-//! - WV-07-06では Dummy GTK Widget も生成しない。
-//! - WV-07-06では sync_child_window() 内の GTK Host Window move_(), resize() を実行しない。
+//! - WV-07-07では WebViewBuilder::build_gtk() を呼び出さない。
+//! - WV-07-07では Dummy GTK Widget も生成しない。
+//! - WV-07-07では sync_child_window() 内の GTK Host Window move_(), resize() を実行しない。
+//! - WV-07-07では GTKイベントポンプを実行しない。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -30,7 +31,7 @@ const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
 
 /// GTKイベント flush の最小間隔。
 ///
-/// WV-07-06:
+/// WV-07-07:
 /// - GTKイベントポンプ頻度を最大2回/秒に制限する。
 const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
 
@@ -56,7 +57,7 @@ struct SurfaceState {
 /// - Host Window 自体を Dock Panel に重ねるため、装飾とタスクバー表示を抑制する。
 ///
 /// 注意:
-/// - WV-07-06では GDK_BACKEND=x11 での実行を前提とする。
+/// - WV-07-07では GDK_BACKEND=x11 での実行を前提とする。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -70,12 +71,12 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         }
 
         if let Err(error) = gtk::init() {
-            println!("WV-07-06 Linux gtk::init failed = {:?}", error);
+            println!("WV-07-07 Linux gtk::init failed = {:?}", error);
             return;
         }
 
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
-        window.set_title("WV-07-06 Linux GTK WebView Host");
+        window.set_title("WV-07-07 Linux GTK WebView Host");
         window.set_default_size(800, 600);
         window.set_decorated(false);
         window.set_skip_taskbar_hint(true);
@@ -90,7 +91,7 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         GTK_WINDOW = Some(window);
         ROOT_FIXED = Some(root_fixed);
 
-        println!("WV-07-06 Linux GTK host window initialized");
+        println!("WV-07-07 Linux GTK host window initialized");
     }
 }
 
@@ -120,7 +121,7 @@ pub fn ensure_webview_initialized(
         }
 
         let Some(root_fixed) = ROOT_FIXED.as_ref() else {
-            println!("WV-07-06 Linux ROOT_FIXED not initialized");
+            println!("WV-07-07 Linux ROOT_FIXED not initialized");
             return;
         };
 
@@ -139,7 +140,7 @@ pub fn ensure_webview_initialized(
         WEBVIEW_CREATED = true;
 
         println!(
-            "WV-07-06 Linux host window only initialized x={} y={} w={} h={}",
+            "WV-07-07 Linux host window only initialized x={} y={} w={} h={}",
             x,
             y,
             width,
@@ -209,7 +210,7 @@ pub fn sync_child_window(
 
         if let Some(_window) = GTK_WINDOW.as_ref() {
             println!(
-                "WV-07-06 Linux runtime host window move/resize skipped x={} y={} w={} h={}",
+                "WV-07-07 Linux runtime host window move/resize skipped x={} y={} w={} h={}",
                 new_state.x,
                 new_state.y,
                 new_state.width,
@@ -234,7 +235,7 @@ pub fn sync_child_window(
         );
 
         println!(
-            "WV-07-06 Linux sync host window x={} y={} w={} h={}",
+            "WV-07-07 Linux sync host window x={} y={} w={} h={}",
             new_state.x,
             new_state.y,
             new_state.width,
@@ -288,23 +289,10 @@ fn rect_to_i32_bounds(
 /// 戻り値:
 /// - なし。
 fn flush_gtk_events_bounded(label: &str) {
-    let mut count = 0;
-
-    while gtk::events_pending() && count < GTK_FLUSH_MAX_ITERATIONS {
-        gtk::main_iteration_do(false);
-        count += 1;
-    }
-
-    let remaining = gtk::events_pending();
-
-    if count > 0 || remaining {
-        println!(
-            "WV-07-06 Linux flush_gtk_events_bounded label={} processed={} remaining={}",
-            label,
-            count,
-            remaining
-        );
-    }
+    println!(
+        "WV-07-07 Linux GTK event pump disabled label={}",
+        label
+    );
 }
 
 /// GTKイベントを低頻度で処理する。
