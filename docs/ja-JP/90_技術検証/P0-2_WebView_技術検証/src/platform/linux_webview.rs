@@ -1,11 +1,11 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-08-02
+//! WV-08-03
 //!
 //! 役割:
-//! - gtk::init() のみを実行する。
-//! - GTK Host Window / WebView / Dummy GTK Widget / GTKイベントポンプは生成・実行しない。
-//! - 応答なしの主因が GTK初期化時点で入るか、GTK Window生成以降で入るかを切り分ける。
+//! - gtk::init() と gtk::Window生成のみを実行する。
+//! - GTK Host Window表示は行わない。
+//! - GTK Window生成だけで応答なしが発生するか確認する。
 //!
 //! 注意:
 //! - 技術検証用コード。
@@ -63,16 +63,21 @@ struct SurfaceState {
 /// 戻り値:
 /// - なし。
 pub fn initialize_root_window(_cc: &CreationContext<'_>) {
-    println!("WV-08-02 gtk::init start");
+    println!("WV-08-03 gtk::init start");
 
     match gtk::init() {
         Ok(_) => {
-            println!("WV-08-02 gtk::init success");
+            println!("WV-08-03 gtk::init success");
         }
         Err(err) => {
-            println!("WV-08-02 gtk::init failed: {}", err);
+            println!("WV-08-03 gtk::init failed: {}", err);
+            return;
         }
     }
+
+    let _window = gtk::Window::new(gtk::WindowType::Popup);
+
+    println!("WV-08-03 gtk::Window created");
 }
 
 /// Linux向け WebView を初期化する。
@@ -95,7 +100,7 @@ pub fn ensure_webview_initialized(
     _initial_rect: Option<egui::Rect>,
     _scale: f32,
 ) {
-    println!("WV-08-02 ensure_webview_initialized skipped");
+    println!("WV-08-03 ensure_webview_initialized skipped");
 }
 
 /// Linux向け Child Surface 追従処理。
