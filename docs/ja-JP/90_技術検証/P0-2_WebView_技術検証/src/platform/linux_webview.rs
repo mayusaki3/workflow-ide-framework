@@ -1,17 +1,17 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-08-01
+//! WV-08-02
 //!
 //! 役割:
-//! - GTK処理を完全に無効化する。
-//! - PoC-2e / egui_dock / eframe のみで応答なしが発生するか確認する。
-//! - 応答なしの主因が GTK統合層か、Hyper-V + Ubuntu + eframe/winit 側かを切り分ける。
+//! - gtk::init() のみを実行する。
+//! - GTK Host Window / WebView / Dummy GTK Widget / GTKイベントポンプは生成・実行しない。
+//! - 応答なしの主因が GTK初期化時点で入るか、GTK Window生成以降で入るかを切り分ける。
 //!
 //! 注意:
 //! - 技術検証用コード。
-//! - WV-08-01では gtk::init() を呼び出さない。
-//! - WV-08-01では GTK Host Window を生成しない。
-//! - WV-08-01では WebView / Dummy GTK Widget / GTKイベントポンプを使用しない。
+//! - WV-08-02では gtk::init() のみ呼び出す。
+//! - WV-08-02では GTK Host Window を生成しない。
+//! - WV-08-02では WebView / Dummy GTK Widget / GTKイベントポンプを使用しない。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -29,7 +29,7 @@ const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
 
 /// GTKイベント flush の最小間隔。
 ///
-/// WV-08-01:
+/// WV-08-02:
 /// - GTKイベントポンプ頻度を最大2回/秒に制限する。
 const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
 
@@ -55,7 +55,7 @@ struct SurfaceState {
 /// - Host Window 自体を Dock Panel に重ねるため、装飾とタスクバー表示を抑制する。
 ///
 /// 注意:
-/// - WV-08-01では GDK_BACKEND=x11 での実行を前提とする。
+/// - WV-08-02では GDK_BACKEND=x11 での実行を前提とする。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -63,7 +63,16 @@ struct SurfaceState {
 /// 戻り値:
 /// - なし。
 pub fn initialize_root_window(_cc: &CreationContext<'_>) {
-    println!("WV-08-01 GTK disabled");
+    println!("WV-08-02 gtk::init start");
+
+    match gtk::init() {
+        Ok(_) => {
+            println!("WV-08-02 gtk::init success");
+        }
+        Err(err) => {
+            println!("WV-08-02 gtk::init failed: {}", err);
+        }
+    }
 }
 
 /// Linux向け WebView を初期化する。
@@ -86,7 +95,7 @@ pub fn ensure_webview_initialized(
     _initial_rect: Option<egui::Rect>,
     _scale: f32,
 ) {
-    println!("WV-08-01 ensure_webview_initialized skipped");
+    println!("WV-08-02 ensure_webview_initialized skipped");
 }
 
 /// Linux向け Child Surface 追従処理。
@@ -152,7 +161,7 @@ fn rect_to_i32_bounds(
 /// - なし。
 fn flush_gtk_events_bounded(label: &str) {
     println!(
-        "WV-08-01 Linux GTK event pump disabled label={}",
+        "WV-08-02 Linux GTK event pump disabled label={}",
         label
     );
 }
