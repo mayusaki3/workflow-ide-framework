@@ -63,21 +63,25 @@ struct SurfaceState {
 /// 戻り値:
 /// - なし。
 pub fn initialize_root_window(_cc: &CreationContext<'_>) {
-    println!("WV-08-03 gtk::init start");
+    println!("WV-08-04 gtk::init start");
 
     match gtk::init() {
         Ok(_) => {
-            println!("WV-08-03 gtk::init success");
+            println!("WV-08-04 gtk::init success");
         }
         Err(err) => {
-            println!("WV-08-03 gtk::init failed: {}", err);
+            println!("WV-08-04 gtk::init failed: {}", err);
             return;
         }
     }
 
-    let _window = gtk::Window::new(gtk::WindowType::Popup);
+    let window = gtk::Window::new(gtk::WindowType::Popup);
 
-    println!("WV-08-03 gtk::Window created");
+    println!("WV-08-04 gtk::Window created");
+
+    window.show_all();
+
+    println!("WV-08-04 window.show_all done");
 }
 
 /// Linux向け WebView を初期化する。
