@@ -84,7 +84,7 @@ WV-08-01 ensure_webview_initialized skipped
 * GTKを完全に無効化した状態では、応答なしは再現していない。
 * 応答なしの主因は、GTK統合層または GTK Toplevel Window と eframe / winit の共存条件である可能性が高い。
 
-## 評価基準
+評価基準
 
 成功
 
@@ -98,13 +98,116 @@ WV-08-01 ensure_webview_initialized skipped
 
 * GTKを無効化しても応答なしが発生する。
 
-## 結果
+結果
 
 条件付き成功
 
 * GTK完全無効化状態で、PoC-2e / egui_dock / eframe の動作は継続した。
 * GTK無効化により、未使用 import / static / const / function の警告が発生した。
 * 実行ログ上、応答なしは確認されていない。
+
+---
+
+### WV-08-02 GTK Host Window生成検証
+
+目的
+
+GTK Toplevel Window の生成だけで応答なしが発生するか確認する。
+
+WV-08-01 により GTK 完全無効化状態では応答なしは再現していない。
+
+そのため、GTK統合層のどの段階で問題が発生するかを切り分ける。
+
+実施内容
+
+以下のみ実施する。
+
+* `gtk::init()`
+* `gtk::Window::new()`
+
+以下は実施しない。
+
+* `window.show_all()`
+* WebView生成
+* Dummy GTK Widget生成
+* Child Widget生成
+* GTKイベントポンプ
+* GTKイベントflush
+
+想定コード
+
+```rust
+match gtk::init() {
+    Ok(_) => {
+        println!("WV-08-02 gtk::init success");
+    }
+    Err(err) => {
+        println!("WV-08-02 gtk::init failed: {}", err);
+        return;
+    }
+}
+
+let _window = gtk::Window::new(gtk::WindowType::Popup);
+
+println!("WV-08-02 gtk::Window created");
+```
+
+確認項目
+
+#### WV-08-02-01
+
+確認内容
+
+* `gtk::init()` 成功確認
+
+期待結果
+
+* `WV-08-02 gtk::init success`
+
+#### WV-08-02-02
+
+確認内容
+
+* `gtk::Window::new()` 成功確認
+
+期待結果
+
+* `WV-08-02 gtk::Window created`
+
+#### WV-08-02-03
+
+確認内容
+
+* eframe継続動作確認
+
+期待結果
+
+* Dock操作可能
+* マウス移動可能
+* 応答なし発生なし
+
+判定
+
+成功
+
+* 応答なし発生なし
+
+失敗
+
+* 応答なし発生
+* ウィンドウ生成失敗
+
+次工程
+
+成功時
+
+* WV-08-03 Window表示検証
+
+失敗時
+
+* GTK生成段階が主因候補
+
+---
 
 ## 結論
 
