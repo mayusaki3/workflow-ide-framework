@@ -1,15 +1,16 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-08-05
+//! WV-08-06
 //!
 //! 役割:
 //! - gtk::init()、gtk::Window生成、window.show_all() を実行する。
+//! - GTK Window を static GTK_WINDOW に保持する。
 //! - show_all() 直後に GTK イベントを上限付きで1回処理する。
-//! - GTK Host Window表示後のイベント処理で応答なしが発生するか確認する。
+//! - GTK Window のライフタイム保持で応答なしが発生するか確認する。
 //!
 //! 注意:
 //! - 技術検証用コード。
-//! - WV-08-05では WebView / Dummy GTK Widget / 継続的な GTKイベントポンプを使用しない。
+//! - WV-08-06では WebView / Dummy GTK Widget / 継続的な GTKイベントポンプを使用しない。
 //! - GTKイベント処理は show_all() 直後の明示的な上限付き flush のみに限定する。
 
 use eframe::{egui, CreationContext};
@@ -28,7 +29,7 @@ const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
 
 /// GTKイベント flush の最小間隔。
 ///
-/// WV-08-05:
+/// WV-08-06:
 /// - 継続的なGTKイベントポンプは使用しない。
 /// - 本定数は後続検証で再利用する可能性があるため残置する。
 const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
@@ -52,12 +53,13 @@ struct SurfaceState {
 /// - GTKを初期化する。
 /// - GTK Host Window を Toplevel Window として生成する。
 /// - GTK Host Window を表示する。
+/// - GTK Host Window を static GTK_WINDOW に保持する。
 /// - show_all() 直後に GTK イベントを上限付きで処理する。
 ///
 /// 注意:
-/// - WV-08-05では GDK_BACKEND=x11 での実行を前提とする。
-/// - WV-08-05では WebView / Dummy GTK Widget は生成しない。
-/// - WV-08-05では継続的な GTKイベントポンプは使用しない。
+/// - WV-08-06では GDK_BACKEND=x11 での実行を前提とする。
+/// - WV-08-06では WebView / Dummy GTK Widget は生成しない。
+/// - WV-08-06では継続的な GTKイベントポンプは使用しない。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -65,27 +67,33 @@ struct SurfaceState {
 /// 戻り値:
 /// - なし。
 pub fn initialize_root_window(_cc: &CreationContext<'_>) {
-    println!("WV-08-05 gtk::init start");
+    println!("WV-08-06 gtk::init start");
 
     match gtk::init() {
         Ok(_) => {
-            println!("WV-08-05 gtk::init success");
+            println!("WV-08-06 gtk::init success");
         }
         Err(err) => {
-            println!("WV-08-05 gtk::init failed: {}", err);
+            println!("WV-08-06 gtk::init failed: {}", err);
             return;
         }
     }
 
     let window = gtk::Window::new(gtk::WindowType::Popup);
 
-    println!("WV-08-05 gtk::Window created");
+    println!("WV-08-06 gtk::Window created");
 
     window.show_all();
 
-    println!("WV-08-05 window.show_all done");
+    println!("WV-08-06 window.show_all done");
 
-    flush_gtk_events_bounded("WV-08-05 after show_all");
+    unsafe {
+        GTK_WINDOW = Some(window);
+    }
+
+    println!("WV-08-06 GTK_WINDOW stored");
+
+    flush_gtk_events_bounded("WV-08-06 after show_all");
 }
 
 /// Linux向け WebView を初期化する。
@@ -108,7 +116,7 @@ pub fn ensure_webview_initialized(
     _initial_rect: Option<egui::Rect>,
     _scale: f32,
 ) {
-    println!("WV-08-05 ensure_webview_initialized skipped");
+    println!("WV-08-06 ensure_webview_initialized skipped");
 }
 
 /// Linux向け Child Surface 追従処理。
@@ -173,12 +181,12 @@ fn rect_to_i32_bounds(
 /// 戻り値:
 /// - なし。
 fn flush_gtk_events_bounded(label: &str) {
-    println!("WV-08-05 GTK event flush start label={}", label);
+    println!("WV-08-06 GTK event flush start label={}", label);
 
     for iteration in 0..GTK_FLUSH_MAX_ITERATIONS {
         if !gtk::events_pending() {
             println!(
-                "WV-08-05 GTK event flush completed label={} iterations={}",
+                "WV-08-06 GTK event flush completed label={} iterations={}",
                 label,
                 iteration
             );
@@ -189,7 +197,7 @@ fn flush_gtk_events_bounded(label: &str) {
     }
 
     println!(
-        "WV-08-05 GTK event flush stopped by limit label={} limit={}",
+        "WV-08-06 GTK event flush stopped by limit label={} limit={}",
         label,
         GTK_FLUSH_MAX_ITERATIONS
     );
