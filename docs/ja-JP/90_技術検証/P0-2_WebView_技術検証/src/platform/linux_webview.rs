@@ -1,6 +1,6 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-08-12
+//! WV-08-13
 //!
 //! 役割:
 //! - gtk::init()、GTK Window生成、Root Fixed生成、Child Fixed生成、Child Fixed move/resize、GTK Label生成、window.show_all() を実行する。
@@ -10,18 +10,20 @@
 //! - wry::WebViewBuilderExtUnix::build_gtk() により WebKitGTK WebView を Child Fixed へ最小追加する。
 //! - build_gtk() 成功後、WebView::set_bounds() を1回だけ実行する。
 //! - WebView を static に保持し、Dock矩形変化時に set_bounds() を継続実行する。
+//! - WebView表示状態に応じて set_visible(true / false) を実行する。
 //! - GTK Window / Root Fixed / Child Fixed / WebView を static に保持する。
 //! - show_all() 直後に上限付き GTKイベントflush を1回実行する。
-//! - Dummy GTK Widget生成、継続的なGTKイベント処理、show/hide は実行しない。
-//! - WebKitGTK生成 + GtkFixed attach + WebView set_bounds 継続実行だけで応答なしが発生するか確認する。
+//! - Dummy GTK Widget生成、継続的なGTKイベント処理は実行しない。
+//! - WebKitGTK生成 + GtkFixed attach + WebView set_bounds 継続実行 + set_visible() だけで応答なしが発生するか確認する。
 //!
 //! 注意:
 //! - 技術検証用コード。
-//! - WV-08-12では Dummy GTK Widget / 継続的な GTKイベントポンプを使用しない。
-//! - WV-08-12では GTKイベントflush を show_all() 後に1回だけ呼び出す。
+//! - WV-08-13では Dummy GTK Widget / 継続的な GTKイベントポンプを使用しない。
+//! - WV-08-13では GTKイベントflush を show_all() 後に1回だけ呼び出す。
 //! - build_gtk() は WebKitGTK生成に加え、GtkFixed の set_size_request() と put() まで実行する。
 //! - set_bounds() は GtkFixed 配下では WebView Widget への size_allocate() を実行する。
 //! - Dock矩形が変化した場合のみ set_bounds() を実行する。
+//! - Native Surface表示切替のうち WebView::set_visible() のみを検証する。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -38,14 +40,14 @@ static mut LAST_GTK_FLUSH_AT: Option<Instant> = None;
 
 /// GTKイベント flush の最大処理回数。
 ///
-/// WV-08-12:
+/// WV-08-13:
 /// - show_all() 後に1回だけ使用する。
 /// - pending が残る場合でも、上限回数で打ち切る。
 const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
 
 /// GTKイベント flush の最小間隔。
 ///
-/// WV-08-12:
+/// WV-08-13:
 /// - 継続的なGTKイベントポンプは使用しない。
 /// - 後続検証で再利用する可能性があるため残置する。
 const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
@@ -53,7 +55,7 @@ const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
 /// Native Surface の同期状態。
 ///
 /// 役割:
-/// - 前回同期状態と比較し、不要な WebView set_bounds() を抑制する。
+/// - 前回同期状態と比較し、不要な WebView set_bounds() / set_visible() を抑制する。
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct SurfaceState {
     x: i32,
@@ -79,10 +81,11 @@ struct SurfaceState {
 /// - show_all() 後に GTKイベントflush を1回だけ実行する。
 ///
 /// 注意:
-/// - WV-08-12では GDK_BACKEND=x11 での実行を前提とする。
-/// - WV-08-12では Dummy GTK Widget、継続的な GTKイベントポンプ、show/hide は使用しない。
+/// - WV-08-13では GDK_BACKEND=x11 での実行を前提とする。
+/// - WV-08-13では Dummy GTK Widget、継続的な GTKイベントポンプは使用しない。
 /// - build_gtk() は WebView生成 + GtkFixedへの追加までを実行する。
 /// - 初期 set_bounds() 後、Dock矩形変化に応じて ensure_webview_initialized() 側で set_bounds() を継続実行する。
+/// - WebView表示状態は ensure_webview_initialized() 側で set_visible() により制御する。
 ///
 /// 引数:
 /// - _cc: eframe生成コンテキスト。
@@ -90,60 +93,60 @@ struct SurfaceState {
 /// 戻り値:
 /// - なし。
 pub fn initialize_root_window(_cc: &CreationContext<'_>) {
-    println!("WV-08-12 gtk::init start");
+    println!("WV-08-13 gtk::init start");
 
     match gtk::init() {
         Ok(_) => {
-            println!("WV-08-12 gtk::init success");
+            println!("WV-08-13 gtk::init success");
         }
         Err(err) => {
-            println!("WV-08-12 gtk::init failed: {}", err);
+            println!("WV-08-13 gtk::init failed: {}", err);
             return;
         }
     }
 
     let window = gtk::Window::new(gtk::WindowType::Popup);
 
-    println!("WV-08-12 gtk::Window created");
+    println!("WV-08-13 gtk::Window created");
 
     let root_fixed = gtk::Fixed::new();
 
-    println!("WV-08-12 root_fixed created");
+    println!("WV-08-13 root_fixed created");
 
     window.add(&root_fixed);
 
-    println!("WV-08-12 root_fixed attached");
+    println!("WV-08-13 root_fixed attached");
 
     let child_fixed = gtk::Fixed::new();
 
-    println!("WV-08-12 child_fixed created");
+    println!("WV-08-13 child_fixed created");
 
     root_fixed.put(&child_fixed, 0, 0);
 
-    println!("WV-08-12 child_fixed attached");
+    println!("WV-08-13 child_fixed attached");
 
     root_fixed.move_(&child_fixed, 100, 100);
 
-    println!("WV-08-12 child_fixed moved");
+    println!("WV-08-13 child_fixed moved");
 
     child_fixed.set_size_request(300, 200);
 
-    println!("WV-08-12 child_fixed resized");
+    println!("WV-08-13 child_fixed resized");
 
-    let label = gtk::Label::new(Some("WV-08-12"));
+    let label = gtk::Label::new(Some("WV-08-13"));
 
-    println!("WV-08-12 label created");
+    println!("WV-08-13 label created");
 
     child_fixed.put(&label, 0, 0);
 
-    println!("WV-08-12 label attached");
+    println!("WV-08-13 label attached");
 
     let webview_bounds = Rect {
         position: dpi::LogicalPosition::new(0, 0).into(),
         size: dpi::LogicalSize::new(300, 200).into(),
     };
 
-    println!("WV-08-12 webview build_gtk start");
+    println!("WV-08-13 webview build_gtk start");
 
     let webview_result = WebViewBuilder::new()
         .with_url("about:blank")
@@ -152,21 +155,21 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
 
     let webview_created = match webview_result {
         Ok(webview) => {
-            println!("WV-08-12 webview build_gtk success");
+            println!("WV-08-13 webview build_gtk success");
 
             let updated_bounds = Rect {
                 position: dpi::LogicalPosition::new(20, 20).into(),
                 size: dpi::LogicalSize::new(280, 180).into(),
             };
 
-            println!("WV-08-12 webview initial set_bounds start");
+            println!("WV-08-13 webview initial set_bounds start");
 
             match webview.set_bounds(updated_bounds) {
                 Ok(_) => {
-                    println!("WV-08-12 webview initial set_bounds success");
+                    println!("WV-08-13 webview initial set_bounds success");
                 }
                 Err(err) => {
-                    println!("WV-08-12 webview initial set_bounds failed: {}", err);
+                    println!("WV-08-13 webview initial set_bounds failed: {}", err);
                 }
             }
 
@@ -177,14 +180,14 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
             true
         }
         Err(err) => {
-            println!("WV-08-12 webview build_gtk failed: {}", err);
+            println!("WV-08-13 webview build_gtk failed: {}", err);
             false
         }
     };
 
     window.show_all();
 
-    println!("WV-08-12 window.show_all done");
+    println!("WV-08-13 window.show_all done");
 
     unsafe {
         GTK_WINDOW = Some(window);
@@ -193,25 +196,27 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         WEBVIEW_CREATED = webview_created;
     }
 
-    println!("WV-08-12 GTK_WINDOW stored");
-    println!("WV-08-12 ROOT_FIXED stored");
-    println!("WV-08-12 CHILD_FIXED stored");
-    println!("WV-08-12 WEBVIEW_CREATED={}", unsafe { WEBVIEW_CREATED });
+    println!("WV-08-13 GTK_WINDOW stored");
+    println!("WV-08-13 ROOT_FIXED stored");
+    println!("WV-08-13 CHILD_FIXED stored");
+    println!("WV-08-13 WEBVIEW_CREATED={}", unsafe { WEBVIEW_CREATED });
 
-    flush_gtk_events_bounded("WV-08-12");
+    flush_gtk_events_bounded("WV-08-13");
 
-    println!("WV-08-12 GTK flush done");
+    println!("WV-08-13 GTK flush done");
 }
 
 /// Linux向け WebView を初期化・追従する。
 ///
 /// 役割:
-/// - WV-08-12では WebViewの生成は initialize_root_window() 内で行う。
+/// - WV-08-13では WebViewの生成は initialize_root_window() 内で行う。
+/// - WebView配置矩形がある場合は WebView::set_visible(true) を実行する。
+/// - WebView配置矩形がない場合は WebView::set_visible(false) を実行する。
 /// - Dock矩形が変化した場合のみ WebView::set_bounds() を実行する。
 ///
 /// 注意:
-/// - WV-08-12では set_visible() を呼び出さない。
-/// - WV-08-12では継続的な GTKイベントポンプを実行しない。
+/// - WV-08-13では継続的な GTKイベントポンプを実行しない。
+/// - WV-08-13では Native Surface表示切替のうち WebView::set_visible() のみを検証する。
 ///
 /// 引数:
 /// - initial_rect: WebView配置矩形。
@@ -226,6 +231,35 @@ pub fn ensure_webview_initialized(
     let rect = match initial_rect {
         Some(rect) => rect,
         None => {
+            let state = SurfaceState {
+                x: 0,
+                y: 0,
+                width: 1,
+                height: 1,
+                visible: false,
+            };
+
+            unsafe {
+                if LAST_SURFACE_STATE == Some(state) {
+                    return;
+                }
+
+                LAST_SURFACE_STATE = Some(state);
+
+                if let Some(webview) = WEBVIEW.as_ref() {
+                    println!("WV-08-13 set_visible(false) start");
+
+                    match webview.set_visible(false) {
+                        Ok(_) => {
+                            println!("WV-08-13 set_visible(false) success");
+                        }
+                        Err(err) => {
+                            println!("WV-08-13 set_visible(false) failed: {}", err);
+                        }
+                    }
+                }
+            }
+
             return;
         }
     };
@@ -248,8 +282,19 @@ pub fn ensure_webview_initialized(
         LAST_SURFACE_STATE = Some(state);
 
         if let Some(webview) = WEBVIEW.as_ref() {
+            println!("WV-08-13 set_visible(true) start");
+
+            match webview.set_visible(true) {
+                Ok(_) => {
+                    println!("WV-08-13 set_visible(true) success");
+                }
+                Err(err) => {
+                    println!("WV-08-13 set_visible(true) failed: {}", err);
+                }
+            }
+
             println!(
-                "WV-08-12 set_bounds start x={} y={} w={} h={}",
+                "WV-08-13 set_bounds start x={} y={} w={} h={}",
                 x, y, width, height
             );
 
@@ -260,10 +305,10 @@ pub fn ensure_webview_initialized(
 
             match webview.set_bounds(bounds) {
                 Ok(_) => {
-                    println!("WV-08-12 set_bounds success");
+                    println!("WV-08-13 set_bounds success");
                 }
                 Err(err) => {
-                    println!("WV-08-12 set_bounds failed: {}", err);
+                    println!("WV-08-13 set_bounds failed: {}", err);
                 }
             }
         }
@@ -273,7 +318,7 @@ pub fn ensure_webview_initialized(
 /// Linux向け Child Surface 追従処理。
 ///
 /// 役割:
-/// - WV-08-12では Child Surface 追従処理を実行しない。
+/// - WV-08-13では Child Surface 追従処理を実行しない。
 ///
 /// 引数:
 /// - _ctx: egui コンテキスト。
@@ -325,7 +370,7 @@ fn rect_to_i32_bounds(
 /// - pending が残っていても上限回数で打ち切る。
 ///
 /// 注意:
-/// - WV-08-12では show_all() 後に1回だけ呼び出す。
+/// - WV-08-13では show_all() 後に1回だけ呼び出す。
 ///
 /// 引数:
 /// - label: ログ識別名。
@@ -333,12 +378,12 @@ fn rect_to_i32_bounds(
 /// 戻り値:
 /// - なし。
 fn flush_gtk_events_bounded(label: &str) {
-    println!("WV-08-12 GTK event flush start label={}", label);
+    println!("WV-08-13 GTK event flush start label={}", label);
 
     for iteration in 0..GTK_FLUSH_MAX_ITERATIONS {
         if !gtk::events_pending() {
             println!(
-                "WV-08-12 GTK event flush completed label={} iterations={}",
+                "WV-08-13 GTK event flush completed label={} iterations={}",
                 label,
                 iteration
             );
@@ -349,7 +394,7 @@ fn flush_gtk_events_bounded(label: &str) {
     }
 
     println!(
-        "WV-08-12 GTK event flush stopped by limit label={} limit={}",
+        "WV-08-13 GTK event flush stopped by limit label={} limit={}",
         label,
         GTK_FLUSH_MAX_ITERATIONS
     );
@@ -362,7 +407,7 @@ fn flush_gtk_events_bounded(label: &str) {
 /// - GTK Host Window の応答停止を防げるか確認する。
 ///
 /// 注意:
-/// - WV-08-12では呼び出さない。
+/// - WV-08-13では呼び出さない。
 ///
 /// 引数:
 /// - label: ログ識別名。
