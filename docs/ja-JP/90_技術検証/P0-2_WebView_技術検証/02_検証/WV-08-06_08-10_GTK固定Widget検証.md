@@ -145,15 +145,11 @@ child_fixed.set_size_request(300, 200);
 
 ## WV-08-09 GTK Label追加検証
 
-### 状態
-
-未実施
-
 ### 目的
 
-GTK Widget追加のみで応答なしが再現するか確認する。
+GTK Label追加のみで応答なしが再現するか確認する。
 
-### 実施予定
+### 実施内容
 
 ```rust
 let label = gtk::Label::new(Some("WV-08-09"));
@@ -161,38 +157,72 @@ let label = gtk::Label::new(Some("WV-08-09"));
 child_fixed.put(&label, 0, 0);
 ```
 
-### 判定条件
+### 結果
 
-応答なし発生:
+* label created
+* label attached
+* GTK event flush completed
+* 白Window表示
+* Dock移動可能
+* Dockサイズ変更可能
+* マウス操作可能
+* 応答なし発生せず
 
-* GTK Widget階層が主因候補
+### 判定
 
-応答なし未発生:
+成功
 
-* WebKitGTK系へ原因を絞り込む
+### 知見
+
+以下は主因ではない可能性が高い。
+
+* GTK Label生成
+* GTK Widget追加
+* Fixed配下へのWidget配置
 
 ---
 
-## WV-08-10 予備検証
-
-### 状態
-
-未実施
+## WV-08-10 WebKitGTK最小生成検証
 
 ### 目的
 
-WV-08-09の結果に応じて追加切り分けを実施する。
+WebKitGTK WebView生成および GtkFixed への attach のみで応答なしが再現するか確認する。
 
-候補:
+### 実施内容
 
-* Widget show / hide
-* Widget visibility
-* Widget remove
-* Widget destroy
+```rust
+let webview = WebViewBuilder::new()
+    .with_url("about:blank")
+    .with_bounds(...)
+    .build_gtk(&child_fixed);
+```
+
+### 結果
+
+* webview build_gtk success
+* WEBVIEW_CREATED=true
+* GTK event flush completed
+* Dock移動可能
+* Dockサイズ変更可能
+* マウス操作可能
+* 応答なし発生せず
+
+### 判定
+
+成功
+
+### 知見
+
+以下は主因ではない可能性が高い。
+
+* WebKitGTK生成
+* build_gtk()
+* GtkFixed attach
+* WebView初期化
 
 ---
 
-## WV-08-06 ～ WV-08-08総括
+## WV-08-06 ～ WV-08-10総括
 
 除外できた要因:
 
@@ -203,30 +233,34 @@ WV-08-09の結果に応じて追加切り分けを実施する。
 * Child Fixed move
 * Child Fixed resize
 * GTKレイアウト更新
+* GTK Label生成
+* GTK Widget追加
+* WebKitGTK生成
+* build_gtk()
+* GtkFixed attach
+* WebView初期化
 
 現在の有力候補:
 
 優先度高:
 
-1. GTK Widget追加
+1. WebView set_bounds継続実行
 2. 継続GTKイベントポンプ
-3. WebKitGTK WebView生成
-4. WebKitGTK attach
-5. WebKitGTK move / resize
-6. WebKitGTK + eframe / winit 共存
+3. WebKitGTK + eframe / winit 共存
+4. WebView visibility制御
 
 優先度中:
 
-7. Widget visibility制御
-8. Native Surface表示切替
+5. Native Surface表示切替
+6. Dock追従同期処理
 
 ### 現時点の結論
 
-WV-08-08時点では GTK Fixed 系のみでは応答なしは再現していない。
+WV-08-10時点では GTK Widget階層および WebKitGTK生成だけでは応答なしは再現していない。
 
-GTK基盤部分は概ね正常動作している。
+GTK基盤および WebKitGTK初期化経路は正常動作している可能性が高い。
 
-今後の切り分け対象は GTK Widget 実体および WebKitGTK 統合層である。
+今後の切り分け対象は WebView再配置処理および継続同期処理である。
 
 ---
 
