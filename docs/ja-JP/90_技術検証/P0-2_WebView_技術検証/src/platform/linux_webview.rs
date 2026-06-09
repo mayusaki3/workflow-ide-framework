@@ -1,21 +1,284 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-08-10
+//! WV-08-09
 //!
 //! 役割:
-//! - gtk::init()、GTK Window生成、Root Fixed生成、Child Fixed生成、Child Fixed move/resize、GTK Label生成を実行する。
-//! - wry::WebViewBuilder::build_gtk(&child_fixed) により WebKitGTK WebView を最小生成する。
+//! - gtk::init()、GTK Window生成、Root Fixed生成、Child Fixed生成、Child Fixed move/resize、GTK Label生成、window.show_all() を実行する。
 //! - Root Fixed を GTK Window に追加し、Child Fixed を Root Fixed に追加する。
 //! - Child Fixed を固定位置へ移動し、固定サイズを設定する。
 //! - GTK Label を Child Fixed に追加する。
-//! - GTK Window / Root Fixed / Child Fixed / WebView を static に保持する。
+//! - GTK Window / Root Fixed / Child Fixed を static に保持する。
 //! - show_all() 直後に上限付き GTKイベントflush を1回実行する。
-//! - 継続的なGTKイベント処理、WebView追従move/resizeは実行しない。
-//! - WebKitGTK WebView最小生成だけで応答なしが発生するか確認する。
+//! - WebView生成、Dummy GTK Widget生成、継続的なGTKイベント処理は実行しない。
+//! - GTK Widget実体の追加だけで応答なしが発生するか確認する。
+//!
+//! 注意:
+//! - 技術検証用コード。
+//! - WV-08-09では WebView / Dummy GTK Widget / 継続的な GTKイベントポンプを使用しない。
+//! - WV-08-09では GTKイベントflush を show_all() 後に1回だけ呼び出す。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
 use std::time::{Duration, Instant};
-use wry::{WebView, WebViewBuilder, WebViewBuilderExtUnix};
 
-// 以下変更なし
+static mut GTK_WINDOW: Option<gtk::Window> = None;
+static mut ROOT_FIXED: Option<gtk::Fixed> = None;
+static mut CHILD_FIXED: Option<gtk::Fixed> = None;
+static mut WEBVIEW_CREATED: bool = false;
+static mut LAST_SURFACE_STATE: Option<SurfaceState> = None;
+static mut LAST_GTK_FLUSH_AT: Option<Instant> = None;
+
+/// GTKイベント flush の最大処理回数。
+///
+/// WV-08-09:
+/// - show_all() 後に1回だけ使用する。
+/// - pending が残る場合でも、上限回数で打ち切る。
+const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
+
+/// GTKイベント flush の最小間隔。
+///
+/// WV-08-09:
+/// - 継続的なGTKイベントポンプは使用しない。
+/// - 後続検証で再利用する可能性があるため残置する。
+const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
+
+/// Native Surface の同期状態。
+///
+/// 役割:
+/// - 前回同期状態と比較し、不要な GTK Widget 操作を抑制する。
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct SurfaceState {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    visible: bool,
+}
+
+/// Linux向け GTK Host Window を初期化する。
+///
+/// 役割:
+/// - GTKを初期化する。
+/// - GTK Host Window を Toplevel Window として生成する。
+/// - Root Fixed を生成し、GTK Host Window に追加する。
+/// - Child Fixed を生成し、Root Fixed に追加する。
+/// - Child Fixed の位置とサイズを固定値で設定する。
+/// - GTK Label を生成し、Child Fixed に追加する。
+/// - GTK Host Window を表示し、Window / Root Fixed / Child Fixed を static に保持する。
+/// - show_all() 後に GTKイベントflush を1回だけ実行する。
+///
+/// 注意:
+/// - WV-08-09では GDK_BACKEND=x11 での実行を前提とする。
+/// - WV-08-09では WebView / Dummy GTK Widget は生成しない。
+/// - WV-08-09では継続的な GTKイベントポンプは使用しない。
+///
+/// 引数:
+/// - _cc: eframe生成コンテキスト。
+///
+/// 戻り値:
+/// - なし。
+pub fn initialize_root_window(_cc: &CreationContext<'_>) {
+    println!("WV-08-09 gtk::init start");
+
+    match gtk::init() {
+        Ok(_) => {
+            println!("WV-08-09 gtk::init success");
+        }
+        Err(err) => {
+            println!("WV-08-09 gtk::init failed: {}", err);
+            return;
+        }
+    }
+
+    let window = gtk::Window::new(gtk::WindowType::Popup);
+
+    println!("WV-08-09 gtk::Window created");
+
+    let root_fixed = gtk::Fixed::new();
+
+    println!("WV-08-09 root_fixed created");
+
+    window.add(&root_fixed);
+
+    println!("WV-08-09 root_fixed attached");
+
+    let child_fixed = gtk::Fixed::new();
+
+    println!("WV-08-09 child_fixed created");
+
+    root_fixed.put(&child_fixed, 0, 0);
+
+    println!("WV-08-09 child_fixed attached");
+
+    root_fixed.move_(&child_fixed, 100, 100);
+
+    println!("WV-08-09 child_fixed moved");
+
+    child_fixed.set_size_request(300, 200);
+
+    println!("WV-08-09 child_fixed resized");
+
+    let label = gtk::Label::new(Some("WV-08-09"));
+
+    println!("WV-08-09 label created");
+
+    child_fixed.put(&label, 0, 0);
+
+    println!("WV-08-09 label attached");
+
+    window.show_all();
+
+    println!("WV-08-09 window.show_all done");
+
+    unsafe {
+        GTK_WINDOW = Some(window);
+        ROOT_FIXED = Some(root_fixed);
+        CHILD_FIXED = Some(child_fixed);
+    }
+
+    println!("WV-08-09 GTK_WINDOW stored");
+    println!("WV-08-09 ROOT_FIXED stored");
+    println!("WV-08-09 CHILD_FIXED stored");
+
+    flush_gtk_events_bounded("WV-08-09");
+
+    println!("WV-08-09 GTK flush done");
+}
+
+/// Linux向け WebView を初期化する。
+///
+/// 役割:
+/// - WV-08-09では WebView を生成しない。
+///
+/// 注意:
+/// - WV-08-09では GTK Widget実体追加段階のみを検証する。
+///
+/// 引数:
+/// - _initial_rect: 初期配置矩形。
+/// - _scale: egui のスケール値。
+///
+/// 戻り値:
+/// - なし。
+pub fn ensure_webview_initialized(
+    _initial_rect: Option<egui::Rect>,
+    _scale: f32,
+) {
+    println!("WV-08-09 ensure_webview_initialized skipped");
+}
+
+/// Linux向け Child Surface 追従処理。
+///
+/// 役割:
+/// - WV-08-09では Child Surface 追従処理を実行しない。
+///
+/// 引数:
+/// - _ctx: egui コンテキスト。
+/// - _webview_rect: WebView配置矩形。
+/// - _should_show_native_surface: Native Surface を表示する場合 true。
+///
+/// 戻り値:
+/// - なし。
+pub fn sync_child_window(
+    _ctx: &egui::Context,
+    _webview_rect: Option<egui::Rect>,
+    _should_show_native_surface: bool,
+) {
+}
+
+/// egui矩形を GTK / wry 用 i32 境界値へ変換する。
+///
+/// 役割:
+/// - egui座標をスケール適用後の整数座標へ変換する。
+/// - 極端な値を制限し、GTK側へ不正に大きい値を渡さない。
+///
+/// 引数:
+/// - rect: egui矩形。
+/// - scale: スケール値。
+///
+/// 戻り値:
+/// - (x, y, width, height)
+fn rect_to_i32_bounds(
+    rect: egui::Rect,
+    scale: f32,
+) -> (i32, i32, i32, i32) {
+    let x = (rect.min.x * scale) as i32;
+    let y = (rect.min.y * scale) as i32;
+    let width = (rect.width() * scale) as i32;
+    let height = (rect.height() * scale) as i32;
+
+    (
+        x.max(0).min(16_000),
+        y.max(0).min(16_000),
+        width.max(1).min(16_000),
+        height.max(1).min(16_000),
+    )
+}
+
+/// GTKイベントを上限付きで処理する。
+///
+/// 役割:
+/// - show_all() 直後など、明示的に GTK イベントを処理する。
+/// - pending が残っていても上限回数で打ち切る。
+///
+/// 注意:
+/// - WV-08-09では show_all() 後に1回だけ呼び出す。
+///
+/// 引数:
+/// - label: ログ識別名。
+///
+/// 戻り値:
+/// - なし。
+fn flush_gtk_events_bounded(label: &str) {
+    println!("WV-08-09 GTK event flush start label={}", label);
+
+    for iteration in 0..GTK_FLUSH_MAX_ITERATIONS {
+        if !gtk::events_pending() {
+            println!(
+                "WV-08-09 GTK event flush completed label={} iterations={}",
+                label,
+                iteration
+            );
+            return;
+        }
+
+        gtk::main_iteration_do(false);
+    }
+
+    println!(
+        "WV-08-09 GTK event flush stopped by limit label={} limit={}",
+        label,
+        GTK_FLUSH_MAX_ITERATIONS
+    );
+}
+
+/// GTKイベントを低頻度で処理する。
+///
+/// 役割:
+/// - eframe / winit を停止させずに GTK / WebKitGTK のイベントを継続処理する。
+/// - GTK Host Window の応答停止を防げるか確認する。
+///
+/// 注意:
+/// - WV-08-09では呼び出さない。
+///
+/// 引数:
+/// - label: ログ識別名。
+///
+/// 戻り値:
+/// - なし。
+fn flush_gtk_events_throttled(label: &str) {
+    unsafe {
+        let now = Instant::now();
+
+        let should_flush = LAST_GTK_FLUSH_AT
+            .map(|last| now.duration_since(last) >= GTK_FLUSH_INTERVAL)
+            .unwrap_or(true);
+
+        if !should_flush {
+            return;
+        }
+
+        LAST_GTK_FLUSH_AT = Some(now);
+    }
+
+    flush_gtk_events_bounded(label);
+}
