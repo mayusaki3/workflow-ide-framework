@@ -330,8 +330,35 @@ pub fn ensure_webview_initialized(
 pub fn sync_child_window(
     _ctx: &egui::Context,
     _webview_rect: Option<egui::Rect>,
-    _should_show_native_surface: bool,
+    should_show_native_surface: bool,
 ) {
+    unsafe {
+        if let Some(webview) = WEBVIEW.as_ref() {
+            if should_show_native_surface {
+                println!(\"WV-08-14 set_visible(true) start\");
+
+                match webview.set_visible(true) {
+                    Ok(_) => {
+                        println!(\"WV-08-14 set_visible(true) success\");
+                    }
+                    Err(err) => {
+                        println!(\"WV-08-14 set_visible(true) failed: {}\", err);
+                    }
+                }
+            } else {
+                println!(\"WV-08-14 set_visible(false) start\");
+
+                match webview.set_visible(false) {
+                    Ok(_) => {
+                        println!(\"WV-08-14 set_visible(false) success\");
+                    }
+                    Err(err) => {
+                        println!(\"WV-08-14 set_visible(false) failed: {}\", err);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// egui矩形を GTK / wry 用 i32 境界値へ変換する。
