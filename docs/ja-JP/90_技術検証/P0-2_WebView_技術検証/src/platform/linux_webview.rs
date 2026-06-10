@@ -1,6 +1,6 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-08-15
+//! WV-08-16
 //!
 //! 役割:
 //! - gtk::init()、GTK Window生成、Root Fixed生成、Child Fixed生成、Child Fixed move/resize、GTK Label生成、window.show_all() を実行する。
@@ -10,20 +10,21 @@
 //! - wry::WebViewBuilderExtUnix::build_gtk() により WebKitGTK WebView を Child Fixed へ最小追加する。
 //! - build_gtk() 成功後、WebView::set_bounds() を1回だけ実行する。
 //! - WebView を static に保持し、Dock矩形変化時に set_bounds() を継続実行する。
-//! - sync_child_window() で WebView::set_visible(false) を強制実行する。
+//! - Dock矩形変化時に set_bounds() を継続実行する。
+//! - flush_gtk_events_throttled() を再導入する。
 //! - GTK Window / Root Fixed / Child Fixed / WebView を static に保持する。
 //! - show_all() 直後に上限付き GTKイベントflush を1回実行する。
 //! - Dummy GTK Widget生成、継続的なGTKイベント処理は実行しない。
-//! - WebKitGTK生成 + GtkFixed attach + WebView set_bounds 継続実行 + set_visible(false) 強制実行で応答なしが発生するか確認する。
+//! - WebKitGTK生成 + GtkFixed attach + WebView set_bounds 継続実行 + GTKイベントポンプ再導入で応答なしが発生するか確認する。
 //!
 //! 注意:
 //! - 技術検証用コード。
-//! - WV-08-13では Dummy GTK Widget / 継続的な GTKイベントポンプを使用しない。
-//! - WV-08-13では GTKイベントflush を show_all() 後に1回だけ呼び出す。
+//! - WV-08-16では Dummy GTK Widget は使用しない。
+//! - WV-08-16では show_all() 後に加え、Dock追従時に低頻度 GTKイベントflush を呼び出す。
 //! - build_gtk() は WebKitGTK生成に加え、GtkFixed の set_size_request() と put() まで実行する。
 //! - set_bounds() は GtkFixed 配下では WebView Widget への size_allocate() を実行する。
 //! - Dock矩形が変化した場合のみ set_bounds() を実行する。
-//! - WebView::set_visible(false) を強制実行して検証する。
+//! - flush_gtk_events_throttled() を継続実行して検証する。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -311,6 +312,10 @@ pub fn ensure_webview_initialized(
                     println!("WV-08-13 set_bounds failed: {}", err);
                 }
             }
+
+            println!("WV-08-16 throttled GTK flush request");
+
+            flush_gtk_events_throttled("WV-08-16");
         }
     }
 }
@@ -318,38 +323,20 @@ pub fn ensure_webview_initialized(
 /// Linux向け Child Surface 追従処理。
 ///
 /// 役割:
-/// - WV-08-15では WebView::set_visible(false) を強制実行する。
+/// - WV-08-16では Child Surface 追従処理を実行しない。
 ///
 /// 引数:
 /// - _ctx: egui コンテキスト。
 /// - _webview_rect: WebView配置矩形。
-/// - should_show_native_surface: WV-08-15では参照せず、強制非表示検証を行う。
+/// - _should_show_native_surface: 未使用。
 ///
 /// 戻り値:
 /// - なし。
 pub fn sync_child_window(
     _ctx: &egui::Context,
     _webview_rect: Option<egui::Rect>,
-    should_show_native_surface: bool,
+    _should_show_native_surface: bool,
 ) {
-    let _ = should_show_native_surface;
-
-    unsafe {
-        if let Some(webview) = WEBVIEW.as_ref() {
-            println!("WV-08-15 force hide start");
-
-            match webview.set_visible(false) {
-                Ok(_) => {
-                    println!("WV-08-15 force hide success");
-                }
-                Err(err) => {
-                    println!("WV-08-15 force hide failed: {}", err);
-                }
-            }
-
-            return;
-        }
-    }
 }
 
 /// egui矩形を GTK / wry 用 i32 境界値へ変換する。
@@ -425,7 +412,7 @@ fn flush_gtk_events_bounded(label: &str) {
 /// - GTK Host Window の応答停止を防げるか確認する。
 ///
 /// 注意:
-/// - WV-08-13では呼び出さない。
+/// - WV-08-16では Dock追従時に呼び出す。
 ///
 /// 引数:
 /// - label: ログ識別名。
