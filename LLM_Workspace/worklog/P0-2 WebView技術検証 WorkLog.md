@@ -9,7 +9,7 @@
 
 ### 到達点
 
-* WV-08-11 完了
+* WV-08-14 完了
 
 ### ドキュメント構成
 
@@ -22,6 +22,9 @@
 * WV-08-01_08-05_GTK基本検証.md
 * WV-08-06_08-10_GTK固定Widget検証.md
 * WV-08-11_WebView_set_bounds単発検証.md
+* WV-08-12_WebView_set_bounds継続追従検証.md
+* WV-08-13_WebView_visibility追従検証.md
+* WV-08-14_sync_child_window_visibility検証.md
 
 ### 更新対象
 
@@ -29,6 +32,9 @@
 
 * src/platform/linux_webview.rs
 * WV-08_GTK完全無効化検証.md
+* WV-08-12_WebView_set_bounds継続追従検証.md
+* WV-08-13_WebView_visibility追従検証.md
+* WV-08-14_sync_child_window_visibility検証.md
 
 親ドキュメントは知見管理のみ行う。
 
@@ -55,49 +61,47 @@
 * WebView初期化
 * WebView set_bounds単発
 * GtkFixed配下での size_allocate
+* WebView set_bounds継続実行
+* WebView set_visible(true)
+* sync_child_window() 経由の WebView set_visible(true)
 
 ## 現在の有力候補
 
 優先度高:
 
-1. WebView set_bounds継続実行
+1. WebView set_visible(false)
 2. 継続GTKイベントポンプ
 3. WebKitGTK + eframe / winit 共存
-4. WebView visibility制御
+4. Native Surface表示切替
 
 優先度中:
 
-5. Native Surface表示切替
-6. Dock追従同期処理
+5. Dock追従同期処理
 
 ## 次工程
 
-### WV-08-12 WebView set_bounds継続追従検証
+### WV-08-15 WebView set_visible(false) 強制検証
 
 目的:
 
-* Dock矩形変化に追従して WebView::set_bounds() を継続実行した場合に応答なしが再現するか確認する。
+* Native Surface非表示経路を強制実行し、WebView::set_visible(false) が応答なし要因か確認する。
 
 実施内容:
 
 * build_gtk()
-* Dock矩形取得
+* Dock追従
 * set_bounds継続実行
-
-実施しない内容:
-
-* set_visible()
-* Native Surface表示切替
+* set_visible(false) 強制実行
 
 判定:
 
 応答なし発生:
 
-* 継続的な set_bounds() が主因候補
+* set_visible(false) が主因候補
 
 応答なし未発生:
 
-* visibility制御またはGTKイベントポンプへ調査を進める
+* visibility制御は主因から除外し、継続GTKイベントポンプまたは eframe / winit 共存へ調査を進める。
 
 ## 運用ルール
 
