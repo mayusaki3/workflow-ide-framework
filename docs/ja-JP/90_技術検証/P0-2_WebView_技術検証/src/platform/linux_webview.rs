@@ -335,25 +335,25 @@ pub fn sync_child_window(
     unsafe {
         if let Some(webview) = WEBVIEW.as_ref() {
             if should_show_native_surface {
-                println!(\"WV-08-14 set_visible(true) start\");
+                println!("WV-08-14 set_visible(true) start");
 
                 match webview.set_visible(true) {
                     Ok(_) => {
-                        println!(\"WV-08-14 set_visible(true) success\");
+                        println!("WV-08-14 set_visible(true) success");
                     }
                     Err(err) => {
-                        println!(\"WV-08-14 set_visible(true) failed: {}\", err);
+                        println!("WV-08-14 set_visible(true) failed: {}", err);
                     }
                 }
             } else {
-                println!(\"WV-08-14 set_visible(false) start\");
+                println!("WV-08-14 set_visible(false) start");
 
                 match webview.set_visible(false) {
                     Ok(_) => {
-                        println!(\"WV-08-14 set_visible(false) success\");
+                        println!("WV-08-14 set_visible(false) success");
                     }
                     Err(err) => {
-                        println!(\"WV-08-14 set_visible(false) failed: {}\", err);
+                        println!("WV-08-14 set_visible(false) failed: {}", err);
                     }
                 }
             }
