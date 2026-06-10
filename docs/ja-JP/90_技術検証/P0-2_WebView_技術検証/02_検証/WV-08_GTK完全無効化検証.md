@@ -70,6 +70,7 @@ WV-07では以下を確認した。
 * WV-08-12 WebView set_bounds継続追従検証
 * WV-08-13 WebView visibility追従検証
 * WV-08-14 sync_child_window visibility検証
+* WV-08-15 WebView set_visible(false) 強制検証
 
 参照:
 
@@ -77,6 +78,7 @@ WV-07では以下を確認した。
 * [WebView set_bounds継続追従検証](WV-08-12_WebView_set_bounds継続追従検証.md)
 * [WebView visibility追従検証](WV-08-13_WebView_visibility追従検証.md)
 * [sync_child_window visibility検証](WV-08-14_sync_child_window_visibility検証.md)
+* [WebView set_visible(false) 強制検証](WV-08-15_WebView_set_visible_false強制検証.md)
 
 ## 現在の知見
 
