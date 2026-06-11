@@ -1,6 +1,6 @@
 //! Linux向け WebView / GTK Fixed PoC処理。
 //!
-//! WV-08-16
+//! WV-08-17
 //!
 //! 役割:
 //! - gtk::init()、GTK Window生成、Root Fixed生成、Child Fixed生成、Child Fixed move/resize、GTK Label生成、window.show_all() を実行する。
@@ -11,11 +11,12 @@
 //! - build_gtk() 成功後、WebView::set_bounds() を1回だけ実行する。
 //! - WebView を static に保持し、Dock矩形変化時に set_bounds() を継続実行する。
 //! - Dock矩形変化時に set_bounds() を継続実行する。
-//! - flush_gtk_events_throttled() を再導入する。
+//! - flush_gtk_events_throttled() を継続する。
+//! - should_show_native_surface に連動して Native Surface 表示切替を実行する。
 //! - GTK Window / Root Fixed / Child Fixed / WebView を static に保持する。
 //! - show_all() 直後に上限付き GTKイベントflush を1回実行する。
 //! - Dummy GTK Widget生成、継続的なGTKイベント処理は実行しない。
-//! - WebKitGTK生成 + GtkFixed attach + WebView set_bounds 継続実行 + GTKイベントポンプ再導入で応答なしが発生するか確認する。
+//! - WebKitGTK生成 + GtkFixed attach + WebView set_bounds 継続実行 + GTKイベントポンプ + Native Surface表示切替で応答なしが発生するか確認する。
 //!
 //! 注意:
 //! - 技術検証用コード。
@@ -24,7 +25,7 @@
 //! - build_gtk() は WebKitGTK生成に加え、GtkFixed の set_size_request() と put() まで実行する。
 //! - set_bounds() は GtkFixed 配下では WebView Widget への size_allocate() を実行する。
 //! - Dock矩形が変化した場合のみ set_bounds() を実行する。
-//! - flush_gtk_events_throttled() を継続実行して検証する。
+//! - should_show_native_surface に連動した Native Surface表示切替を検証する。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
@@ -323,20 +324,48 @@ pub fn ensure_webview_initialized(
 /// Linux向け Child Surface 追従処理。
 ///
 /// 役割:
-/// - WV-08-16では Child Surface 追従処理を実行しない。
+/// - WV-08-17では should_show_native_surface に連動して WebView 表示状態を切り替える。
+/// - Native Surface 表示切替経路で応答なしが発生するか確認する。
 ///
 /// 引数:
 /// - _ctx: egui コンテキスト。
 /// - _webview_rect: WebView配置矩形。
-/// - _should_show_native_surface: 未使用。
+/// - should_show_native_surface: Native Surface を表示する場合 true。
 ///
 /// 戻り値:
 /// - なし。
 pub fn sync_child_window(
     _ctx: &egui::Context,
     _webview_rect: Option<egui::Rect>,
-    _should_show_native_surface: bool,
+    should_show_native_surface: bool,
 ) {
+    unsafe {
+        if let Some(webview) = WEBVIEW.as_ref() {
+            if should_show_native_surface {
+                println!("WV-08-17 native surface show start");
+
+                match webview.set_visible(true) {
+                    Ok(_) => {
+                        println!("WV-08-17 native surface show success");
+                    }
+                    Err(err) => {
+                        println!("WV-08-17 native surface show failed: {}", err);
+                    }
+                }
+            } else {
+                println!("WV-08-17 native surface hide start");
+
+                match webview.set_visible(false) {
+                    Ok(_) => {
+                        println!("WV-08-17 native surface hide success");
+                    }
+                    Err(err) => {
+                        println!("WV-08-17 native surface hide failed: {}", err);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// egui矩形を GTK / wry 用 i32 境界値へ変換する。
