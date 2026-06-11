@@ -9,7 +9,8 @@
 
 ### 到達点
 
-* WV-08-15 完了
+* WV-08-17 完了
+* WV-08 系検証完了
 
 ### ドキュメント構成
 
@@ -27,6 +28,7 @@
 * WV-08-14_sync_child_window_visibility検証.md
 * WV-08-15_WebView_set_visible_false強制検証.md
 * WV-08-16_GTKイベントポンプ再導入検証.md
+* WV-08-17_Native_Surface表示切替単独検証.md
 
 ### 更新対象
 
@@ -39,6 +41,7 @@
 * WV-08-14_sync_child_window_visibility検証.md
 * WV-08-15_WebView_set_visible_false強制検証.md
 * WV-08-16_GTKイベントポンプ再導入検証.md
+* WV-08-17_Native_Surface表示切替単独検証.md
 
 親ドキュメントは知見管理のみ行う。
 
@@ -69,14 +72,18 @@
 * WebView set_visible(true)
 * sync_child_window() 経由の WebView set_visible(true)
 * WebView set_visible(false)
+* sync_child_window() 経由の WebView set_visible(false)
+* flush_gtk_events_throttled()
+* gtk::main_iteration_do(false) 継続実行
+* Native Surface表示切替
 
 ## 現在の有力候補
 
 優先度高:
 
-1. 継続GTKイベントポンプ
-2. WebKitGTK + eframe / winit 共存
-3. Native Surface表示切替
+1. WebKitGTK + eframe / winit 共存
+2. X11親子ウィンドウ制御
+3. 実運用側の同期処理
 
 優先度中:
 
@@ -84,30 +91,28 @@
 
 ## 次工程
 
-### WV-08-16 GTKイベントポンプ再導入検証
+### WV-09 系検証へ移行
 
 目的:
 
-* GTKイベントポンプを再導入した場合に応答なしが再現するか確認する。
+* WV-07で応答なしが発生した構成との差分を再確認し、WV-08で除外できなかった要素を切り分ける。
 
-実施内容:
+調査候補:
 
-* build_gtk()
-* GtkFixed attach
-* set_bounds継続実行
-* set_visible(true)
-* set_visible(false)
-* flush_gtk_events_throttled() 再導入
+* WebKitGTK + eframe / winit 共存
+* X11親子ウィンドウ制御
+* 実運用側の同期処理
+* Dock追従同期処理
 
 判定:
 
 応答なし発生:
 
-* GTKイベント処理が主因候補
+* 追加した構成要素を主因候補として扱う
 
 応答なし未発生:
 
-* GTKイベント処理を主因から除外
+* 次の未評価要素へ調査を進める
 
 ## 運用ルール
 
