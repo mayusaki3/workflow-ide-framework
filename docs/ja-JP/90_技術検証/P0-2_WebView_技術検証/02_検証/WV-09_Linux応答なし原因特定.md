@@ -8,7 +8,7 @@ canonical_document: true
 status: in_progress
 -->
 
-[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [検証目次](検証目次.md) > WV-09 Linux応答なし原因特定
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [検証目次](検証目次.md) > WV-09 Linux応答なし原因特定
 
 # WV-09 Linux応答なし原因特定
 
@@ -74,4 +74,4 @@ WV-09-04として、WebKitGTK + eframe / winit 共存検証を実施する。
 
 ---
 
-[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [検証目次](検証目次.md) > WV-09 Linux応答なし原因特定
+[目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [検証目次](検証目次.md) > WV-09 Linux応答なし原因特定
