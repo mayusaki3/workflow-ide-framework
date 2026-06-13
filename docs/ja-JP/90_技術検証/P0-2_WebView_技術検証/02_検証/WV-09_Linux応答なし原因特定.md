@@ -1,7 +1,7 @@
 <!--
 HLDocS:LLM-MANAGED
 lang: ja-JP
-doc_id: doc-20260613-000000Z-WV09
+doc_id: doc-20260613-010000Z-K3M2
 canonical_title: WV-09 Linux応答なし原因特定
 document_type: technical_validation
 canonical_document: true
