@@ -1,65 +1,67 @@
-目次 > 技術検証 > P0-2_WebView技術検証 > WV-09-03_GtkFixed階層検証
+<!--
+HLDocS:LLM-MANAGED
+lang: ja-JP
+doc_id: workflow-ide-framework-p0-2-webview-wv-09-03
+canonical_title: WV-09-03 GtkFixed階層検証
+document_type: technical_validation
+canonical_document: true
+status: completed
+-->
+
+[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [検証目次](検証目次.md) > [WV-09 Linux応答なし原因特定](WV-09_Linux応答なし原因特定.md) > WV-09-03 GtkFixed階層検証
 
 # WV-09-03 GtkFixed階層検証
 
-## 1. 目的
+## 目的
 
 WV-09-02によりGTK Host Window単体では応答なしが再現しないことを確認した。
 
-本検証では以下構成を導入し、GtkFixed階層自体が応答なしの原因となるか確認する。
+本検証ではGtkFixed階層を導入し、階層構造自体が応答なしの原因となるか確認する。
 
-```text
+## 検証構成
+
 GTK Window
  └ Root Fixed
      └ Child Fixed
-```
 
 WebKitGTKおよびWebViewは使用しない。
 
-## 2. 検証項目
+## 検証結果
 
-### WV-09-03-01
+### WV-09-03-01 起動確認
 
-起動確認
+結果: 成功
 
-期待結果:
+### WV-09-03-02 Dock追従確認
 
-- 起動成功
+結果: 成功
 
-### WV-09-03-02
+GTK Host WindowはDock矩形へ追従した。
 
-Dock追従確認
+### WV-09-03-03 マウス移動確認
 
-期待結果:
+結果: 応答なし再現なし
 
-- Child Fixedを含む構成で追従成功
+### WV-09-03-04 Native Surface表示切替
 
-### WV-09-03-03
+結果: 成功
 
-マウス移動確認
+Debug: Show Native Surface OFF 時にタブ切替へ追従して表示ON/OFFされた。
 
-期待結果:
+## 判定
 
-- 応答なし発生なし
+GtkFixed階層は応答なしの主因候補から除外する。
 
-### WV-09-03-04
+除外対象:
 
-Native Surface表示切替
+- Root Fixed
+- Child Fixed
+- GtkFixed階層
 
-期待結果:
+## 次工程
 
-- ON/OFF成功
-
-## 3. 判定
-
-応答なし発生:
-
-- GtkFixed階層が原因候補
-
-応答なし未発生:
-
-- GtkFixed階層は原因から除外
+WV-09-04 WebKitGTK + eframe / winit 共存検証を実施する。
 
 ---
 
-目次 > 技術検証 > P0-2_WebView技術検証 > WV-09-03_GtkFixed階層検証
+[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [検証目次](検証目次.md) > [WV-09 Linux応答なし原因特定](WV-09_Linux応答なし原因特定.md) > WV-09-03 GtkFixed階層検証
