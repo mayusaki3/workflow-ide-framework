@@ -9,39 +9,29 @@
 
 ### 到達点
 
-* WV-08-17 完了
+* WV-09-03 完了
+* WV-09-01 完了
+* WV-09-02 完了
 * WV-08 系検証完了
 
 ### ドキュメント構成
 
 親:
 
-* WV-08_GTK完全無効化検証.md
+* WV-09_Linux応答なし原因特定.md
 
 子:
 
-* WV-08-01_08-05_GTK基本検証.md
-* WV-08-06_08-10_GTK固定Widget検証.md
-* WV-08-11_WebView_set_bounds単発検証.md
-* WV-08-12_WebView_set_bounds継続追従検証.md
-* WV-08-13_WebView_visibility追従検証.md
-* WV-08-14_sync_child_window_visibility検証.md
-* WV-08-15_WebView_set_visible_false強制検証.md
-* WV-08-16_GTKイベントポンプ再導入検証.md
-* WV-08-17_Native_Surface表示切替単独検証.md
+* WV-09-01_WV07_WV08差分分析.md
+* WV-09-02_X11親子Window制御検証.md
+* WV-09-03_GtkFixed階層検証.md
 
 ### 更新対象
 
 現在の更新対象:
 
 * src/platform/linux_webview.rs
-* WV-08_GTK完全無効化検証.md
-* WV-08-12_WebView_set_bounds継続追従検証.md
-* WV-08-13_WebView_visibility追従検証.md
-* WV-08-14_sync_child_window_visibility検証.md
-* WV-08-15_WebView_set_visible_false強制検証.md
-* WV-08-16_GTKイベントポンプ再導入検証.md
-* WV-08-17_Native_Surface表示切替単独検証.md
+* WV-09-04_WebKitGTK_eframe_winit共存検証.md
 
 親ドキュメントは知見管理のみ行う。
 
@@ -76,43 +66,35 @@
 * flush_gtk_events_throttled()
 * gtk::main_iteration_do(false) 継続実行
 * Native Surface表示切替
+* GTK Host Window単体
+* X11 Host Window同期
+* GtkFixed階層
 
 ## 現在の有力候補
 
 優先度高:
 
 1. WebKitGTK + eframe / winit 共存
-2. X11親子ウィンドウ制御
-3. 実運用側の同期処理
-
-優先度中:
-
-4. Dock追従同期処理
+2. 実運用側の同期処理
+3. Dock追従同期処理
 
 ## 次工程
 
-### WV-09 系検証へ移行
+### WV-09-04 WebKitGTK + eframe / winit 共存検証
 
 目的:
 
-* WV-07で応答なしが発生した構成との差分を再確認し、WV-08で除外できなかった要素を切り分ける。
-
-調査候補:
-
-* WebKitGTK + eframe / winit 共存
-* X11親子ウィンドウ制御
-* 実運用側の同期処理
-* Dock追従同期処理
+* WebKitGTKを再導入し、Linux応答なしが再現するか確認する。
 
 判定:
 
 応答なし発生:
 
-* 追加した構成要素を主因候補として扱う
+* WebKitGTK系を主因候補として扱う
 
 応答なし未発生:
 
-* 次の未評価要素へ調査を進める
+* 実運用同期処理の調査へ進む
 
 ## 運用ルール
 
