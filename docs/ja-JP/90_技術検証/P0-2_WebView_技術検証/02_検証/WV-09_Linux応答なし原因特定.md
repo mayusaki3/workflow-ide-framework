@@ -41,7 +41,7 @@ WV-08では GTK / WebKitGTK / WebView 操作を段階的に再導入し、以下
 | [WV-09-01](WV-09-01_WV07_WV08差分分析.md) | WV07_WV08差分分析 | 完了 |
 | [WV-09-02](WV-09-02_X11親子Window制御検証.md) | X11親子Window制御検証 | 完了 |
 | [WV-09-03](WV-09-03_GtkFixed階層検証.md) | GtkFixed階層検証 | 完了 |
-| WV-09-04 | WebKitGTK + eframe / winit 共存検証 | 未実施 |
+| [WV-09-04](WV-09-04_WebKitGTK_eframe_winit共存検証.md) | WebKitGTK + eframe / winit 共存検証 | 未実施 |
 
 ## 検証結果概要
 
