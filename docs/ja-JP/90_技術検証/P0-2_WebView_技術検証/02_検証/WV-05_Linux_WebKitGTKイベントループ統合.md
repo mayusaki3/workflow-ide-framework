@@ -1,8 +1,9 @@
 <!--
 HLDocS:LLM-MANAGED
+doc_id: doc-20260614-000006Z-WV05
 lang: ja-JP
 canonical_title: WV-05 Linux WebKitGTKイベントループ統合
-document_type: verification
+document_type: note
 canonical_document: true
 -->
 

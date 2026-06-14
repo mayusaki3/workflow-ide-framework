@@ -1,8 +1,9 @@
 <!--
 HLDocS:LLM-MANAGED
+doc_id: doc-20260614-000007Z-WV06
 lang: ja-JP
 canonical_title: WV-06 GTK Host Window最小構成
-document_type: verification
+document_type: note
 canonical_document: true
 -->
 

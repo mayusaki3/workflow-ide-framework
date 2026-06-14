@@ -1,11 +1,10 @@
 <!--
 HLDocS:LLM-MANAGED
+doc_id: doc-20260614-000094Z-W904
 lang: ja-JP
-doc_id: workflow-ide-framework-p0-2-webview-wv-09-04
 canonical_title: WV-09-04 WebKitGTK eframe winit共存検証
-document_type: technical_validation
+document_type: testspec
 canonical_document: true
-status: planned
 -->
 
 [目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [検証目次](検証目次.md) > [WV-09 Linux応答なし原因特定](WV-09_Linux応答なし原因特定.md) > WV-09-04 WebKitGTK eframe winit共存検証

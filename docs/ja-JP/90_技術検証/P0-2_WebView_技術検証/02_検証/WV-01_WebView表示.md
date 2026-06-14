@@ -1,5 +1,6 @@
 <!--
 HLDocS:LLM-MANAGED
+doc_id: doc-20260614-000002Z-WV01
 lang: ja-JP
 canonical_title: WV-01 WebView表示
 document_type: note

@@ -1,7 +1,6 @@
 <!--
 HLDocS:LLM-MANAGED
 doc_id: doc-20260606-000002Z-BCAY
-parent_doc_id: doc-20260606-000000Z-BCAY
 lang: ja-JP
 canonical_title: WV-08-06_08-10 GTK固定Widget検証
 document_type: testspec

@@ -1,5 +1,6 @@
 <!--
 HLDocS:LLM-MANAGED
+doc_id: doc-20260614-000005Z-WV04
 lang: ja-JP
 canonical_title: WV-04 Linux WebView方式選定
 document_type: note

@@ -1,3 +1,12 @@
+<!--
+HLDocS:LLM-MANAGED
+doc_id: doc-20260614-000017Z-W817
+lang: ja-JP
+canonical_title: WV-08-17 Native Surface表示切替単独検証
+document_type: testspec
+canonical_document: true
+-->
+
 [目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [検証目次](./検証目次.md) > [WV-08 GTK完全無効化検証](./WV-08_GTK完全無効化検証.md) > WV-08-17 Native Surface表示切替単独検証
 
 # WV-08-17 Native Surface表示切替単独検証

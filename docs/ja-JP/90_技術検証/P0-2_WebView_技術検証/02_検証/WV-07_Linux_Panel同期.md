@@ -1,10 +1,9 @@
 <!--
 HLDocS:LLM-MANAGED
-doc_id: WV-07_Linux_Panel同期
-parent_doc_id: 検証目次
+doc_id: doc-20260614-000008Z-WV07
 lang: ja-JP
 canonical_title: WV-07 Linux Panel同期
-document_type: verification
+document_type: note
 canonical_document: true
 -->
 

@@ -1,7 +1,6 @@
 <!--
 HLDocS:LLM-MANAGED
 doc_id: doc-20260606-000000Z-BCAY
-parent_doc_id: 検証目次
 lang: ja-JP
 canonical_title: WV-08 GTK完全無効化検証
 document_type: testspec

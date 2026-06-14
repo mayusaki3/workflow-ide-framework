@@ -1,5 +1,6 @@
 <!--
 HLDocS:LLM-MANAGED
+doc_id: doc-20260614-000003Z-WV02
 lang: ja-JP
 canonical_title: WV-02 egui共存
 document_type: note

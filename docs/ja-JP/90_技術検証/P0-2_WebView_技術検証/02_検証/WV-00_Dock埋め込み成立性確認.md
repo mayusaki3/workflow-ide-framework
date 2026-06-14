@@ -1,5 +1,6 @@
 <!--
 HLDocS:LLM-MANAGED
+doc_id: doc-20260614-000001Z-WV00
 lang: ja-JP
 canonical_title: WV-00 Dock埋め込み成立性確認
 document_type: note

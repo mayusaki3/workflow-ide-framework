@@ -1,11 +1,10 @@
 <!--
 HLDocS:LLM-MANAGED
-lang: ja-JP
 doc_id: doc-20260613-010000Z-K3M2
+lang: ja-JP
 canonical_title: WV-09 Linux応答なし原因特定
-document_type: technical_validation
+document_type: testspec
 canonical_document: true
-status: in_progress
 -->
 
 [目次](../../../目次.md) > [技術検証目次](../../技術検証目次.md) > [P0-2 WebView 技術検証](../README.md) > [検証目次](検証目次.md) > WV-09 Linux応答なし原因特定
