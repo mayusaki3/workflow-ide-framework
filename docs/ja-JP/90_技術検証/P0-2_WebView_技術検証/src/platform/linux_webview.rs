@@ -17,7 +17,8 @@
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
 use std::time::{Duration, Instant};
-use wry::{Rect, WebView, WebViewBuilder};
+use wry::dpi::{PhysicalPosition, PhysicalSize};
+use wry::{Rect, WebView, WebViewBuilder, WebViewBuilderExtUnix};
 
 static mut GTK_WINDOW: Option<gtk::Window> = None;
 static mut ROOT_FIXED: Option<gtk::Fixed> = None;
@@ -176,8 +177,8 @@ pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) 
             );
 
             if let Err(err) = webview.set_bounds(Rect {
-                position: (0, 0).into(),
-                size: (width, height).into(),
+                position: PhysicalPosition::new(0, 0).into(),
+                size: PhysicalSize::new(width as u32, height as u32).into(),
             }) {
                 println!("WV-09-04 webview set_bounds failed: {}", err);
             } else {
