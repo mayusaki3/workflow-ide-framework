@@ -1,28 +1,75 @@
-//! Linux向け GTK Host Window 同期検証処理。
+//! Linux向け WebKitGTK + eframe / winit 共存検証処理。
 //!
-//! WV-09-02
+//! WV-09-04
 //!
 //! 役割:
-//! - GTK Host Window のみを生成する。
-//! - WebKitGTK / wry WebView / GtkFixed 配下 WebView 操作を使用しない。
-//! - eframe / winit 実行中に GTK Host Window 自体を Dock矩形へ move_() / resize() で追従させる。
-//! - GTK Host Window が画面表示された状態でマウス移動により応答なしが発生するか確認する。
+//! - GTK Host Window と GtkFixed を生成する。
+//! - wry の build_gtk() 経由で WebKitGTK WebView を生成する。
+//! - eframe / winit 実行中に WebView の位置・サイズ・表示状態を Dock矩形へ追従させる。
+//! - WebKitGTK と eframe / winit の共存状態で、マウス移動や Dock 操作により応答なしが発生するか確認する。
 //!
 //! 注意:
 //! - 技術検証用コード。
 //! - GDK_BACKEND=x11 前提。
-//! - WV-07 と WV-08 の差分である「GTK Host Window 自体の Dock追従」を再導入する。
+//! - WV-09-02 / WV-09-03 で除外済みの GTK Host Window 単体および GtkFixed階層に、WebKitGTK WebView を再導入する。
+//! - この検証では原因切り分けを優先し、WebView の内容は固定HTMLとする。
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
 use std::time::{Duration, Instant};
+use wry::{Rect, WebView, WebViewBuilder};
 
 static mut GTK_WINDOW: Option<gtk::Window> = None;
+static mut ROOT_FIXED: Option<gtk::Fixed> = None;
+static mut WEBVIEW: Option<WebView> = None;
 static mut LAST_SURFACE_STATE: Option<SurfaceState> = None;
 static mut LAST_GTK_FLUSH_AT: Option<Instant> = None;
 
 const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
 const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
+
+const WV_09_04_HTML: &str = r#"
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #20242a;
+      color: #f0f0f0;
+      font-family: sans-serif;
+    }
+    main {
+      box-sizing: border-box;
+      width: 100%;
+      height: 100%;
+      padding: 16px;
+      border: 4px solid #80cbc4;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 20px;
+    }
+    p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>WV-09-04</h1>
+    <p>WebKitGTK + eframe / winit coexistence validation</p>
+    <p>Move / resize / visibility tracking enabled.</p>
+  </main>
+</body>
+</html>
+"#;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct SurfaceState {
@@ -33,42 +80,63 @@ struct SurfaceState {
     visible: bool,
 }
 
+/// GTK Host Window と GtkFixed 階層を初期化する。
+///
+/// # 引数
+///
+/// * `_cc` - eframe の作成コンテキスト。この検証では利用しない。
+///
+/// # 戻り値
+///
+/// なし。初期化に失敗した場合はログを出力して処理を中断する。
 pub fn initialize_root_window(_cc: &CreationContext<'_>) {
-    println!("WV-09-02 gtk::init start");
+    println!("WV-09-04 gtk::init start");
 
     if let Err(err) = gtk::init() {
-        println!("WV-09-02 gtk::init failed: {}", err);
+        println!("WV-09-04 gtk::init failed: {}", err);
         return;
     }
 
-    println!("WV-09-02 gtk::init success");
+    println!("WV-09-04 gtk::init success");
 
     let window = gtk::Window::new(gtk::WindowType::Popup);
-    window.set_title("WV-09-02 GTK Host Window");
+    window.set_title("WV-09-04 WebKitGTK Host Window");
     window.set_default_size(300, 200);
 
-    let label = gtk::Label::new(Some("WV-09-02 GTK Host Window Only"));
-    window.add(&label);
-
+    let root_fixed = gtk::Fixed::new();
+    window.add(&root_fixed);
     window.show_all();
 
     unsafe {
+        ROOT_FIXED = Some(root_fixed);
         GTK_WINDOW = Some(window);
     }
 
-    println!("WV-09-02 GTK_WINDOW stored");
+    println!("WV-09-04 GTK_WINDOW and ROOT_FIXED stored");
 
-    flush_gtk_events_bounded("WV-09-02 initialize");
+    flush_gtk_events_bounded("WV-09-04 initialize");
 }
 
+/// WebKitGTK WebView を初期化し、Dock矩形へ追従させる。
+///
+/// # 引数
+///
+/// * `initial_rect` - WebView Panel のDock矩形。存在しない場合はNative Surfaceを非表示にする。
+/// * `scale` - egui の pixels_per_point。
+///
+/// # 戻り値
+///
+/// なし。WebView生成または再配置に失敗した場合はログを出力する。
 pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) {
     let rect = match initial_rect {
         Some(rect) => rect,
         None => {
-            sync_host_window_visibility(false);
+            sync_webview_visibility(false);
             return;
         }
     };
+
+    ensure_webkit_webview();
 
     let (x, y, width, height) = rect_to_i32_bounds(rect, scale);
 
@@ -82,7 +150,7 @@ pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) 
 
     unsafe {
         if LAST_SURFACE_STATE == Some(state) {
-            flush_gtk_events_throttled("WV-09-02 unchanged");
+            flush_gtk_events_throttled("WV-09-04 unchanged");
             return;
         }
 
@@ -90,7 +158,7 @@ pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) 
 
         if let Some(window) = GTK_WINDOW.as_ref() {
             println!(
-                "WV-09-02 host window sync start x={} y={} w={} h={}",
+                "WV-09-04 host window sync start x={} y={} w={} h={}",
                 x, y, width, height
             );
 
@@ -98,37 +166,134 @@ pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) 
             window.resize(width, height);
             window.show_all();
 
-            println!("WV-09-02 host window sync done");
+            println!("WV-09-04 host window sync done");
+        }
+
+        if let Some(webview) = WEBVIEW.as_ref() {
+            println!(
+                "WV-09-04 webview set_bounds start x={} y={} w={} h={}",
+                x, y, width, height
+            );
+
+            if let Err(err) = webview.set_bounds(Rect {
+                position: (0, 0).into(),
+                size: (width, height).into(),
+            }) {
+                println!("WV-09-04 webview set_bounds failed: {}", err);
+            } else {
+                println!("WV-09-04 webview set_bounds success");
+            }
+
+            if let Err(err) = webview.set_visible(true) {
+                println!("WV-09-04 webview set_visible(true) failed: {}", err);
+            } else {
+                println!("WV-09-04 webview set_visible(true) success");
+            }
         }
     }
 
-    flush_gtk_events_throttled("WV-09-02 sync");
+    flush_gtk_events_throttled("WV-09-04 sync");
 }
 
+/// Native Surface の表示状態を同期する。
+///
+/// # 引数
+///
+/// * `_ctx` - egui Context。この検証では利用しない。
+/// * `_webview_rect` - WebView Panel の矩形。この検証では `ensure_webview_initialized()` 側で処理する。
+/// * `should_show_native_surface` - Native Surface を表示する場合は true。
+///
+/// # 戻り値
+///
+/// なし。
 pub fn sync_child_window(
     _ctx: &egui::Context,
     _webview_rect: Option<egui::Rect>,
     should_show_native_surface: bool,
 ) {
-    sync_host_window_visibility(should_show_native_surface);
+    sync_webview_visibility(should_show_native_surface);
 }
 
-fn sync_host_window_visibility(visible: bool) {
+/// WebKitGTK WebView を一度だけ生成する。
+///
+/// # 戻り値
+///
+/// なし。すでに生成済みの場合は何もしない。
+fn ensure_webkit_webview() {
     unsafe {
-        if let Some(window) = GTK_WINDOW.as_ref() {
-            if visible {
-                println!("WV-09-02 host window show");
-                window.show_all();
-            } else {
-                println!("WV-09-02 host window hide");
-                window.hide();
+        if WEBVIEW.is_some() {
+            return;
+        }
+
+        let Some(root_fixed) = ROOT_FIXED.as_ref() else {
+            println!("WV-09-04 WebView build skipped: ROOT_FIXED is none");
+            return;
+        };
+
+        println!("WV-09-04 WebView build_gtk start");
+
+        match WebViewBuilder::new()
+            .with_html(WV_09_04_HTML)
+            .build_gtk(root_fixed)
+        {
+            Ok(webview) => {
+                WEBVIEW = Some(webview);
+                println!("WV-09-04 WebView build_gtk success");
+            }
+            Err(err) => {
+                println!("WV-09-04 WebView build_gtk failed: {}", err);
             }
         }
     }
 
-    flush_gtk_events_throttled("WV-09-02 visibility");
+    flush_gtk_events_bounded("WV-09-04 webview build");
 }
 
+/// GTK Host Window と WebView の表示状態を同期する。
+///
+/// # 引数
+///
+/// * `visible` - 表示する場合は true、非表示にする場合は false。
+///
+/// # 戻り値
+///
+/// なし。
+fn sync_webview_visibility(visible: bool) {
+    unsafe {
+        if let Some(window) = GTK_WINDOW.as_ref() {
+            if visible {
+                println!("WV-09-04 host window show");
+                window.show_all();
+            } else {
+                println!("WV-09-04 host window hide");
+                window.hide();
+            }
+        }
+
+        if let Some(webview) = WEBVIEW.as_ref() {
+            println!("WV-09-04 webview set_visible({}) start", visible);
+
+            if let Err(err) = webview.set_visible(visible) {
+                println!("WV-09-04 webview set_visible({}) failed: {}", visible, err);
+            } else {
+                println!("WV-09-04 webview set_visible({}) success", visible);
+            }
+        }
+    }
+
+    flush_gtk_events_throttled("WV-09-04 visibility");
+}
+
+/// egui座標をNative Surface向けの整数座標へ変換する。
+///
+/// # 引数
+///
+/// * `rect` - egui の矩形。
+/// * `scale` - pixels_per_point。
+///
+/// # 戻り値
+///
+/// `(x, y, width, height)` の整数座標。
 fn rect_to_i32_bounds(rect: egui::Rect, scale: f32) -> (i32, i32, i32, i32) {
     let x = (rect.min.x * scale) as i32;
     let y = (rect.min.y * scale) as i32;
@@ -143,13 +308,22 @@ fn rect_to_i32_bounds(rect: egui::Rect, scale: f32) -> (i32, i32, i32, i32) {
     )
 }
 
+/// GTKイベントを上限付きで処理する。
+///
+/// # 引数
+///
+/// * `label` - ログ識別子。
+///
+/// # 戻り値
+///
+/// なし。
 fn flush_gtk_events_bounded(label: &str) {
-    println!("WV-09-02 GTK event flush start label={}", label);
+    println!("WV-09-04 GTK event flush start label={}", label);
 
     for iteration in 0..GTK_FLUSH_MAX_ITERATIONS {
         if !gtk::events_pending() {
             println!(
-                "WV-09-02 GTK event flush completed label={} iterations={}",
+                "WV-09-04 GTK event flush completed label={} iterations={}",
                 label, iteration
             );
             return;
@@ -159,11 +333,20 @@ fn flush_gtk_events_bounded(label: &str) {
     }
 
     println!(
-        "WV-09-02 GTK event flush stopped by limit label={} limit={}",
+        "WV-09-04 GTK event flush stopped by limit label={} limit={}",
         label, GTK_FLUSH_MAX_ITERATIONS
     );
 }
 
+/// GTKイベントを一定間隔で処理する。
+///
+/// # 引数
+///
+/// * `label` - ログ識別子。
+///
+/// # 戻り値
+///
+/// なし。
 fn flush_gtk_events_throttled(label: &str) {
     unsafe {
         let now = Instant::now();
