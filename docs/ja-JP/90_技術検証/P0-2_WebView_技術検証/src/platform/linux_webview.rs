@@ -1,6 +1,6 @@
 //! Linux向け Native Child Window 再導入検証処理。
 //!
-//! WV-09-06-01
+//! WV-09-06-02
 //!
 //! 役割:
 //! - GTK Host Window を Native Child Window 相当の検証対象として生成する。
@@ -16,6 +16,7 @@
 
 use eframe::{egui, CreationContext};
 use gtk::prelude::*;
+use std::time::{Duration, Instant};
 use wry::dpi::{PhysicalPosition, PhysicalSize};
 use wry::{Rect, WebView, WebViewBuilder, WebViewBuilderExtUnix};
 
@@ -23,6 +24,11 @@ static mut GTK_WINDOW: Option<gtk::Window> = None;
 static mut ROOT_FIXED: Option<gtk::Fixed> = None;
 static mut WEBVIEW: Option<WebView> = None;
 static mut LAST_SURFACE_STATE: Option<SurfaceState> = None;
+static mut LAST_GTK_FLUSH_AT: Option<Instant> = None;
+
+const GTK_FLUSH_MAX_ITERATIONS: usize = 64;
+const GTK_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
+
 const WV_09_05_HTML: &str = r#"
 <!doctype html>
 <html lang="ja">
@@ -58,9 +64,9 @@ const WV_09_05_HTML: &str = r#"
 </head>
 <body>
   <main>
-    <h1>WV-09-06-01</h1>
-    <p>GTK event pump disabled validation</p>
-    <p>GTK event pump disabled; host window move / resize / visibility tracking enabled.</p>
+    <h1>WV-09-06-02</h1>
+    <p>GTK event pump minimal validation</p>
+    <p>GTK event pump is allowed only during initialization and WebView build.</p>
   </main>
 </body>
 </html>
@@ -85,17 +91,17 @@ struct SurfaceState {
 ///
 /// なし。初期化に失敗した場合はログを出力して処理を中断する。
 pub fn initialize_root_window(_cc: &CreationContext<'_>) {
-    println!("WV-09-06-01 gtk::init start");
+    println!("WV-09-06-02 gtk::init start");
 
     if let Err(err) = gtk::init() {
-        println!("WV-09-06-01 gtk::init failed: {}", err);
+        println!("WV-09-06-02 gtk::init failed: {}", err);
         return;
     }
 
-    println!("WV-09-06-01 gtk::init success");
+    println!("WV-09-06-02 gtk::init success");
 
     let window = gtk::Window::new(gtk::WindowType::Popup);
-    window.set_title("WV-09-06-01 Native Child Window Host");
+    window.set_title("WV-09-06-02 Native Child Window Host");
     window.set_default_size(300, 200);
 
     let root_fixed = gtk::Fixed::new();
@@ -107,9 +113,9 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         GTK_WINDOW = Some(window);
     }
 
-    println!("WV-09-06-01 GTK_WINDOW and ROOT_FIXED stored");
+    println!("WV-09-06-02 GTK_WINDOW and ROOT_FIXED stored");
 
-    flush_gtk_events_bounded("WV-09-06-01 initialize");
+    flush_gtk_events_bounded("WV-09-06-02 initialize");
 }
 
 /// WebKitGTK WebView を初期化し、Native Child Window を Dock矩形へ追従させる。
@@ -145,7 +151,7 @@ pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) 
 
     unsafe {
         if LAST_SURFACE_STATE == Some(state) {
-            flush_gtk_events_throttled("WV-09-06-01 unchanged");
+            flush_gtk_events_throttled("WV-09-06-02 unchanged");
             return;
         }
 
@@ -153,7 +159,7 @@ pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) 
 
         if let Some(window) = GTK_WINDOW.as_ref() {
             println!(
-                "WV-09-06-01 native child window sync start x={} y={} w={} h={}",
+                "WV-09-06-02 native child window sync start x={} y={} w={} h={}",
                 x, y, width, height
             );
 
@@ -161,12 +167,12 @@ pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) 
             window.resize(width, height);
             window.show_all();
 
-            println!("WV-09-06-01 native child window sync done");
+            println!("WV-09-06-02 native child window sync done");
         }
 
         if let Some(webview) = WEBVIEW.as_ref() {
             println!(
-                "WV-09-06-01 webview set_bounds start x={} y={} w={} h={}",
+                "WV-09-06-02 webview set_bounds start x={} y={} w={} h={}",
                 x, y, width, height
             );
 
@@ -174,20 +180,20 @@ pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) 
                 position: PhysicalPosition::new(0, 0).into(),
                 size: PhysicalSize::new(width as u32, height as u32).into(),
             }) {
-                println!("WV-09-06-01 webview set_bounds failed: {}", err);
+                println!("WV-09-06-02 webview set_bounds failed: {}", err);
             } else {
-                println!("WV-09-06-01 webview set_bounds success");
+                println!("WV-09-06-02 webview set_bounds success");
             }
 
             if let Err(err) = webview.set_visible(true) {
-                println!("WV-09-06-01 webview set_visible(true) failed: {}", err);
+                println!("WV-09-06-02 webview set_visible(true) failed: {}", err);
             } else {
-                println!("WV-09-06-01 webview set_visible(true) success");
+                println!("WV-09-06-02 webview set_visible(true) success");
             }
         }
     }
 
-    flush_gtk_events_throttled("WV-09-06-01 sync");
+    flush_gtk_events_throttled("WV-09-06-02 sync");
 }
 
 /// Native Surface の表示状態を同期する。
@@ -221,11 +227,11 @@ fn ensure_webkit_webview() {
         }
 
         let Some(root_fixed) = ROOT_FIXED.as_ref() else {
-            println!("WV-09-06-01 WebView build skipped: ROOT_FIXED is none");
+            println!("WV-09-06-02 WebView build skipped: ROOT_FIXED is none");
             return;
         };
 
-        println!("WV-09-06-01 WebView build_gtk start");
+        println!("WV-09-06-02 WebView build_gtk start");
 
         match WebViewBuilder::new()
             .with_html(WV_09_05_HTML)
@@ -233,15 +239,15 @@ fn ensure_webkit_webview() {
         {
             Ok(webview) => {
                 WEBVIEW = Some(webview);
-                println!("WV-09-06-01 WebView build_gtk success");
+                println!("WV-09-06-02 WebView build_gtk success");
             }
             Err(err) => {
-                println!("WV-09-06-01 WebView build_gtk failed: {}", err);
+                println!("WV-09-06-02 WebView build_gtk failed: {}", err);
             }
         }
     }
 
-    flush_gtk_events_bounded("WV-09-06-01 webview build");
+    flush_gtk_events_bounded("WV-09-06-02 webview build");
 }
 
 /// GTK Host Window と WebView の表示状態を同期する。
@@ -257,26 +263,26 @@ fn sync_webview_visibility(visible: bool) {
     unsafe {
         if let Some(window) = GTK_WINDOW.as_ref() {
             if visible {
-                println!("WV-09-06-01 native child window show");
+                println!("WV-09-06-02 native child window show");
                 window.show_all();
             } else {
-                println!("WV-09-06-01 native child window hide");
+                println!("WV-09-06-02 native child window hide");
                 window.hide();
             }
         }
 
         if let Some(webview) = WEBVIEW.as_ref() {
-            println!("WV-09-06-01 webview set_visible({}) start", visible);
+            println!("WV-09-06-02 webview set_visible({}) start", visible);
 
             if let Err(err) = webview.set_visible(visible) {
-                println!("WV-09-06-01 webview set_visible({}) failed: {}", visible, err);
+                println!("WV-09-06-02 webview set_visible({}) failed: {}", visible, err);
             } else {
-                println!("WV-09-06-01 webview set_visible({}) success", visible);
+                println!("WV-09-06-02 webview set_visible({}) success", visible);
             }
         }
     }
 
-    flush_gtk_events_throttled("WV-09-06-01 visibility");
+    flush_gtk_events_throttled("WV-09-06-02 visibility");
 }
 
 /// egui座標をNative Surface向けの整数座標へ変換する。
@@ -303,7 +309,7 @@ fn rect_to_i32_bounds(rect: egui::Rect, scale: f32) -> (i32, i32, i32, i32) {
     )
 }
 
-/// GTKイベントポンプ停止検証のため、GTKイベント処理を実行しない。
+/// GTKイベントを上限付きで処理する。
 ///
 /// # 引数
 ///
@@ -313,13 +319,27 @@ fn rect_to_i32_bounds(rect: egui::Rect, scale: f32) -> (i32, i32, i32, i32) {
 ///
 /// なし。
 fn flush_gtk_events_bounded(label: &str) {
+    println!("WV-09-06-02 GTK event flush start label={}", label);
+
+    for iteration in 0..GTK_FLUSH_MAX_ITERATIONS {
+        if !gtk::events_pending() {
+            println!(
+                "WV-09-06-02 GTK event flush completed label={} iterations={}",
+                label, iteration
+            );
+            return;
+        }
+
+        gtk::main_iteration_do(false);
+    }
+
     println!(
-        "WV-09-06-01 GTK event flush skipped label={} reason=event_pump_disabled",
-        label
+        "WV-09-06-02 GTK event flush stopped by limit label={} limit={}",
+        label, GTK_FLUSH_MAX_ITERATIONS
     );
 }
 
-/// GTKイベントポンプ停止検証のため、間隔制御を行わずGTKイベント処理を実行しない。
+/// GTKイベントポンプ最小化検証のため、初期化およびWebView生成時のみGTKイベントを処理する。
 ///
 /// # 引数
 ///
@@ -329,5 +349,33 @@ fn flush_gtk_events_bounded(label: &str) {
 ///
 /// なし。
 fn flush_gtk_events_throttled(label: &str) {
+    let allow_flush = label.contains("initialize") || label.contains("webview build");
+
+    if !allow_flush {
+        println!(
+            "WV-09-06-02 GTK event flush skipped label={} reason=sync_phase_disabled",
+            label
+        );
+        return;
+    }
+
+    unsafe {
+        let now = Instant::now();
+
+        let should_flush = LAST_GTK_FLUSH_AT
+            .map(|last| now.duration_since(last) >= GTK_FLUSH_INTERVAL)
+            .unwrap_or(true);
+
+        if !should_flush {
+            println!(
+                "WV-09-06-02 GTK event flush skipped label={} reason=throttled",
+                label
+            );
+            return;
+        }
+
+        LAST_GTK_FLUSH_AT = Some(now);
+    }
+
     flush_gtk_events_bounded(label);
 }
