@@ -185,11 +185,9 @@ pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) 
                 println!("WV-09-06-04 webview set_bounds success");
             }
 
-            if let Err(err) = webview.set_visible(true) {
-                println!("WV-09-06-04 webview set_visible(true) failed: {}", err);
-            } else {
-                println!("WV-09-06-04 webview set_visible(true) success");
-            }
+            println!(
+                "WV-09-06-04 webview set_visible(true) skipped reason=visibility_call_disabled"
+            );
         }
     }
 
@@ -271,14 +269,11 @@ fn sync_webview_visibility(visible: bool) {
             }
         }
 
-        if let Some(webview) = WEBVIEW.as_ref() {
-            println!("WV-09-06-04 webview set_visible({}) start", visible);
-
-            if let Err(err) = webview.set_visible(visible) {
-                println!("WV-09-06-04 webview set_visible({}) failed: {}", visible, err);
-            } else {
-                println!("WV-09-06-04 webview set_visible({}) success", visible);
-            }
+        if WEBVIEW.as_ref().is_some() {
+            println!(
+                "WV-09-06-04 webview set_visible({}) skipped reason=visibility_call_disabled",
+                visible
+            );
         }
     }
 
