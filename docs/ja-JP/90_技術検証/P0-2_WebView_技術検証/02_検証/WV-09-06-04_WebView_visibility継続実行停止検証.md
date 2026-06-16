@@ -26,15 +26,15 @@ WV-09-06-03 では、Visibility同期フェーズの GTKイベントポンプを
 - GTK Window show / hide
 - Native Surface位置同期
 
-本検証では、GTKイベントポンプは有効に戻し、Visibility同期フェーズの WebView `set_visible` 呼び出しのみを停止する。
+本検証では、GTKイベントポンプは有効に戻し、WebView `set_visible` 呼び出しを停止する。
 
 ## 検証方針
 
 Visibility同期処理自体は維持する。
 
-ただし、Visibility同期フェーズで継続実行される WebView `set_visible` 呼び出しは実行せず、ログ出力のみ行う。
+ただし、WebView `set_visible` 呼び出しは実行せず、ログ出力のみ行う。
 
-初回生成時の WebView `set_visible(true)` は維持する。
+GTK Window の `show_all()` / `hide()`、Native Surface位置同期、WebView `set_bounds` は維持する。
 
 ## 検証構成
 
@@ -46,7 +46,7 @@ Visibility同期処理自体は維持する。
 - WebKitGTK
 - Native Surface位置同期
 - GTKイベントポンプ有効
-- Visibility同期フェーズの WebView `set_visible` 継続実行のみ停止
+- WebView `set_visible` 呼び出し停止
 
 ## 検証項目
 
@@ -63,7 +63,7 @@ Visibility同期処理自体は維持する。
 
 応答停止が再現しない場合
 
-- Visibility同期フェーズの WebView `set_visible` 継続実行を主因候補とする
+- WebView `set_visible` 継続実行を主因候補から除外する
 
 応答停止が再現する場合
 
@@ -75,23 +75,56 @@ Window表示またはDock追従が成立しない場合
 
 ## 検証結果
 
-未実施
+実施完了。
+
+観測結果は以下の通り。
+
+- ビルド成功
+- 起動成功
+- gtk::init 成功
+- WebView build_gtk 成功
+- Native Child Window同期成功
+- WebView set_bounds 成功
+- WebView `set_visible(true)` は `skipped reason=visibility_call_disabled` を出力し、実行されない
+- Dockドラッグ中も WebView `set_visible(true)` は `skipped reason=visibility_call_disabled` を出力し、実行されない
+- Window表示は成立する
+- Dockドラッグ後も表示は維持される
+- Window は Dock に合わせて移動する
+- Window は Dock に合わせてサイズ変更される
+- 応答なしは発生しない
 
 ## 判定
 
-未判定
+合格とする。
+
+WebView `set_visible` 呼び出しを停止しても、Window表示、Dock追従、サイズ変更は成立した。
+
+また、応答なしは発生しなかった。
 
 ## 知見
 
-なし
+WebView `set_visible` 継続実行を停止しても応答なしは再現しなかった。
+
+このため、WebView `set_visible` 継続実行は Linux応答停止の単独主因ではない。
+
+一方で、GTK Window `show_all()`、Native Surface位置同期、WebView `set_bounds`、GTKイベントポンプは維持された状態で応答なしが発生していないため、これら単独要因でも応答なしは再現していない。
 
 ## 結論
 
-未実施
+WebView `set_visible` 継続実行は主因候補から除外する。
+
+残存主因候補は以下とする。
+
+- Native Surface位置同期
+- GTK Window show / hide
+- GTKイベントポンプとの組み合わせ
+- 現在の develop では再現条件を失っている可能性
 
 ## 次工程
 
-検証結果を記録し、応答停止再現有無に応じて次の切り分けを決定する。
+WV-09-06 親文書へ結果を反映する。
+
+その後、WV-09-06-05 Native Surface位置同期単独有効検証へ進む。
 
 ---
 
