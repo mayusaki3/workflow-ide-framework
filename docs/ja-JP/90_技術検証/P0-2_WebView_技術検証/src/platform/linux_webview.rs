@@ -122,7 +122,7 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
         return;
     }
 
-    let window = gtk::Window::new(gtk::WindowType::Popup);
+    let window = gtk::Window::new(gtk::WindowType::Toplevel);
     window.set_title("Linux WebView Host Window");
     window.set_default_size(1, 1);
 
@@ -265,7 +265,7 @@ fn ensure_root_window_initialized() {
         return;
     }
 
-    let window = gtk::Window::new(gtk::WindowType::Popup);
+    let window = gtk::Window::new(gtk::WindowType::Toplevel);
     window.set_title("Linux WebView Host Window");
     window.set_default_size(1, 1);
 
