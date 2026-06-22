@@ -127,6 +127,7 @@ pub fn initialize_root_window(_cc: &CreationContext<'_>) {
     window.set_default_size(1, 1);
 
     let root_fixed = gtk::Fixed::new();
+    root_fixed.set_sensitive(false);
     window.add(&root_fixed);
     window.hide();
 
@@ -270,6 +271,7 @@ fn ensure_root_window_initialized() {
     window.set_default_size(1, 1);
 
     let root_fixed = gtk::Fixed::new();
+    root_fixed.set_sensitive(false);
     window.add(&root_fixed);
     window.hide();
 
@@ -333,6 +335,7 @@ fn create_webview() {
 /// - 前回状態と同一の場合は何もしない。
 /// - GTK Host Window と WebView bounds を同期する。
 /// - WV-10-08では WebView の `set_bounds()` のみを停止し、入力イベントとの相互作用を切り分ける。
+/// - WV-10-09では `root_fixed.set_sensitive(false)` により入力イベント抑制を検証する。
 ///
 /// # 引数
 ///
