@@ -109,11 +109,6 @@ extern "C" {
     fn gdk_x11_window_get_xid(window: *mut c_void) -> c_ulong;
 }
 
-/// Native Surface の同期状態。
-///
-/// # 役割
-///
-/// - 前回同期状態と比較し、不要な GTK / X11 操作を抑制する。
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct SurfaceState {
     x: i32,
@@ -122,25 +117,6 @@ struct SurfaceState {
     height: i32,
 }
 
-/// Linux向け GTK Root Window を初期化する。
-///
-/// # 役割
-///
-/// - eframe / winit の X11 Window ID を取得する。
-/// - Xlib Display を開き、GTK Window の親子化に使う。
-///
-/// # 注意点
-///
-/// - WebView生成は行わない。
-/// - X11以外の RawWindowHandle は対象外とする。
-///
-/// # 引数
-///
-/// * `cc` - eframe生成コンテキスト。
-///
-/// # 戻り値
-///
-/// なし。
 pub fn initialize_root_window(cc: &CreationContext<'_>) {
     unsafe {
         if ROOT_XID.is_some() {
@@ -183,27 +159,6 @@ pub fn initialize_root_window(cc: &CreationContext<'_>) {
     }
 }
 
-/// Linux向け WebView を初期化する。
-///
-/// # 役割
-///
-/// - GTK Host Window が未生成の場合は初期化する。
-/// - GTK Host Window を eframe / winit の X11 Window の子へ reparent する。
-/// - WebKitGTK WebView を初回のみ生成する。
-/// - 初期矩形が存在する場合は Host Window へ適用する。
-///
-/// # 注意点
-///
-/// - WV-10-08同様、`WebView::set_bounds()` は呼ばない。
-///
-/// # 引数
-///
-/// * `initial_rect` - 初期配置矩形。
-/// * `scale` - egui の pixels_per_point。
-///
-/// # 戻り値
-///
-/// なし。
 pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) {
     ensure_root_window_initialized();
     create_webview();
@@ -213,23 +168,6 @@ pub fn ensure_webview_initialized(initial_rect: Option<egui::Rect>, scale: f32) 
     }
 }
 
-/// Linux向け Native Surface 追従処理。
-///
-/// # 役割
-///
-/// - GTK Host Window を表示・非表示にする。
-/// - WebView配置矩形が変化した場合のみ、位置・サイズを同期する。
-/// - GTK / WebKitGTK のイベントを低頻度で処理する。
-///
-/// # 引数
-///
-/// * `ctx` - egui コンテキスト。
-/// * `webview_rect` - WebView配置矩形。
-/// * `should_show_native_surface` - Native Surface を表示する場合 true。
-///
-/// # 戻り値
-///
-/// なし。
 pub fn sync_child_window(
     ctx: &egui::Context,
     webview_rect: Option<egui::Rect>,
@@ -250,19 +188,6 @@ pub fn sync_child_window(
     flush_gtk_events_throttled();
 }
 
-/// Linux向け Native Surface の表示状態を同期する。
-///
-/// # 役割
-///
-/// - 表示状態が変化した場合のみ `show_all()` / `hide()` を実行する。
-///
-/// # 引数
-///
-/// * `visible` - 表示する場合 true。
-///
-/// # 戻り値
-///
-/// なし。
 fn sync_child_window_visibility(visible: bool) {
     unsafe {
         if LAST_VISIBLE == Some(visible) {
@@ -287,17 +212,6 @@ fn sync_child_window_visibility(visible: bool) {
     }
 }
 
-/// GTK Root Window が初期化済みであることを保証する。
-///
-/// # 役割
-///
-/// - GTK Window / GtkFixed を作成する。
-/// - GTK Window の XID を取得する。
-/// - `XReparentWindow()` で eframe / winit 側の X11 Window の子へ移す。
-///
-/// # 戻り値
-///
-/// なし。
 fn ensure_root_window_initialized() {
     unsafe {
         if GTK_WINDOW.is_some() && ROOT_FIXED.is_some() {
@@ -344,27 +258,17 @@ fn ensure_root_window_initialized() {
     flush_gtk_events_bounded();
 }
 
-/// GTK Window の XID を取得する。
-///
-/// # 役割
-///
-/// - GTK Window の GdkWindow を取得する。
-/// - GDK X11 API で XID へ変換する。
-///
-/// # 引数
-///
-/// * `window` - GTK Window。
-///
-/// # 戻り値
-///
-/// XID。取得できない場合は None。
 fn gtk_window_xid(window: &gtk::Window) -> Option<c_ulong> {
     let Some(gdk_window) = window.window() else {
         return None;
     };
 
     let xid = unsafe {
-        let ptr = gdk_window.to_glib_none().0 as *mut c_void;
+        let ptr = <gtk::gdk::Window as ToGlibPtr<
+            '_,
+            *mut gtk::gdk::ffi::GdkWindow,
+        >>::to_glib_none(&gdk_window)
+            .0 as *mut c_void;
         gdk_x11_window_get_xid(ptr)
     };
 
@@ -375,19 +279,6 @@ fn gtk_window_xid(window: &gtk::Window) -> Option<c_ulong> {
     }
 }
 
-/// GTK Window を eframe / winit の X11 Window の子へ移す。
-///
-/// # 役割
-///
-/// - `XReparentWindow()` により X11 レベルの親子関係を作る。
-///
-/// # 引数
-///
-/// * `gtk_xid` - GTK Window の XID。
-///
-/// # 戻り値
-///
-/// なし。
 unsafe fn reparent_gtk_window(gtk_xid: c_ulong) {
     let Some(display) = X_DISPLAY else {
         println!("WV-11 reparent skipped: X display is none");
@@ -408,16 +299,6 @@ unsafe fn reparent_gtk_window(gtk_xid: c_ulong) {
     );
 }
 
-/// WebKitGTK WebView を初回のみ生成する。
-///
-/// # 役割
-///
-/// - `ROOT_FIXED` を親として wry WebView を生成する。
-/// - 生成した WebView を保持する。
-///
-/// # 戻り値
-///
-/// なし。
 fn create_webview() {
     unsafe {
         if WEBVIEW.is_some() {
@@ -446,23 +327,6 @@ fn create_webview() {
     flush_gtk_events_bounded();
 }
 
-/// Native Surface の位置・サイズを同期する。
-///
-/// # 役割
-///
-/// - egui矩形をNative Surface用の整数座標へ変換する。
-/// - 前回状態と同一の場合は何もしない。
-/// - GTK Host Window を X11 親Window内の子Windowとして移動・リサイズする。
-/// - WV-10-08同様、WebView の `set_bounds()` は呼ばない。
-///
-/// # 引数
-///
-/// * `rect` - egui矩形。
-/// * `scale` - egui の pixels_per_point。
-///
-/// # 戻り値
-///
-/// なし。
 fn apply_surface_rect(rect: egui::Rect, scale: f32) {
     let (x, y, width, height) = rect_to_i32_bounds(rect, scale);
     let state = SurfaceState {
@@ -501,21 +365,6 @@ fn apply_surface_rect(rect: egui::Rect, scale: f32) {
     }
 }
 
-/// egui矩形を GTK / X11 用 i32 境界値へ変換する。
-///
-/// # 役割
-///
-/// - egui座標をスケール適用後の整数座標へ変換する。
-/// - 極端な値を制限し、X11側へ不正に大きい値を渡さない。
-///
-/// # 引数
-///
-/// * `rect` - egui矩形。
-/// * `scale` - スケール値。
-///
-/// # 戻り値
-///
-/// `(x, y, width, height)`
 fn rect_to_i32_bounds(rect: egui::Rect, scale: f32) -> (i32, i32, i32, i32) {
     let x = (rect.min.x * scale) as i32;
     let y = (rect.min.y * scale) as i32;
@@ -530,16 +379,6 @@ fn rect_to_i32_bounds(rect: egui::Rect, scale: f32) -> (i32, i32, i32, i32) {
     )
 }
 
-/// GTKイベントを上限付きで処理する。
-///
-/// # 役割
-///
-/// - WebView生成直後など、明示的に GTK イベントを処理する。
-/// - pending が残っていても上限回数で打ち切る。
-///
-/// # 戻り値
-///
-/// なし。
 fn flush_gtk_events_bounded() {
     let mut count = 0usize;
 
@@ -566,15 +405,6 @@ fn flush_gtk_events_bounded() {
     }
 }
 
-/// GTKイベントを低頻度で処理する。
-///
-/// # 役割
-///
-/// - eframe / winit を停止させずに GTK / WebKitGTK のイベントを継続処理する。
-///
-/// # 戻り値
-///
-/// なし。
 fn flush_gtk_events_throttled() {
     unsafe {
         let now = Instant::now();
