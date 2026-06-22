@@ -332,6 +332,7 @@ fn create_webview() {
 /// - egui矩形をNative Surface用の整数座標へ変換する。
 /// - 前回状態と同一の場合は何もしない。
 /// - GTK Host Window と WebView bounds を同期する。
+/// - WV-10-08では WebView の `set_bounds()` のみを停止し、入力イベントとの相互作用を切り分ける。
 ///
 /// # 引数
 ///
@@ -362,13 +363,8 @@ fn apply_surface_rect(rect: egui::Rect, scale: f32) {
             window.resize(width, height);
         }
 
-        if let Some(webview) = WEBVIEW.as_ref() {
-            if let Err(err) = webview.set_bounds(Rect {
-                position: PhysicalPosition::new(0, 0).into(),
-                size: PhysicalSize::new(width as u32, height as u32).into(),
-            }) {
-                println!("Linux WebView set_bounds failed: {}", err);
-            }
+        if WEBVIEW.as_ref().is_some() {
+            println!("WV-10-08 webview set_bounds skipped");
         }
     }
 }
