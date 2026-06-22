@@ -408,17 +408,34 @@ fn rect_to_i32_bounds(rect: egui::Rect, scale: f32) -> (i32, i32, i32, i32) {
 ///
 /// - WebView生成直後など、明示的に GTK イベントを処理する。
 /// - pending が残っていても上限回数で打ち切る。
+/// - WV-10-06 のため、処理件数と上限到達有無をログ出力する。
 ///
 /// # 戻り値
 ///
 /// なし。
 fn flush_gtk_events_bounded() {
-    for _ in 0..GTK_FLUSH_MAX_ITERATIONS {
-        if !gtk::events_pending() {
-            return;
+    let mut count = 0usize;
+
+    while gtk::events_pending() {
+        count += 1;
+
+        if count <= 10 {
+            println!("WV-10-06 GTK event iteration={}", count);
         }
 
         gtk::main_iteration_do(false);
+
+        if count >= GTK_FLUSH_MAX_ITERATIONS {
+            println!(
+                "WV-10-06 GTK event flush limit reached limit={}",
+                GTK_FLUSH_MAX_ITERATIONS
+            );
+            break;
+        }
+    }
+
+    if count > 0 {
+        println!("WV-10-06 GTK events processed count={}", count);
     }
 }
 
