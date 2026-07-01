@@ -1,0 +1,141 @@
+<!--
+HLDocS:LLM-MANAGED
+doc_id: doc-20260527-010201Z-X8R3
+lang: ja-JP
+canonical_title: P0-1b EmbeddedFont 技術検証
+document_type: note
+canonical_document: true
+-->
+
+[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > P0-1b EmbeddedFont 技術検証
+
+# P0-1b EmbeddedFont 技術検証
+
+# 1. 目的
+
+cross-platform 環境で、日本語表示を安定させる Embedded Font 構造を検証する。
+
+# 2. 関連ドキュメント
+
+## 2.1 仕様
+
+- [EmbeddedFont 技術検証仕様](./01_仕様/01_EmbeddedFont_技術検証仕様.md)
+
+## 2.2 検証仕様
+
+- [EmbeddedFont 検証ケース](./02_検証仕様/01_検証ケース.md)
+
+## 2.3 検証結果
+
+- [EmbeddedFont 検証結果](./03_検証結果/README.md)
+
+## 2.4 asset setup
+
+- [EmbeddedFont Asset Setup](./assets/fonts/default/README.md)
+
+# 3. 背景
+
+P0-1a の検証により、OS font fallback のみでは Linux / Windows 間で表示差異が発生することを確認した。
+
+そのため、IDE 側で font asset を保持し、UI renderer へ直接登録する構造を検証する。
+
+# 4. 検証項目
+
+- include_bytes! による font 埋め込み
+- 日本語表示
+- Linux / Windows 一致確認
+- egui custom font
+- Runtime 配布構造
+
+# 5. 実行方法
+
+## 5.1 Windows
+
+### font setup
+
+```powershell
+cd C:\WORKPLACE\Makes\GitHub\workflow-ide-framework\docs\ja-JP\90_技術検証\P0-1b_EmbeddedFont_技術検証
+
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_fonts.ps1
+```
+
+### 実行
+
+```powershell
+cargo run
+```
+
+## 5.2 Linux
+
+### font setup
+
+```bash
+cd ~/workflow-ide-framework/docs/ja-JP/90_技術検証/P0-1b_EmbeddedFont_技術検証
+
+chmod +x ./scripts/setup_fonts.sh
+
+./scripts/setup_fonts.sh
+```
+
+### 実行
+
+```bash
+cargo run
+```
+
+# 6. 検討事項
+
+## 6.1 利用者による font 選択
+
+利用者が UI font を変更可能な構造を考慮する。
+
+## 6.2 標準 font
+
+Framework 標準 font を提供する。
+
+## 6.3 カスタム font
+
+利用者が独自 font を追加可能な構造を考慮する。
+
+## 6.4 Runtime 切替
+
+Runtime 中に font 切替可能な構造を考慮する。
+
+# 7. 想定構造
+
+```text
+assets/fonts/
+ ├─ default/
+ │   └─ NotoSansCJK-Regular.ttc
+ │
+ └─ custom/
+     └─ user font
+```
+
+# 8. 方針
+
+## 8.1 Framework 標準提供
+
+Framework 側で標準 font を提供する。
+
+## 8.2 利用者拡張
+
+利用者が custom font を追加可能とする。
+
+## 8.3 OS 非依存
+
+固定 OS path を使用しない。
+
+## 8.4 将来拡張
+
+以下を将来対応候補とする。
+
+- Emoji
+- Font fallback chain
+- Multi language
+- Font weight
+- Icon font
+
+---
+
+[目次](../../目次.md) > [技術検証目次](../技術検証目次.md) > P0-1b EmbeddedFont 技術検証

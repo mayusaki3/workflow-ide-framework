@@ -1,0 +1,33 @@
+# Rust build artifacts
+/target/
+**/target/
+
+# Rust lock files for technical validation
+Cargo.lock
+**/Cargo.lock
+
+# Temporary logs
+*.log
+*.tmp
+
+# Local editor settings
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Local branch protection helper files
+branch-protection.json
+
+# Layout persistence
+dock_layout.json
+
+# Local fonts
+*.otf
+*.ttf
+
+# Keep directory
+!assets/fonts/default/.gitkeep
+!assets/fonts/default/README.md

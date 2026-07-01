@@ -1,0 +1,28 @@
+[package]
+name = "p0_2_webview_validation"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+eframe = "=0.33.0"
+egui = "=0.33.0"
+egui_dock = { version = "=0.18.0", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+winit = "0.30.13"
+wry = "0.53"
+raw-window-handle = "0.6"
+tao = "0.34"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi"
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
+[dev-dependencies]
