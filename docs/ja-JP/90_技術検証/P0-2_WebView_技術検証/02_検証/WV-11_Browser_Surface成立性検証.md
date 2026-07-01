@@ -92,6 +92,24 @@ Framework 内部で Surface として扱えることを最優先とする。
 | WebKitGTK | 不可 | 可 | 不可 | WV-10 で Host Window 方式を終了 |
 | CEF OSR | 可 | 可 | 可 | 主候補 |
 
+### 調査結果
+
+CEF は Windows / Linux / macOS で利用可能な Chromium ベースの埋め込みフレームワークである。
+
+CEF 本体は C / C++ を主対象とするため、Rust から利用する場合は以下のいずれかを検討する。
+
+- 既存 Rust バインディングまたはラッパーを評価する。
+- 既存ラッパーで OSR / OnPaint / 入力転送を扱えない場合、CEF C API への FFI 境界を Framework 内部に閉じ込める。
+- Framework 利用アプリには CEF 依存を公開せず、Browser Surface API のみを公開する。
+
+現時点の判断では、WebView2 は Windows 専用、WebKitGTK は WV-10 の結果により Linux 主方式から外すため、Browser Surface の主候補は CEF OSR とする。
+
+### 判定
+
+WV-11-01 は完了とする。
+
+Browser Surface 方式は CEF OSR を主候補として次工程へ進める。
+
 ### 完了条件
 
 Browser Surface の主候補を CEF OSR として扱ってよいか判断できること。
@@ -223,7 +241,7 @@ WV-11 は以下を満たした時点で完了とする。
 
 ## 次工程
 
-WV-11-01 Browser Surface 方式選定から開始する。
+WV-11-02 CEF OSR 最小構成検証へ進む。
 
 WV-11 完了後は、WV-12 GPU Surface 技術検証へ進む。
 
