@@ -3,11 +3,15 @@
 //! 役割:
 //! - OS固有の Child Window / WebView 処理を呼び出す。
 //! - Windows / Linux では OS別の実装を使用する。
+//! - WV-11 Browser Surface 検証用 CEF モジュールを公開する。
 //! - その他の環境では同じ関数シグネチャのスタブを提供する。
 //!
 //! 注意:
 //! - P0-2 WebView 技術検証用のPoCコード。
 //! - Linux / macOS の正式処理は WV-03 / WV-04 の結果に応じて追加する。
+//! - CEF モジュールは WV-11 技術検証用であり、正式 API 仕様ではない。
+
+pub mod cef;
 
 #[cfg(target_os = "windows")]
 mod windows_webview;
