@@ -2,12 +2,12 @@
 //!
 //! 役割:
 //! - 技術検証アプリケーションのエントリーポイント。
-//! - WV-11-02 CEF OSR 最小構成検証用の `--cef-probe` を提供する。
+//! - WV-11-02 CEF OSR 最小構成検証用の Probe を提供する。
 //!
 //! 注意:
-//! - P0-2 WebView 技術検証用のPoCコード。
-//! - WV-03以降の検証結果により、モジュール構成は変更される可能性がある。
-//! - `--cef-probe` は技術検証用であり、正式 API 仕様ではない。
+//! - P0-2 WebView 技術検証用の PoC コード。
+//! - WV-03 以降の検証結果により、モジュール構成は変更される可能性がある。
+//! - CEF Probe は技術検証用であり、正式 API 仕様ではない。
 
 mod app;
 mod layout_storage;
@@ -21,19 +21,25 @@ use std::path::PathBuf;
 /// # 役割
 /// - 通常起動時は eframe アプリケーションを起動する。
 /// - `--cef-probe` 指定時は CEF ライブラリのロードと主要シンボル解決のみを行い終了する。
+/// - `--cef-init-probe` 指定時は CEF の初期化と shutdown を行い終了する。
 ///
 /// # 戻り値
 /// - 成功時: `Ok(())`。
 /// - 失敗時: eframe または検証処理のエラー。
 ///
 /// # 注意点
-/// - `--cef-probe` では `cef_initialize` は呼び出さない。
-/// - `--cef-path` には CEF ライブラリファイル、または `libcef` を含むディレクトリを指定できる。
+/// - `--cef-path` は `--cef-probe` 専用であり、CEF ライブラリファイルまたはディレクトリを指定する。
+/// - `--cef-init-probe` の CEF 配置は `cef-rs` / `cef-dll-sys` のランタイム探索規則に従う。
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
 
     if args.iter().any(|arg| arg == "--cef-probe") {
         run_cef_probe_from_args(&args);
+        return Ok(());
+    }
+
+    if args.iter().any(|arg| arg == "--cef-init-probe") {
+        run_cef_initialize_probe();
         return Ok(());
     }
 
@@ -46,7 +52,10 @@ fn main() -> eframe::Result<()> {
     )
 }
 
-/// コマンドライン引数から CEF Probe を実行する。
+/// コマンドライン引数から CEF Runtime / Symbol Probe を実行する。
+///
+/// @hldocs.ref doc-20260628-000011Z-WV11#sec_10811wkg708i
+/// @hldocs.ref doc-20260628-000011Z-WV11#sec_pkl5oq8fkmc6
 ///
 /// # 役割
 /// - `--cef-path` を解析する。
@@ -76,13 +85,40 @@ fn run_cef_probe_from_args(args: &[String]) {
     }
 }
 
+/// CEF Initialize Probe を実行する。
+///
+/// @hldocs.ref doc-20260628-000011Z-WV11#sec_aj1rfgg9rguj
+///
+/// # 役割
+/// - `platform::cef::run_initialize_probe` を呼び出す。
+/// - CEF 初期化と shutdown の検証結果を標準出力または標準エラーへ出力する。
+///
+/// # 注意点
+/// - 検証失敗時はプロセスを `1` で終了する。
+/// - Browser 作成は本 Probe の対象外とする。
+fn run_cef_initialize_probe() {
+    println!("WV-11-02 CEF initialize probe start");
+
+    match platform::cef::run_initialize_probe() {
+        Ok(message) => {
+            println!("{message}");
+            println!("WV-11-02 CEF initialize probe OK");
+        }
+        Err(error) => {
+            eprintln!("WV-11-02 CEF initialize probe failed");
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+    }
+}
+
 /// 指定オプションの値を取得する。
 ///
 /// # 役割
 /// - `--cef-path <path>` 形式を解析する。
 ///
 /// # 引数
-/// - `args`: コマンドライン引数一覧。
+/// - `args`: `std::env::args()` から取得した引数一覧。
 /// - `name`: 取得対象のオプション名。
 ///
 /// # 戻り値
