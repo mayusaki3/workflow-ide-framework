@@ -7,14 +7,21 @@
 //!
 //! 注意点:
 //! - 本モジュールは技術検証用であり、正式 API 仕様ではない。
-//! - WV-11-02 では、まず CEF ライブラリの動的ロードと主要シンボル解決を確認する。
-//! - Browser 作成、OSR、OnPaint、RGBA バッファ取得は後続ステップで追加する。
+//! - WV-11-02 の Runtime / Symbol 検証は `libloading` による既存 Probe を使用する。
+//! - CEF Initialize 以降は、検証基準 CEF と一致する `cef-rs` バインディングを使用し、
+//!   CEF C API ABI の手書き複製を避ける。
+//! - Browser 作成、OSR、OnPaint、描画バッファ取得は後続ステップで追加する。
 
 pub mod ffi;
 
+use cef::{args::Args, api_hash, initialize, shutdown, Settings};
 use std::path::{Path, PathBuf};
+use std::ptr;
 
-/// CEF OSR 検証の初期段階を実行する。
+/// WV-11-02 Runtime / Symbol Probe を実行する。
+///
+/// @hldocs.ref doc-20260628-000011Z-WV11#sec_10811wkg708i
+/// @hldocs.ref doc-20260628-000011Z-WV11#sec_pkl5oq8fkmc6
 ///
 /// # 役割
 /// - CEF ライブラリをロードする。
@@ -31,8 +38,8 @@ use std::path::{Path, PathBuf};
 /// - 失敗時: 失敗理由を含むエラー文字列。
 ///
 /// # 注意点
-/// - 現段階では `cef_initialize` を呼び出さない。
-/// - CEF ABI 構造体定義を追加した後、初期化呼び出しへ進む。
+/// - 本 Probe は `cef_initialize` を呼び出さない。
+/// - CEF 初期化は `run_initialize_probe` で独立して検証する。
 pub fn run_symbol_probe(library_path: Option<PathBuf>) -> Result<String, String> {
     let path = resolve_cef_library_path(library_path)?;
     let probe = ffi::CefLibraryProbe::load(&path)?;
@@ -42,6 +49,53 @@ pub fn run_symbol_probe(library_path: Option<PathBuf>) -> Result<String, String>
         "CEF library loaded and required symbols resolved: {}",
         probe.path().display()
     ))
+}
+
+/// WV-11-02 CEF Initialize Probe を実行する。
+///
+/// @hldocs.ref doc-20260628-000011Z-WV11#sec_aj1rfgg9rguj
+///
+/// # 役割
+/// - `cef-rs` が使用する CEF API バージョンを初期化する。
+/// - Windowless Rendering を有効にした最小設定で CEF を初期化する。
+/// - 初期化成功後、Browser を作成せず直ちに CEF を shutdown する。
+///
+/// # 戻り値
+/// - 成功時: 検証ログ文字列。
+/// - 失敗時: CEF 初期化失敗を示すエラー文字列。
+///
+/// # 注意点
+/// - 本 Probe は CEF-IT-SPEC-003 のみを対象とする。
+/// - Browser 作成や subprocess lifecycle の本格検証は CEF-IT-SPEC-004 以降で行う。
+/// - `shutdown` は `initialize` が成功した場合にのみ呼び出す。
+pub fn run_initialize_probe() -> Result<String, String> {
+    // cef-rs の生成バインディングが対象 CEF と同じ API バージョンを使用するよう初期化する。
+    let _ = api_hash(cef::sys::CEF_API_VERSION_LAST, 0);
+
+    let args = Args::new();
+    let settings = Settings {
+        windowless_rendering_enabled: 1,
+        external_message_pump: 1,
+        no_sandbox: 1,
+        ..Default::default()
+    };
+
+    let initialized = initialize(
+        Some(args.as_main_args()),
+        Some(&settings),
+        None,
+        ptr::null_mut(),
+    );
+
+    if initialized != 1 {
+        return Err(format!(
+            "CEF initialize failed: cef_initialize returned {initialized}"
+        ));
+    }
+
+    shutdown();
+
+    Ok("CEF initialize and shutdown succeeded".to_string())
 }
 
 /// CEF ライブラリパスを解決する。
@@ -116,6 +170,7 @@ pub fn default_cef_library_path() -> PathBuf {
 /// # 戻り値
 /// - Windows: `windows`
 /// - Linux: `linux`
+/// - macOS: `macos`
 /// - その他: `unknown`
 #[must_use]
 pub fn default_cef_platform_dir() -> &'static str {
@@ -123,6 +178,8 @@ pub fn default_cef_platform_dir() -> &'static str {
         "windows"
     } else if cfg!(target_os = "linux") {
         "linux"
+    } else if cfg!(target_os = "macos") {
+        "macos"
     } else {
         "unknown"
     }
