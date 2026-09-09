@@ -141,7 +141,7 @@ CEF OSR が Browser Surface の描画元として利用可能か確認する。
 
 ### 検証基準 CEF
 
-検証基準は CEF Automated Builds の Current Stable Build とし、WV-11-02 開始時点では `151.3.17+gf059e67+chromium-151.0.7922.138` を使用する。
+WV-11-02 の検証基準は stable 系の `151.3.24+g2384915+chromium-151.0.7922.174` とし、対応する Rust バインディングは `cef 151.8.1+151.3.24` を使用する。
 
 検証結果には実際に使用した CEF バージョンを記録し、将来の Framework 実装で恒久固定するバージョンとは区別する。
 
