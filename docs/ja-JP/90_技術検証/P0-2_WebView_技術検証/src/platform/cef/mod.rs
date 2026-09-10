@@ -51,25 +51,56 @@ pub fn run_symbol_probe(library_path: Option<PathBuf>) -> Result<String, String>
     ))
 }
 
+/// CEF subprocess を実行する。
+///
+/// @hldocs.ref doc-20260628-000011Z-WV11#sec_aj1rfgg9rguj
+///
+/// # 役割
+/// - `--type=<process>` を持つ CEF subprocess から `cef_execute_process` を実行する。
+/// - renderer / gpu-process 等を通常の eframe アプリ起動経路へ入れない。
+///
+/// # 戻り値
+/// - CEF subprocess の終了コード。
+/// - `cef_execute_process` が負値を返した異常時は `1`。
+///
+/// # 注意点
+/// - この関数は `main` の通常アプリ起動判定より前から呼び出す。
+/// - CEF subprocess では `cef_initialize` / `cef_shutdown` を呼び出さない。
+pub fn run_subprocess() -> i32 {
+    let _ = api_hash(cef::sys::CEF_API_VERSION_LAST, 0);
+    let args = Args::new();
+    let exit_code = execute_process(
+        Some(args.as_main_args()),
+        None,
+        ptr::null_mut(),
+    );
+
+    if exit_code >= 0 {
+        exit_code
+    } else {
+        eprintln!(
+            "WV-11-02 CEF subprocess failed: cef_execute_process returned {exit_code}"
+        );
+        1
+    }
+}
+
 /// WV-11-02 CEF Initialize Probe を実行する。
 ///
 /// @hldocs.ref doc-20260628-000011Z-WV11#sec_aj1rfgg9rguj
 ///
 /// # 役割
 /// - `cef-rs` が使用する CEF API バージョンを初期化する。
-/// - `cef_execute_process` により CEF subprocess を先に処理する。
 /// - Browser Process では Windowless Rendering のみを有効にした最小設定で CEF を初期化する。
 /// - 初期化成功後、Browser を作成せず直ちに CEF を shutdown する。
 ///
 /// # 戻り値
 /// - Browser Process で成功時: CEF 初期化と shutdown 成功を示す文字列。
-/// - CEF subprocess で成功時: subprocess の終了コードを示す文字列。
 /// - 失敗時: CEF 初期化失敗を示すエラー文字列。
 ///
 /// # 注意点
 /// - 本 Probe は CEF-IT-SPEC-003 のみを対象とする。
-/// - `cef_execute_process` が 0 以上を返した場合、そのプロセスは subprocess なので
-///   `cef_initialize` / `cef_shutdown` を呼び出してはならない。
+/// - CEF subprocess は `main` 冒頭で `run_subprocess` へ分岐済みであることを前提とする。
 /// - `external_message_pump` は Browser / UI イベントループ統合時に検証するため、
 ///   初期化単体 Probe では有効化しない。
 /// - Browser 作成は CEF-IT-SPEC-004 以降で行う。
@@ -79,17 +110,17 @@ pub fn run_initialize_probe() -> Result<String, String> {
 
     let args = Args::new();
 
-    // CEF はマルチプロセス構成を前提とする。
-    // subprocess では execute_process が 0 以上を返すため、アプリ本体の初期化へ進まず終了する。
-    let subprocess_exit_code = execute_process(
+    // Browser Process 自身でも CEF の標準初期化手順に従い execute_process を先行する。
+    // Browser Process では -1 が返り、そのまま initialize へ進む。
+    let process_result = execute_process(
         Some(args.as_main_args()),
         None,
         ptr::null_mut(),
     );
 
-    if subprocess_exit_code >= 0 {
+    if process_result >= 0 {
         return Ok(format!(
-            "CEF subprocess completed with exit code {subprocess_exit_code}"
+            "CEF subprocess completed with exit code {process_result}"
         ));
     }
 
