@@ -19,6 +19,7 @@ use std::path::PathBuf;
 /// アプリケーションの起動処理。
 ///
 /// # 役割
+/// - CEF subprocess の `--type` 引数を最優先で判定し、通常アプリ起動経路へ入れない。
 /// - 通常起動時は eframe アプリケーションを起動する。
 /// - `--cef-probe` 指定時は CEF ライブラリのロードと主要シンボル解決のみを行い終了する。
 /// - `--cef-init-probe` 指定時は CEF の初期化と shutdown を行い終了する。
@@ -28,10 +29,19 @@ use std::path::PathBuf;
 /// - 失敗時: eframe または検証処理のエラー。
 ///
 /// # 注意点
+/// - CEF は renderer 等の subprocess を同一実行ファイルから起動できるため、`--type` 判定は通常 UI 起動より前に行う。
 /// - `--cef-path` は `--cef-probe` 専用であり、CEF ライブラリファイルまたはディレクトリを指定する。
 /// - `--cef-init-probe` の CEF 配置は `cef-rs` / `cef-dll-sys` のランタイム探索規則に従う。
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
+
+    // @hldocs.ref doc-20260628-000011Z-WV11#sec_aj1rfgg9rguj
+    // CEF subprocess は `--cef-init-probe` を引き継がない場合があるため、
+    // Chromium の `--type=<process>` を先に検出して通常アプリ起動を防止する。
+    if is_cef_subprocess(&args) {
+        let exit_code = platform::cef::run_subprocess();
+        std::process::exit(exit_code);
+    }
 
     if args.iter().any(|arg| arg == "--cef-probe") {
         run_cef_probe_from_args(&args);
@@ -50,6 +60,24 @@ fn main() -> eframe::Result<()> {
         options,
         Box::new(|cc| Ok(Box::new(app::DockingValidationApp::new(cc)))),
     )
+}
+
+/// CEF subprocess を示す Chromium の `--type` 引数が存在するか判定する。
+///
+/// @hldocs.ref doc-20260628-000011Z-WV11#sec_aj1rfgg9rguj
+///
+/// # 引数
+/// - `args`: `std::env::args()` から取得した引数一覧。
+///
+/// # 戻り値
+/// - `--type=<process>` または `--type <process>` が存在する場合は `true`。
+/// - それ以外は `false`。
+///
+/// # 注意点
+/// - CEF API を呼び出す前の軽量判定として使用し、通常起動時に不要な CEF 初期化処理を行わない。
+fn is_cef_subprocess(args: &[String]) -> bool {
+    args.iter()
+        .any(|arg| arg == "--type" || arg.starts_with("--type="))
 }
 
 /// コマンドライン引数から CEF Runtime / Symbol Probe を実行する。
