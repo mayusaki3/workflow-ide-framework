@@ -3,7 +3,7 @@
 //! 役割:
 //! - CEF OSR 検証コードの公開口を提供する。
 //! - CEF 依存を Framework 内部の実験用境界に閉じ込める。
-//! - `third_party/cef/<os>` 配置の CEF ランタイムを探索する。
+//! - `cef-dll-sys` が実行バイナリ出力先へ配置した CEF ランタイムを検証対象とする。
 //!
 //! 注意点:
 //! - 本モジュールは技術検証用であり、正式 API 仕様ではない。
@@ -15,7 +15,7 @@
 pub mod ffi;
 
 use cef::{args::Args, api_hash, execute_process, initialize, shutdown, Settings};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::ptr;
 
 /// WV-11-02 Runtime / Symbol Probe を実行する。
@@ -31,7 +31,7 @@ use std::ptr;
 /// - `library_path`: CEF ライブラリまたは CEF 配置ディレクトリへの明示パス。
 ///   - ファイルの場合はそのままロードする。
 ///   - ディレクトリの場合は OS ごとの CEF ライブラリ名を連結してロードする。
-///   - `None` の場合は `third_party/cef/<os>/<libcef>` を使用する。
+///   - `None` の場合は、現在の実行ファイルと同じディレクトリにある CEF ライブラリを使用する。
 ///
 /// # 戻り値
 /// - 成功時: 検証ログ文字列。
@@ -40,6 +40,8 @@ use std::ptr;
 /// # 注意点
 /// - 本 Probe は `cef_initialize` を呼び出さない。
 /// - CEF 初期化は `run_initialize_probe` で独立して検証する。
+/// - Windows / Linux では `cef-dll-sys` が CEF ランタイムを実行バイナリ出力先へ配置するため、
+///   既定 Probe でも Initialize Probe と同じランタイムを確認できる。
 pub fn run_symbol_probe(library_path: Option<PathBuf>) -> Result<String, String> {
     let path = resolve_cef_library_path(library_path)?;
     let probe = ffi::CefLibraryProbe::load(&path)?;
@@ -154,7 +156,7 @@ pub fn run_initialize_probe() -> Result<String, String> {
 ///
 /// # 役割
 /// - `--cef-path` にファイルまたはディレクトリのどちらを渡しても扱えるようにする。
-/// - 未指定時は `third_party/cef/<os>` 配下を既定配置として扱う。
+/// - 未指定時は現在の実行ファイルと同じディレクトリを既定配置として扱う。
 ///
 /// # 引数
 /// - `path`: 明示指定された CEF ライブラリまたは CEF 配置ディレクトリ。
@@ -168,7 +170,7 @@ pub fn run_initialize_probe() -> Result<String, String> {
 pub fn resolve_cef_library_path(path: Option<PathBuf>) -> Result<PathBuf, String> {
     let candidate = match path {
         Some(path) => to_library_path(path),
-        None => default_cef_library_path(),
+        None => default_cef_library_path()?,
     };
 
     if candidate.exists() {
@@ -202,37 +204,25 @@ fn to_library_path(path: PathBuf) -> PathBuf {
 /// 既定の CEF ライブラリファイルパスを返す。
 ///
 /// # 役割
-/// - 技術検証用に `third_party/cef/<os>` 配置を標準探索先とする。
+/// - 現在実行中の検証バイナリと同じディレクトリにある CEF ライブラリを返す。
+/// - Runtime / Symbol Probe と Initialize Probe が同一ランタイムを対象にする。
 ///
 /// # 戻り値
-/// - OS ごとの CEF ライブラリファイルパス。
-#[must_use]
-pub fn default_cef_library_path() -> PathBuf {
-    Path::new("third_party")
-        .join("cef")
-        .join(default_cef_platform_dir())
-        .join(ffi::default_cef_library_name())
-}
+/// - 成功時: 実行ファイルと同じディレクトリにある OS ごとの CEF ライブラリパス。
+/// - 失敗時: 実行ファイルパスを取得または解決できなかった理由。
+///
+/// # 注意点
+/// - Windows / Linux の `cef-dll-sys` は CEF ランタイムを Cargo の実行バイナリ出力先へ配置する。
+/// - macOS のランタイム配置は別構造のため、WV-11-06 で個別に検証する。
+pub fn default_cef_library_path() -> Result<PathBuf, String> {
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Failed to resolve current executable path: {error}"))?;
+    let executable_dir = executable.parent().ok_or_else(|| {
+        format!(
+            "Failed to resolve current executable directory: {}",
+            executable.display()
+        )
+    })?;
 
-/// CEF ランタイム配置用の OS 別ディレクトリ名を返す。
-///
-/// # 役割
-/// - `third_party/cef/<os>` の `<os>` を決定する。
-///
-/// # 戻り値
-/// - Windows: `windows`
-/// - Linux: `linux`
-/// - macOS: `macos`
-/// - その他: `unknown`
-#[must_use]
-pub fn default_cef_platform_dir() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "windows"
-    } else if cfg!(target_os = "linux") {
-        "linux"
-    } else if cfg!(target_os = "macos") {
-        "macos"
-    } else {
-        "unknown"
-    }
+    Ok(executable_dir.join(ffi::default_cef_library_name()))
 }
