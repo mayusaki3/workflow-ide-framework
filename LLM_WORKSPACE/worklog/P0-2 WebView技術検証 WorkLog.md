@@ -13,7 +13,12 @@
 - Rust バインディングは `cef 151.8.1+151.3.24` を使用する。
 - CEF Runtime / Symbol Probe は既存の `libloading` 実装を維持する。
 - CEF Initialize 以降は CEF C API ABI を手書きせず、検証基準 CEF と一致する `cef-rs` バインディングを Framework 内部の技術検証境界で使用する。
-- `--cef-init-probe` による CEF Initialize / shutdown 検証コードを実装済み。Windows 実機での実行結果は未検証。
+- Windows 実機で CEF-IT-SPEC-001 Runtime load、CEF-IT-SPEC-002 Symbols、CEF-IT-SPEC-003 Initialize の合格を確認した。
+- Runtime / Symbol Probe は `cef-dll-sys` が実行バイナリ出力先へ配置した CEF ランタイムを既定対象とし、Initialize Probe と同一ランタイムを検証する構成へ統一した。
+- CEF subprocess は `main` 冒頭で Chromium の `--type` を判定し、renderer / gpu-process 等を通常の eframe / WebView 起動経路へ入れず `cef_execute_process` へ分岐する構成とした。
+- Windows では `cef-dll-sys` / `libcef_dll_wrapper` のビルド時に深い Cargo target パスで MSVC C1083 が発生したため、短い `CARGO_TARGET_DIR` を使用する必要がある。検証では `D:\cargo-target\workflow-ide-p0-2` を使用した。
+- Windows の管理者権限側では `cef_initialize returned 0` を確認し、通常権限 PowerShell では CEF Initialize / shutdown が成功した。WV-11-02 の Windows 実機検証は通常権限を基準とする。
+- CEF-IT-SPEC-004 Windowless Browser 作成 Probe の実装を開始し、`--cef-browser-probe` を追加した。実機実行結果は未検証。
 - WV-11-07 の位置付けを、正式 API 仕様ではなく技術検証用の実験用インターフェース整理として明確化済み。
 - Browser Surface の主候補は CEF OSR とする。
 - GTK / WebKitGTK Host Window 方式は Linux 主方式として終了する。
@@ -56,6 +61,8 @@ WV-11-01 により、WebView2 は Windows 専用、WebKitGTK は WV-10 の結果
 
 WV-11-02 では、CEF Runtime / Symbol の存在確認は低レベル Probe として `libloading` を使用し、CEF Initialize 以降の ABI 境界は `cef-rs` の生成バインディングを使用する。これにより、CEF の大規模な C API 構造体を Framework 側で手書き複製しない。
 
+Windows 実機では、実行バイナリと同一ディレクトリの `libcef.dll` に対して Runtime load / Symbols が成功し、同一構成で CEF Initialize / shutdown も成功した。これにより CEF-IT-SPEC-001 / 002 / 003 は Windows 実機で成立したと判断する。
+
 WV-11 内で整理するインターフェースは技術検証用であり、Framework 利用アプリ向けの正式 API 仕様ではない。正式 API 仕様は、WV-12 GPU Surface 技術検証および他 Dock Panel との整合を踏まえ、P0-2 完了後の仕様フェーズで定義する。
 
 ## 対応対象 OS
@@ -75,6 +82,8 @@ Workflow IDE Framework の対応対象 OS は以下の 3 OS とする。
 ### Windows
 
 利用可能な実環境で検証する。
+
+CEF WV-11-02 検証では通常権限 PowerShell を使用し、Cargo target の深いパスによる MSVC C1083 を回避するため短い `CARGO_TARGET_DIR` を使用する。
 
 ### Linux
 
@@ -134,10 +143,10 @@ Windows / Linux / macOS を対応対象として、Dock 上で Web ブラウザ�
 
 - WV-11-01: Browser Surface 方式選定（完了）
 - WV-11-02: CEF OSR で描画バッファを取得できるか確認（進行中）
-  - CEF-IT-SPEC-001: CEF ランタイムロード
-  - CEF-IT-SPEC-002: 必須シンボル解決
-  - CEF-IT-SPEC-003: CEF 初期化
-  - CEF-IT-SPEC-004: Windowless Browser 作成
+  - CEF-IT-SPEC-001: CEF ランタイムロード（Windows 実機 ○）
+  - CEF-IT-SPEC-002: 必須シンボル解決（Windows 実機 ○）
+  - CEF-IT-SPEC-003: CEF 初期化（Windows 実機 ○）
+  - CEF-IT-SPEC-004: Windowless Browser 作成（Windows 実機 未検証）
   - CEF-IT-SPEC-005: Paint コールバック受信
   - CEF-IT-SPEC-006: 描画バッファ取得
   - CEF-IT-SPEC-007: 継続描画更新
@@ -200,9 +209,11 @@ P0-2 完了後、技術検証中に得られた知見を基に HLDocS へのフ�
 
 WV-11-02 CEF OSR 最小構成検証を継続する。
 
-現在の次工程は、Windows 実機で CEF-IT-SPEC-001 / 002 / 003 を実行し、Runtime load / Symbol resolution / CEF Initialize の結果を確定すること。
+CEF-IT-SPEC-001 / 002 / 003 は Windows 実機で合格済み。
 
-CEF-IT-SPEC-003 が合格した後、CEF-IT-SPEC-004 Windowless Browser 作成の実装へ進む。
+現在の次工程は、Windows 実機で `--cef-browser-probe` を実行し、CEF-IT-SPEC-004 Windowless Browser 作成を検証すること。
+
+CEF-IT-SPEC-004 が合格した後、CEF-IT-SPEC-005 Paint コールバック受信の設計・検証へ進む。
 
 ---
 
