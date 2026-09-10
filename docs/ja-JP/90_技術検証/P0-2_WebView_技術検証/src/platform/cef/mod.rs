@@ -14,7 +14,7 @@
 
 pub mod ffi;
 
-use cef::{args::Args, api_hash, initialize, shutdown, Settings};
+use cef::{args::Args, api_hash, execute_process, initialize, shutdown, Settings};
 use std::path::{Path, PathBuf};
 use std::ptr;
 
@@ -57,22 +57,40 @@ pub fn run_symbol_probe(library_path: Option<PathBuf>) -> Result<String, String>
 ///
 /// # 役割
 /// - `cef-rs` が使用する CEF API バージョンを初期化する。
-/// - Windowless Rendering を有効にした最小設定で CEF を初期化する。
+/// - `cef_execute_process` により CEF subprocess を先に処理する。
+/// - Browser Process では Windowless Rendering を有効にした最小設定で CEF を初期化する。
 /// - 初期化成功後、Browser を作成せず直ちに CEF を shutdown する。
 ///
 /// # 戻り値
-/// - 成功時: 検証ログ文字列。
+/// - Browser Process で成功時: CEF 初期化と shutdown 成功を示す文字列。
+/// - CEF subprocess で成功時: subprocess の終了コードを示す文字列。
 /// - 失敗時: CEF 初期化失敗を示すエラー文字列。
 ///
 /// # 注意点
 /// - 本 Probe は CEF-IT-SPEC-003 のみを対象とする。
-/// - Browser 作成や subprocess lifecycle の本格検証は CEF-IT-SPEC-004 以降で行う。
-/// - `shutdown` は `initialize` が成功した場合にのみ呼び出す。
+/// - `cef_execute_process` が 0 以上を返した場合、そのプロセスは subprocess なので
+///   `cef_initialize` / `cef_shutdown` を呼び出してはならない。
+/// - Browser 作成は CEF-IT-SPEC-004 以降で行う。
 pub fn run_initialize_probe() -> Result<String, String> {
     // cef-rs の生成バインディングが対象 CEF と同じ API バージョンを使用するよう初期化する。
     let _ = api_hash(cef::sys::CEF_API_VERSION_LAST, 0);
 
     let args = Args::new();
+
+    // CEF はマルチプロセス構成を前提とする。
+    // subprocess では execute_process が 0 以上を返すため、アプリ本体の初期化へ進まず終了する。
+    let subprocess_exit_code = execute_process(
+        Some(args.as_main_args()),
+        None,
+        ptr::null_mut(),
+    );
+
+    if subprocess_exit_code >= 0 {
+        return Ok(format!(
+            "CEF subprocess completed with exit code {subprocess_exit_code}"
+        ));
+    }
+
     let settings = Settings {
         windowless_rendering_enabled: 1,
         external_message_pump: 1,
