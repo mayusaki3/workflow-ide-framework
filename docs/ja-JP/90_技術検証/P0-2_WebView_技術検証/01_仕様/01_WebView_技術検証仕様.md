@@ -42,6 +42,10 @@ Browser Surface の成立性確認に必要な CEF C API シンボルを Framewo
 
 対象 CEF の ABI と一致する定義を使用し、CEF を正常に初期化可能でなければならない。
 
+CEF のマルチプロセス動作に必要な subprocess 判定を `cef_execute_process` で初期化前に実行し、subprocess ではその戻り値に従ってアプリケーション本体の初期化処理へ進まず終了しなければならない。
+
+メインの Browser Process のみが `cef_initialize` へ進み、初期化成功後に `cef_shutdown` を実行可能でなければならない。
+
 ### 3.4 Windowless Browser
 <!-- hldocs:sec_id=sec_fjanz0cmlgpv -->
 
