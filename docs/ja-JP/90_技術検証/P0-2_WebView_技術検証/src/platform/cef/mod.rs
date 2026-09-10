@@ -10,13 +10,15 @@
 //! - WV-11-02 の Runtime / Symbol 検証は `libloading` による既存 Probe を使用する。
 //! - CEF Initialize 以降は、検証基準 CEF と一致する `cef-rs` バインディングを使用し、
 //!   CEF C API ABI の手書き複製を避ける。
-//! - Browser 作成、OSR、OnPaint、描画バッファ取得は後続ステップで追加する。
+//! - Paint、描画バッファ取得、継続描画更新は後続ステップで追加する。
 
 pub mod ffi;
 
-use cef::{args::Args, api_hash, execute_process, initialize, shutdown, Settings};
+use cef::*;
 use std::path::PathBuf;
 use std::ptr;
+use std::thread::sleep;
+use std::time::Duration;
 
 /// WV-11-02 Runtime / Symbol Probe を実行する。
 ///
@@ -69,8 +71,8 @@ pub fn run_symbol_probe(library_path: Option<PathBuf>) -> Result<String, String>
 /// - この関数は `main` の通常アプリ起動判定より前から呼び出す。
 /// - CEF subprocess では `cef_initialize` / `cef_shutdown` を呼び出さない。
 pub fn run_subprocess() -> i32 {
-    let _ = api_hash(cef::sys::CEF_API_VERSION_LAST, 0);
-    let args = Args::new();
+    let _ = api_hash(sys::CEF_API_VERSION_LAST, 0);
+    let args = args::Args::new();
     let exit_code = execute_process(
         Some(args.as_main_args()),
         None,
@@ -107,13 +109,9 @@ pub fn run_subprocess() -> i32 {
 ///   初期化単体 Probe では有効化しない。
 /// - Browser 作成は CEF-IT-SPEC-004 以降で行う。
 pub fn run_initialize_probe() -> Result<String, String> {
-    // cef-rs の生成バインディングが対象 CEF と同じ API バージョンを使用するよう初期化する。
-    let _ = api_hash(cef::sys::CEF_API_VERSION_LAST, 0);
+    let _ = api_hash(sys::CEF_API_VERSION_LAST, 0);
+    let args = args::Args::new();
 
-    let args = Args::new();
-
-    // Browser Process 自身でも CEF の標準初期化手順に従い execute_process を先行する。
-    // Browser Process では -1 が返り、そのまま initialize へ進む。
     let process_result = execute_process(
         Some(args.as_main_args()),
         None,
@@ -126,8 +124,6 @@ pub fn run_initialize_probe() -> Result<String, String> {
         ));
     }
 
-    // CEF-IT-SPEC-003 は初期化成立性だけを対象とする。
-    // external_message_pump 等のイベントループ統合設定は後続検証へ持ち越す。
     let settings = Settings {
         windowless_rendering_enabled: 1,
         no_sandbox: 1,
@@ -150,6 +146,141 @@ pub fn run_initialize_probe() -> Result<String, String> {
     shutdown();
 
     Ok("CEF initialize and shutdown succeeded".to_string())
+}
+
+#[derive(Clone)]
+struct BrowserProbeRenderHandler;
+
+wrap_render_handler! {
+    struct BrowserProbeRenderHandlerBuilder {
+        handler: BrowserProbeRenderHandler,
+    }
+
+    impl RenderHandler {
+        fn view_rect(&self, _browser: Option<&mut Browser>, rect: Option<&mut Rect>) {
+            if let Some(rect) = rect {
+                rect.width = 800;
+                rect.height = 600;
+            }
+        }
+    }
+}
+
+impl BrowserProbeRenderHandlerBuilder {
+    /// CEF-IT-SPEC-004 用の固定サイズ RenderHandler を生成する。
+    ///
+    /// # 戻り値
+    /// - 800x600 の view rect を返す RenderHandler。
+    fn build() -> RenderHandler {
+        Self::new(BrowserProbeRenderHandler)
+    }
+}
+
+wrap_client! {
+    struct BrowserProbeClientBuilder {
+        render_handler: RenderHandler,
+    }
+
+    impl Client {
+        fn render_handler(&self) -> Option<RenderHandler> {
+            Some(self.render_handler.clone())
+        }
+    }
+}
+
+impl BrowserProbeClientBuilder {
+    /// CEF-IT-SPEC-004 用の最小 Client を生成する。
+    ///
+    /// # 戻り値
+    /// - Windowless Rendering に必要な RenderHandler を持つ Client。
+    fn build() -> Client {
+        Self::new(BrowserProbeRenderHandlerBuilder::build())
+    }
+}
+
+/// WV-11-02 Windowless Browser Probe を実行する。
+///
+/// @hldocs.ref doc-20260628-000011Z-WV11#sec_fjanz0cmlgpv
+///
+/// # 役割
+/// - CEF を Windowless Rendering 有効で初期化する。
+/// - 独立 Native Window を生成しない Windowless Browser の作成を確認する。
+/// - Paint / Buffer の成立性は判定せず CEF-IT-SPEC-005 以降へ分離する。
+///
+/// # 戻り値
+/// - 成功時: Windowless Browser 作成成功を示す文字列。
+/// - 失敗時: 初期化または Browser 作成失敗理由。
+///
+/// # 注意点
+/// - Browser は検証後に close 要求し、CEF メッセージ処理を短時間継続してから shutdown する。
+/// - この終了処理は Probe の後始末であり、CEF-IT-SPEC-008 の合格判定には使用しない。
+pub fn run_browser_probe() -> Result<String, String> {
+    let _ = api_hash(sys::CEF_API_VERSION_LAST, 0);
+    let args = args::Args::new();
+
+    let process_result = execute_process(
+        Some(args.as_main_args()),
+        None,
+        ptr::null_mut(),
+    );
+
+    if process_result >= 0 {
+        return Ok(format!(
+            "CEF subprocess completed with exit code {process_result}"
+        ));
+    }
+
+    let settings = Settings {
+        windowless_rendering_enabled: 1,
+        no_sandbox: 1,
+        ..Default::default()
+    };
+
+    let initialized = initialize(
+        Some(args.as_main_args()),
+        Some(&settings),
+        None,
+        ptr::null_mut(),
+    );
+
+    if initialized != 1 {
+        return Err(format!(
+            "CEF initialize failed before browser creation: cef_initialize returned {initialized}"
+        ));
+    }
+
+    let window_info = WindowInfo {
+        windowless_rendering_enabled: 1,
+        ..Default::default()
+    };
+    let browser_settings = BrowserSettings::default();
+    let mut client = BrowserProbeClientBuilder::build();
+    let browser = browser_host_create_browser_sync(
+        Some(&window_info),
+        Some(&mut client),
+        Some(&"about:blank".into()),
+        Some(&browser_settings),
+        None,
+        None,
+    );
+
+    let Some(mut browser) = browser else {
+        shutdown();
+        return Err("CEF windowless browser creation returned None".to_string());
+    };
+
+    if let Some(host) = browser.host() {
+        host.close_browser(true.into());
+    }
+
+    for _ in 0..20 {
+        do_message_loop_work();
+        sleep(Duration::from_millis(10));
+    }
+
+    shutdown();
+
+    Ok("CEF windowless browser creation succeeded".to_string())
 }
 
 /// CEF ライブラリパスを解決する。
