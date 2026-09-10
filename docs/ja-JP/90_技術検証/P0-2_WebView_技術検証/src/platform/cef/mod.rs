@@ -58,7 +58,7 @@ pub fn run_symbol_probe(library_path: Option<PathBuf>) -> Result<String, String>
 /// # 役割
 /// - `cef-rs` が使用する CEF API バージョンを初期化する。
 /// - `cef_execute_process` により CEF subprocess を先に処理する。
-/// - Browser Process では Windowless Rendering を有効にした最小設定で CEF を初期化する。
+/// - Browser Process では Windowless Rendering のみを有効にした最小設定で CEF を初期化する。
 /// - 初期化成功後、Browser を作成せず直ちに CEF を shutdown する。
 ///
 /// # 戻り値
@@ -70,6 +70,8 @@ pub fn run_symbol_probe(library_path: Option<PathBuf>) -> Result<String, String>
 /// - 本 Probe は CEF-IT-SPEC-003 のみを対象とする。
 /// - `cef_execute_process` が 0 以上を返した場合、そのプロセスは subprocess なので
 ///   `cef_initialize` / `cef_shutdown` を呼び出してはならない。
+/// - `external_message_pump` は Browser / UI イベントループ統合時に検証するため、
+///   初期化単体 Probe では有効化しない。
 /// - Browser 作成は CEF-IT-SPEC-004 以降で行う。
 pub fn run_initialize_probe() -> Result<String, String> {
     // cef-rs の生成バインディングが対象 CEF と同じ API バージョンを使用するよう初期化する。
@@ -91,9 +93,10 @@ pub fn run_initialize_probe() -> Result<String, String> {
         ));
     }
 
+    // CEF-IT-SPEC-003 は初期化成立性だけを対象とする。
+    // external_message_pump 等のイベントループ統合設定は後続検証へ持ち越す。
     let settings = Settings {
         windowless_rendering_enabled: 1,
-        external_message_pump: 1,
         no_sandbox: 1,
         ..Default::default()
     };
