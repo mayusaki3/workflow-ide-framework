@@ -23,6 +23,7 @@ use std::path::PathBuf;
 /// - 通常起動時は eframe アプリケーションを起動する。
 /// - `--cef-probe` 指定時は CEF ライブラリのロードと主要シンボル解決のみを行い終了する。
 /// - `--cef-init-probe` 指定時は CEF の初期化と shutdown を行い終了する。
+/// - `--cef-browser-probe` 指定時は Windowless Browser の生成成立性を確認する。
 ///
 /// # 戻り値
 /// - 成功時: `Ok(())`。
@@ -31,12 +32,12 @@ use std::path::PathBuf;
 /// # 注意点
 /// - CEF は renderer 等の subprocess を同一実行ファイルから起動できるため、`--type` 判定は通常 UI 起動より前に行う。
 /// - `--cef-path` は `--cef-probe` 専用であり、CEF ライブラリファイルまたはディレクトリを指定する。
-/// - `--cef-init-probe` の CEF 配置は `cef-rs` / `cef-dll-sys` のランタイム探索規則に従う。
+/// - CEF Initialize 以降の Probe は `cef-rs` / `cef-dll-sys` のランタイム探索規則に従う。
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
 
     // @hldocs.ref doc-20260628-000011Z-WV11#sec_aj1rfgg9rguj
-    // CEF subprocess は `--cef-init-probe` を引き継がない場合があるため、
+    // CEF subprocess は Probe 固有引数を引き継がない場合があるため、
     // Chromium の `--type=<process>` を先に検出して通常アプリ起動を防止する。
     if is_cef_subprocess(&args) {
         let exit_code = platform::cef::run_subprocess();
@@ -50,6 +51,11 @@ fn main() -> eframe::Result<()> {
 
     if args.iter().any(|arg| arg == "--cef-init-probe") {
         run_cef_initialize_probe();
+        return Ok(());
+    }
+
+    if args.iter().any(|arg| arg == "--cef-browser-probe") {
+        run_cef_browser_probe();
         return Ok(());
     }
 
@@ -134,6 +140,33 @@ fn run_cef_initialize_probe() {
         }
         Err(error) => {
             eprintln!("WV-11-02 CEF initialize probe failed");
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+    }
+}
+
+/// Windowless Browser Probe を実行する。
+///
+/// @hldocs.ref doc-20260628-000011Z-WV11#sec_fjanz0cmlgpv
+///
+/// # 役割
+/// - `platform::cef::run_browser_probe` を呼び出す。
+/// - CEF-IT-SPEC-004 の Windowless Browser 作成結果を出力する。
+///
+/// # 注意点
+/// - Paint / Buffer / Update は本 Probe の合格判定に含めない。
+/// - 検証失敗時はプロセスを `1` で終了する。
+fn run_cef_browser_probe() {
+    println!("WV-11-02 CEF windowless browser probe start");
+
+    match platform::cef::run_browser_probe() {
+        Ok(message) => {
+            println!("{message}");
+            println!("WV-11-02 CEF windowless browser probe OK");
+        }
+        Err(error) => {
+            eprintln!("WV-11-02 CEF windowless browser probe failed");
             eprintln!("{error}");
             std::process::exit(1);
         }
