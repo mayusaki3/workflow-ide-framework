@@ -11,6 +11,7 @@
 //! - 入力イベント転送は WV-11-04 で検証する。
 //! - CEF subprocess は起動引数の `--type=` を判定し、Browser Process の GUI 初期化前に処理する。
 //! - Windows では CEF の multi-threaded message loop を使用し、eframe/winit のイベントループと分離する。
+//! - Windowless Browser は CEF UI thread の `on_context_initialized` から非同期生成する。
 
 use cef::*;
 use eframe::egui;
@@ -26,7 +27,9 @@ use std::time::{Duration, Instant};
 const VIEW_WIDTH: i32 = 800;
 const VIEW_HEIGHT: i32 = 600;
 const MESSAGE_PUMP_INTERVAL: Duration = Duration::from_millis(10);
+const BROWSER_CREATE_TIMEOUT: Duration = Duration::from_secs(3);
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
+const TEST_URL: &str = "data:text/html,<html><body style='margin:0;background:#17324d;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh'><div style='text-align:center'><h1>WV-11-03 Browser Surface</h1><p>CEF OSR rendered inside egui_dock</p></div></body></html>";
 
 /// CEF Paint の最新フレーム。
 ///
@@ -98,7 +101,6 @@ wrap_render_handler! {
 }
 
 impl DockProbeRenderHandlerBuilder {
-    /// 共有 Paint 状態を持つ RenderHandler を生成する。
     fn build(state: Arc<Mutex<DockProbeState>>) -> RenderHandler {
         Self::new(DockProbeRenderHandler { state })
     }
@@ -106,6 +108,8 @@ impl DockProbeRenderHandlerBuilder {
 
 #[derive(Clone)]
 struct DockProbeLifeSpanHandler {
+    browser: Arc<Mutex<Option<Browser>>>,
+    browser_created: Arc<AtomicBool>,
     closed: Arc<AtomicBool>,
 }
 
@@ -115,17 +119,36 @@ wrap_life_span_handler! {
     }
 
     impl LifeSpanHandler {
-        /// Browser が完全に閉じたことを Browser Process 側へ通知する。
+        fn on_after_created(&self, browser: Option<&mut Browser>) {
+            let Some(browser) = browser.cloned() else {
+                return;
+            };
+            if let Ok(mut slot) = self.handler.browser.lock() {
+                *slot = Some(browser);
+                self.handler.browser_created.store(true, Ordering::Release);
+            }
+        }
+
         fn on_before_close(&self, _browser: Option<&mut Browser>) {
+            if let Ok(mut slot) = self.handler.browser.lock() {
+                *slot = None;
+            }
             self.handler.closed.store(true, Ordering::Release);
         }
     }
 }
 
 impl DockProbeLifeSpanHandlerBuilder {
-    /// Browser 終了状態を共有する LifeSpanHandler を生成する。
-    fn build(closed: Arc<AtomicBool>) -> LifeSpanHandler {
-        Self::new(DockProbeLifeSpanHandler { closed })
+    fn build(
+        browser: Arc<Mutex<Option<Browser>>>,
+        browser_created: Arc<AtomicBool>,
+        closed: Arc<AtomicBool>,
+    ) -> LifeSpanHandler {
+        Self::new(DockProbeLifeSpanHandler {
+            browser,
+            browser_created,
+            closed,
+        })
     }
 }
 
@@ -147,32 +170,105 @@ wrap_client! {
 }
 
 impl DockProbeClientBuilder {
-    /// TEX-IT-SPEC-004 用 CEF Client を生成する。
-    fn build(state: Arc<Mutex<DockProbeState>>, closed: Arc<AtomicBool>) -> Client {
+    fn build(
+        state: Arc<Mutex<DockProbeState>>,
+        browser: Arc<Mutex<Option<Browser>>>,
+        browser_created: Arc<AtomicBool>,
+        closed: Arc<AtomicBool>,
+    ) -> Client {
         Self::new(
             DockProbeRenderHandlerBuilder::build(state),
-            DockProbeLifeSpanHandlerBuilder::build(closed),
+            DockProbeLifeSpanHandlerBuilder::build(browser, browser_created, closed),
         )
     }
 }
 
-/// Chromium subprocess かを判定する。
-///
-/// # 引数
-/// - `args`: 現在のプロセスへ渡されたコマンドライン引数。
-///
-/// # 戻り値
-/// - `--type` または `--type=...` を含む場合は `true`。
+#[derive(Clone)]
+struct DockProbeBrowserProcessHandler {
+    state: Arc<Mutex<DockProbeState>>,
+    browser: Arc<Mutex<Option<Browser>>>,
+    browser_created: Arc<AtomicBool>,
+    browser_create_failed: Arc<AtomicBool>,
+    closed: Arc<AtomicBool>,
+}
+
+wrap_browser_process_handler! {
+    struct DockProbeBrowserProcessHandlerBuilder {
+        handler: DockProbeBrowserProcessHandler,
+    }
+
+    impl BrowserProcessHandler {
+        fn on_context_initialized(&self) {
+            let mut client = DockProbeClientBuilder::build(
+                self.handler.state.clone(),
+                self.handler.browser.clone(),
+                self.handler.browser_created.clone(),
+                self.handler.closed.clone(),
+            );
+            let window_info = WindowInfo {
+                windowless_rendering_enabled: 1,
+                ..Default::default()
+            };
+            let browser_settings = BrowserSettings {
+                windowless_frame_rate: 30,
+                ..Default::default()
+            };
+            let url = CefString::from(TEST_URL);
+
+            let accepted = browser_host_create_browser(
+                Some(&window_info),
+                Some(&mut client),
+                Some(&url),
+                Some(&browser_settings),
+                None,
+                None,
+            );
+
+            if accepted != 1 {
+                self.handler
+                    .browser_create_failed
+                    .store(true, Ordering::Release);
+            }
+        }
+    }
+}
+
+impl DockProbeBrowserProcessHandlerBuilder {
+    fn build(handler: DockProbeBrowserProcessHandler) -> BrowserProcessHandler {
+        Self::new(handler)
+    }
+}
+
+#[derive(Clone)]
+struct DockProbeCefApp {
+    browser_process_handler: BrowserProcessHandler,
+}
+
+wrap_app! {
+    struct DockProbeCefAppBuilder {
+        handler: DockProbeCefApp,
+    }
+
+    impl App {
+        fn browser_process_handler(&self) -> Option<BrowserProcessHandler> {
+            Some(self.handler.browser_process_handler.clone())
+        }
+    }
+}
+
+impl DockProbeCefAppBuilder {
+    fn build(handler: DockProbeBrowserProcessHandler) -> App {
+        Self::new(DockProbeCefApp {
+            browser_process_handler: DockProbeBrowserProcessHandlerBuilder::build(handler),
+        })
+    }
+}
+
 fn is_cef_subprocess(args: &[String]) -> bool {
     args.iter()
         .any(|arg| arg == "--type" || arg.starts_with("--type="))
 }
 
-/// CEF subprocess を処理する。
-///
-/// # 戻り値
-/// - CEF subprocess の終了コード。
-/// - `cef_execute_process` が subprocess として処理しなかった場合は 1。
 fn run_subprocess() -> i32 {
     let _ = api_hash(sys::CEF_API_VERSION_LAST, 0);
     let args = args::Args::new();
@@ -226,15 +322,12 @@ impl<'a> TabViewer for DockProbeViewer<'a> {
 }
 
 struct CefDockRuntime {
-    browser: Browser,
     state: Arc<Mutex<DockProbeState>>,
+    browser: Arc<Mutex<Option<Browser>>>,
     closed: Arc<AtomicBool>,
 }
 
 impl CefDockRuntime {
-    /// Windowless Browser を初期化する。
-    ///
-    /// @hldocs.ref doc-20260911-120000Z-WV13#sec_h5v2c8m7p1rs
     fn new() -> Result<Self, String> {
         let _ = api_hash(sys::CEF_API_VERSION_LAST, 0);
         let args = args::Args::new();
@@ -260,58 +353,110 @@ impl CefDockRuntime {
             ..Default::default()
         };
 
+        let state = Arc::new(Mutex::new(DockProbeState::default()));
+        let browser = Arc::new(Mutex::new(None));
+        let browser_created = Arc::new(AtomicBool::new(false));
+        let browser_create_failed = Arc::new(AtomicBool::new(false));
+        let closed = Arc::new(AtomicBool::new(false));
+
+        let handler = DockProbeBrowserProcessHandler {
+            state: state.clone(),
+            browser: browser.clone(),
+            browser_created: browser_created.clone(),
+            browser_create_failed: browser_create_failed.clone(),
+            closed: closed.clone(),
+        };
+        let mut app = DockProbeCefAppBuilder::build(handler);
+
         let initialized = initialize(
             Some(args.as_main_args()),
             Some(&settings),
-            None,
+            Some(&mut app),
             ptr::null_mut(),
         );
         if initialized != 1 {
             return Err(format!("cef_initialize returned {initialized}"));
         }
 
-        let state = Arc::new(Mutex::new(DockProbeState::default()));
-        let closed = Arc::new(AtomicBool::new(false));
-        let mut client = DockProbeClientBuilder::build(state.clone(), closed.clone());
-        let window_info = WindowInfo {
-            windowless_rendering_enabled: 1,
-            ..Default::default()
-        };
-        let browser_settings = BrowserSettings {
-            windowless_frame_rate: 30,
-            ..Default::default()
-        };
+        #[cfg(target_os = "windows")]
+        {
+            let started = Instant::now();
+            while !browser_created.load(Ordering::Acquire)
+                && !browser_create_failed.load(Ordering::Acquire)
+                && started.elapsed() < BROWSER_CREATE_TIMEOUT
+            {
+                sleep(MESSAGE_PUMP_INTERVAL);
+            }
 
-        let browser = browser_host_create_browser_sync(
-            Some(&window_info),
-            Some(&mut client),
-            Some(&"data:text/html,<html><body style='margin:0;background:#17324d;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh'><div style='text-align:center'><h1>WV-11-03 Browser Surface</h1><p>CEF OSR rendered inside egui_dock</p></div></body></html>".into()),
-            Some(&browser_settings),
-            None,
-            None,
-        )
-        .ok_or_else(|| "CEF windowless browser creation returned None".to_string())?;
+            if browser_create_failed.load(Ordering::Acquire) {
+                shutdown();
+                return Err("CEF asynchronous windowless browser creation was rejected".to_string());
+            }
+            if !browser_created.load(Ordering::Acquire) {
+                shutdown();
+                return Err("CEF asynchronous windowless browser creation timed out".to_string());
+            }
+        }
 
         Ok(Self {
-            browser,
             state,
+            browser,
             closed,
         })
     }
 
-    /// CEF メッセージを必要なプラットフォームで処理する。
-    ///
-    /// Windows は multi-threaded message loop を使用するため手動 Pump を行わない。
     fn pump(&self) {
         #[cfg(not(target_os = "windows"))]
         do_message_loop_work();
     }
 }
 
+#[derive(Clone)]
+struct CloseBrowserTask {
+    browser: Browser,
+}
+
+wrap_task! {
+    struct CloseBrowserTaskBuilder {
+        task: CloseBrowserTask,
+    }
+
+    impl Task {
+        fn execute(&self) {
+            if let Some(host) = self.task.browser.host() {
+                host.close_browser(true.into());
+            }
+        }
+    }
+}
+
+impl CloseBrowserTaskBuilder {
+    fn build(browser: Browser) -> Task {
+        Self::new(CloseBrowserTask { browser })
+    }
+}
+
 impl Drop for CefDockRuntime {
     fn drop(&mut self) {
-        if let Some(host) = self.browser.host() {
-            host.close_browser(true.into());
+        let browser = self
+            .browser
+            .lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().cloned());
+
+        if let Some(browser) = browser {
+            #[cfg(target_os = "windows")]
+            {
+                let mut task = CloseBrowserTaskBuilder::build(browser);
+                if post_task(ThreadId::UI, Some(&mut task)) != 1 {
+                    eprintln!("WV-11-03 CEF Dock display probe: failed to post browser close task");
+                }
+            }
+
+            #[cfg(not(target_os = "windows"))]
+            if let Some(host) = browser.host() {
+                host.close_browser(true.into());
+            }
         }
 
         let started = Instant::now();
@@ -329,14 +474,14 @@ impl Drop for CefDockRuntime {
     }
 }
 
-struct DockProbeApp {
+struct DockProbeEframeApp {
     dock_state: DockState<DockProbeTab>,
     runtime: CefDockRuntime,
     texture: Option<egui::TextureHandle>,
     applied_generation: u64,
 }
 
-impl DockProbeApp {
+impl DockProbeEframeApp {
     fn new(runtime: CefDockRuntime) -> Self {
         Self {
             dock_state: DockState::new(vec![DockProbeTab::Browser]),
@@ -346,7 +491,6 @@ impl DockProbeApp {
         }
     }
 
-    /// 最新 Paint を egui Texture へ反映する。
     fn update_texture(&mut self, ctx: &egui::Context) {
         let snapshot = {
             let Ok(state) = self.runtime.state.lock() else {
@@ -389,7 +533,7 @@ impl DockProbeApp {
     }
 }
 
-impl eframe::App for DockProbeApp {
+impl eframe::App for DockProbeEframeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.runtime.pump();
         self.update_texture(ctx);
@@ -439,6 +583,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "WV-11-03 Browser Surface Dock Probe",
         native_options,
-        Box::new(move |_cc| Ok(Box::new(DockProbeApp::new(runtime)))),
+        Box::new(move |_cc| Ok(Box::new(DockProbeEframeApp::new(runtime)))),
     )
 }
