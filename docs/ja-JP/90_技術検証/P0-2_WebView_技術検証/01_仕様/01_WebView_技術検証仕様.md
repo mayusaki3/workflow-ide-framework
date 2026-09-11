@@ -71,6 +71,36 @@ Browser Surface は、ブラウザ画面の変化に応じて描画バッファ�
 
 Browser Surface の Browser と CEF は、必要な処理完了後に正常な順序で終了可能でなければならない。
 
+### 3.9 Texture 画素形式
+<!-- hldocs:sec_id=sec_3n8qk2v5u7am -->
+
+Browser Surface は、CEF OSR が提供する BGRA 画素バッファを egui Texture が解釈可能な RGBA8 画素列へ正規化可能でなければならない。
+
+### 3.10 egui Texture 生成
+<!-- hldocs:sec_id=sec_r8m4t2x9c6kp -->
+
+Browser Surface は、正規化した描画バッファと描画領域サイズから egui の Texture を生成可能でなければならない。
+
+### 3.11 Texture 更新
+<!-- hldocs:sec_id=sec_q6f1w9n3z8bd -->
+
+Browser Surface は、CEF OSR の新しい Paint 通知に応じて既存の egui Texture を更新可能でなければならない。
+
+### 3.12 Dock Panel 表示
+<!-- hldocs:sec_id=sec_h5v2c8m7p1rs -->
+
+Browser Surface は、Browser 用の独立 Native Window を表示せず、egui Texture として Dock Panel 内へ表示可能でなければならない。
+
+### 3.13 描画サイズ同期
+<!-- hldocs:sec_id=sec_b4j7k1s9d3wx -->
+
+Browser Surface は、Dock Panel の表示領域変更に応じて Browser の OSR 描画領域と Texture のサイズを同期可能でなければならない。
+
+### 3.14 表示継続更新
+<!-- hldocs:sec_id=sec_m9a2e6r4t7yc -->
+
+Browser Surface は、ブラウザ画面の変化に応じた継続的な Paint 更新を Dock Panel 内の表示へ反映可能でなければならない。
+
 ## 4. OS 差異
 
 OS 固有のランタイム配置、プロセス起動方式、描画バックエンドその他の差異は Framework 内部で吸収する。
@@ -79,7 +109,6 @@ OS 固有のランタイム配置、プロセス起動方式、描画バック�
 
 ## 5. 今後の拡張
 
-- Browser Surface Texture 転送
 - Browser Surface 入力転送
 - GPU Surface との共通化
 - Surface 共通 API
