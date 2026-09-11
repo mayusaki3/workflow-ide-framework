@@ -10,19 +10,23 @@
 //! - 継続更新は TEX-IT-SPEC-006 で検証する。
 //! - 入力イベント転送は WV-11-04 で検証する。
 //! - CEF subprocess は起動引数の `--type=` を判定し、Browser Process の GUI 初期化前に処理する。
+//! - Windows では CEF の multi-threaded message loop を使用し、eframe/winit のイベントループと分離する。
 
 use cef::*;
 use eframe::egui;
 use egui_dock::{DockArea, DockState, TabViewer};
-use std::cell::RefCell;
 use std::ptr;
-use std::rc::Rc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const VIEW_WIDTH: i32 = 800;
 const VIEW_HEIGHT: i32 = 600;
 const MESSAGE_PUMP_INTERVAL: Duration = Duration::from_millis(10);
+const CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// CEF Paint の最新フレーム。
 ///
@@ -37,7 +41,7 @@ struct DockProbeState {
 
 #[derive(Clone)]
 struct DockProbeRenderHandler {
-    state: Rc<RefCell<DockProbeState>>,
+    state: Arc<Mutex<DockProbeState>>,
 }
 
 wrap_render_handler! {
@@ -82,7 +86,9 @@ wrap_render_handler! {
                 rgba.extend_from_slice(&[pixel[2], pixel[1], pixel[0], pixel[3]]);
             }
 
-            let mut state = self.handler.state.borrow_mut();
+            let Ok(mut state) = self.handler.state.lock() else {
+                return;
+            };
             state.width = width;
             state.height = height;
             state.rgba = rgba;
@@ -92,26 +98,61 @@ wrap_render_handler! {
 }
 
 impl DockProbeRenderHandlerBuilder {
-    fn build(state: Rc<RefCell<DockProbeState>>) -> RenderHandler {
+    /// 共有 Paint 状態を持つ RenderHandler を生成する。
+    fn build(state: Arc<Mutex<DockProbeState>>) -> RenderHandler {
         Self::new(DockProbeRenderHandler { state })
+    }
+}
+
+#[derive(Clone)]
+struct DockProbeLifeSpanHandler {
+    closed: Arc<AtomicBool>,
+}
+
+wrap_life_span_handler! {
+    struct DockProbeLifeSpanHandlerBuilder {
+        handler: DockProbeLifeSpanHandler,
+    }
+
+    impl LifeSpanHandler {
+        /// Browser が完全に閉じたことを Browser Process 側へ通知する。
+        fn on_before_close(&self, _browser: Option<&mut Browser>) {
+            self.handler.closed.store(true, Ordering::Release);
+        }
+    }
+}
+
+impl DockProbeLifeSpanHandlerBuilder {
+    /// Browser 終了状態を共有する LifeSpanHandler を生成する。
+    fn build(closed: Arc<AtomicBool>) -> LifeSpanHandler {
+        Self::new(DockProbeLifeSpanHandler { closed })
     }
 }
 
 wrap_client! {
     struct DockProbeClientBuilder {
         render_handler: RenderHandler,
+        life_span_handler: LifeSpanHandler,
     }
 
     impl Client {
         fn render_handler(&self) -> Option<RenderHandler> {
             Some(self.render_handler.clone())
         }
+
+        fn life_span_handler(&self) -> Option<LifeSpanHandler> {
+            Some(self.life_span_handler.clone())
+        }
     }
 }
 
 impl DockProbeClientBuilder {
-    fn build(state: Rc<RefCell<DockProbeState>>) -> Client {
-        Self::new(DockProbeRenderHandlerBuilder::build(state))
+    /// TEX-IT-SPEC-004 用 CEF Client を生成する。
+    fn build(state: Arc<Mutex<DockProbeState>>, closed: Arc<AtomicBool>) -> Client {
+        Self::new(
+            DockProbeRenderHandlerBuilder::build(state),
+            DockProbeLifeSpanHandlerBuilder::build(closed),
+        )
     }
 }
 
@@ -186,7 +227,8 @@ impl<'a> TabViewer for DockProbeViewer<'a> {
 
 struct CefDockRuntime {
     browser: Browser,
-    state: Rc<RefCell<DockProbeState>>,
+    state: Arc<Mutex<DockProbeState>>,
+    closed: Arc<AtomicBool>,
 }
 
 impl CefDockRuntime {
@@ -203,6 +245,15 @@ impl CefDockRuntime {
             ));
         }
 
+        #[cfg(target_os = "windows")]
+        let settings = Settings {
+            windowless_rendering_enabled: 1,
+            no_sandbox: 1,
+            multi_threaded_message_loop: 1,
+            ..Default::default()
+        };
+
+        #[cfg(not(target_os = "windows"))]
         let settings = Settings {
             windowless_rendering_enabled: 1,
             no_sandbox: 1,
@@ -219,8 +270,9 @@ impl CefDockRuntime {
             return Err(format!("cef_initialize returned {initialized}"));
         }
 
-        let state = Rc::new(RefCell::new(DockProbeState::default()));
-        let mut client = DockProbeClientBuilder::build(state.clone());
+        let state = Arc::new(Mutex::new(DockProbeState::default()));
+        let closed = Arc::new(AtomicBool::new(false));
+        let mut client = DockProbeClientBuilder::build(state.clone(), closed.clone());
         let window_info = WindowInfo {
             windowless_rendering_enabled: 1,
             ..Default::default()
@@ -240,10 +292,18 @@ impl CefDockRuntime {
         )
         .ok_or_else(|| "CEF windowless browser creation returned None".to_string())?;
 
-        Ok(Self { browser, state })
+        Ok(Self {
+            browser,
+            state,
+            closed,
+        })
     }
 
+    /// CEF メッセージを必要なプラットフォームで処理する。
+    ///
+    /// Windows は multi-threaded message loop を使用するため手動 Pump を行わない。
     fn pump(&self) {
+        #[cfg(not(target_os = "windows"))]
         do_message_loop_work();
     }
 }
@@ -253,10 +313,18 @@ impl Drop for CefDockRuntime {
         if let Some(host) = self.browser.host() {
             host.close_browser(true.into());
         }
-        for _ in 0..50 {
+
+        let started = Instant::now();
+        while !self.closed.load(Ordering::Acquire) && started.elapsed() < CLOSE_TIMEOUT {
+            #[cfg(not(target_os = "windows"))]
             do_message_loop_work();
             sleep(MESSAGE_PUMP_INTERVAL);
         }
+
+        if !self.closed.load(Ordering::Acquire) {
+            eprintln!("WV-11-03 CEF Dock display probe: browser close timeout");
+        }
+
         shutdown();
     }
 }
@@ -281,7 +349,9 @@ impl DockProbeApp {
     /// 最新 Paint を egui Texture へ反映する。
     fn update_texture(&mut self, ctx: &egui::Context) {
         let snapshot = {
-            let state = self.runtime.state.borrow();
+            let Ok(state) = self.runtime.state.lock() else {
+                return;
+            };
             if state.generation == self.applied_generation
                 || state.width <= 0
                 || state.height <= 0
