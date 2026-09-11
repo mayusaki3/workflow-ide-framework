@@ -362,7 +362,7 @@ Browser と CEF を正常な順序で終了できることを確認する。
 
 | 動作対象 | Runtime | Symbols | Initialize | Browser | Paint | Buffer | Update | Shutdown |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Windows 実機 | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ？ |
+| Windows 実機 | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | Linux VM | ？ | ？ | ？ | ？ | ？ | ？ | ？ | ？ |
 | Linux X11 実機 | ？ | ？ | ？ | ？ | ？ | ？ | ？ | ？ |
 | Linux Wayland 実機 | ？ | ？ | ？ | ？ | ？ | ？ | ？ | ？ |
