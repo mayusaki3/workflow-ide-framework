@@ -9,13 +9,12 @@
 //! - Resize 同期は TEX-IT-SPEC-005 で検証する。
 //! - 継続更新は TEX-IT-SPEC-006 で検証する。
 //! - 入力イベント転送は WV-11-04 で検証する。
-//! - CEF subprocess は eframe 初期化を避けるため専用 helper EXE へ分離する。
+//! - CEF subprocess は起動引数の `--type=` を判定し、Browser Process の GUI 初期化前に処理する。
 
 use cef::*;
 use eframe::egui;
 use egui_dock::{DockArea, DockState, TabViewer};
 use std::cell::RefCell;
-use std::path::PathBuf;
 use std::ptr;
 use std::rc::Rc;
 use std::thread::sleep;
@@ -24,11 +23,6 @@ use std::time::Duration;
 const VIEW_WIDTH: i32 = 800;
 const VIEW_HEIGHT: i32 = 600;
 const MESSAGE_PUMP_INTERVAL: Duration = Duration::from_millis(10);
-
-#[cfg(target_os = "windows")]
-const CEF_SUBPROCESS_HELPER_NAME: &str = "cef_subprocess_probe.exe";
-#[cfg(not(target_os = "windows"))]
-const CEF_SUBPROCESS_HELPER_NAME: &str = "cef_subprocess_probe";
 
 /// CEF Paint の最新フレーム。
 ///
@@ -121,29 +115,33 @@ impl DockProbeClientBuilder {
     }
 }
 
-/// 現在の実行ファイルと同じディレクトリにある CEF subprocess helper を解決する。
+/// Chromium subprocess かを判定する。
+///
+/// # 引数
+/// - `args`: 現在のプロセスへ渡されたコマンドライン引数。
 ///
 /// # 戻り値
-/// - 成功時: subprocess helper の絶対パス。
-/// - 失敗時: 実行ファイル位置または helper の存在確認に失敗した理由。
-fn resolve_subprocess_helper_path() -> Result<PathBuf, String> {
-    let current_exe = std::env::current_exe()
-        .map_err(|error| format!("Failed to resolve current executable path: {error}"))?;
-    let executable_dir = current_exe.parent().ok_or_else(|| {
-        format!(
-            "Failed to resolve executable directory: {}",
-            current_exe.display()
-        )
-    })?;
-    let helper = executable_dir.join(CEF_SUBPROCESS_HELPER_NAME);
+/// - `--type` または `--type=...` を含む場合は `true`。
+fn is_cef_subprocess(args: &[String]) -> bool {
+    args.iter()
+        .any(|arg| arg == "--type" || arg.starts_with("--type="))
+}
 
-    if helper.exists() {
-        Ok(helper)
+/// CEF subprocess を処理する。
+///
+/// # 戻り値
+/// - CEF subprocess の終了コード。
+/// - `cef_execute_process` が subprocess として処理しなかった場合は 1。
+fn run_subprocess() -> i32 {
+    let _ = api_hash(sys::CEF_API_VERSION_LAST, 0);
+    let args = args::Args::new();
+    let exit_code = execute_process(Some(args.as_main_args()), None, ptr::null_mut());
+
+    if exit_code >= 0 {
+        exit_code
     } else {
-        Err(format!(
-            "CEF subprocess helper not found: {}. Build it first with `cargo build --bin cef_subprocess_probe`.",
-            helper.display()
-        ))
+        eprintln!("WV-11-03 CEF subprocess failed: cef_execute_process returned {exit_code}");
+        1
     }
 }
 
@@ -205,11 +203,9 @@ impl CefDockRuntime {
             ));
         }
 
-        let subprocess_path = resolve_subprocess_helper_path()?;
         let settings = Settings {
             windowless_rendering_enabled: 1,
             no_sandbox: 1,
-            browser_subprocess_path: subprocess_path.to_string_lossy().as_ref().into(),
             ..Default::default()
         };
 
@@ -348,6 +344,11 @@ impl eframe::App for DockProbeApp {
 }
 
 fn main() -> eframe::Result<()> {
+    let cli_args: Vec<String> = std::env::args().collect();
+    if is_cef_subprocess(&cli_args) {
+        std::process::exit(run_subprocess());
+    }
+
     println!("WV-11-03 CEF Dock display probe start");
 
     let runtime = match CefDockRuntime::new() {
