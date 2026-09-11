@@ -3,7 +3,7 @@ HLDocS:LLM-MANAGED
 doc_id: doc-20260911-120000Z-WV13
 lang: ja-JP
 canonical_title: WV-11-03 Browser Surface Texture 転送検証
- document_type: testspec
+document_type: testspec
 canonical_document: true
 -->
 
