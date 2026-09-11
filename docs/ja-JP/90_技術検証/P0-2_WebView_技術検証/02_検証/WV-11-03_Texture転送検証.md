@@ -188,7 +188,7 @@ Browser の画面変化に応じた継続 Paint を Dock Panel 内表示へ反�
 
 | 動作対象 | Pixel | Texture | Update | Dock | Resize | Continuous |
 | --- | --- | --- | --- | --- | --- | --- |
-| Windows 実機 | ○ | ○ | ？ | ？ | ？ | ？ |
+| Windows 実機 | ○ | ○ | ○ | ？ | ？ | ？ |
 | Linux VM | ？ | ？ | ？ | ？ | ？ | ？ |
 | Linux X11 実機 | ？ | ？ | ？ | ？ | ？ | ？ |
 | Linux Wayland 実機 | ？ | ？ | ？ | ？ | ？ | ？ |
