@@ -29,7 +29,7 @@ const VIEW_HEIGHT: i32 = 600;
 const MESSAGE_PUMP_INTERVAL: Duration = Duration::from_millis(10);
 const BROWSER_CREATE_TIMEOUT: Duration = Duration::from_secs(3);
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
-const TEST_URL: &str = "data:text/html,<html><body style='margin:0;background:#17324d;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh'><div style='text-align:center'><h1>WV-11-03 Browser Surface</h1><p>CEF OSR rendered inside egui_dock</p></div></body></html>";
+const TEST_URL: &str = "data:text/html,<html><body style='margin:0;background:rgb(255,210,0);color:rgb(20,20,20);font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh'><div style='text-align:center;border:12px solid rgb(20,20,20);padding:48px'><h1 style='font-size:56px;margin:0 0 24px'>WV-11-03 CEF PAINT OK</h1><p style='font-size:28px;margin:0'>CEF OSR rendered inside egui_dock</p></div></body></html>";
 
 /// CEF Paint の最新フレーム。
 ///
@@ -409,6 +409,22 @@ impl CefDockRuntime {
         #[cfg(not(target_os = "windows"))]
         do_message_loop_work();
     }
+
+    /// Paint 状態を UI 診断表示用に取得する。
+    ///
+    /// # 戻り値
+    /// - `(generation, width, height, rgba_bytes)`。
+    fn paint_diagnostics(&self) -> (u64, i32, i32, usize) {
+        let Ok(state) = self.state.lock() else {
+            return (0, 0, 0, 0);
+        };
+        (
+            state.generation,
+            state.width,
+            state.height,
+            state.rgba.len(),
+        )
+    }
 }
 
 #[derive(Clone)]
@@ -516,6 +532,7 @@ impl DockProbeEframeApp {
             return;
         };
 
+        let first_texture_frame = self.texture.is_none();
         let image = egui::ColorImage::from_rgba_unmultiplied([width, height], &rgba);
         match self.texture.as_mut() {
             Some(texture) if texture.size() == [width, height] => {
@@ -530,6 +547,12 @@ impl DockProbeEframeApp {
             }
         }
         self.applied_generation = generation;
+
+        if first_texture_frame {
+            println!(
+                "CEF OSR Paint received and egui texture created: generation={generation}, size={width}x{height}"
+            );
+        }
     }
 }
 
@@ -538,11 +561,27 @@ impl eframe::App for DockProbeEframeApp {
         self.runtime.pump();
         self.update_texture(ctx);
 
+        let (generation, paint_width, paint_height, rgba_bytes) = self.runtime.paint_diagnostics();
+        let texture_status = self
+            .texture
+            .as_ref()
+            .map(|texture| {
+                let size = texture.size();
+                format!("{}x{}", size[0], size[1])
+            })
+            .unwrap_or_else(|| "none".to_string());
+
         egui::TopBottomPanel::top("wv11_03_status").show(ctx, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label("WV-11-03 TEX-IT-SPEC-004");
                 ui.separator();
-                ui.label("Browser Surface is rendered as an egui Texture; no Browser Native Window.");
+                ui.label(format!("Paint generation: {generation}"));
+                ui.separator();
+                ui.label(format!("Paint: {paint_width}x{paint_height}"));
+                ui.separator();
+                ui.label(format!("RGBA bytes: {rgba_bytes}"));
+                ui.separator();
+                ui.label(format!("egui Texture: {texture_status}"));
             });
         });
 
