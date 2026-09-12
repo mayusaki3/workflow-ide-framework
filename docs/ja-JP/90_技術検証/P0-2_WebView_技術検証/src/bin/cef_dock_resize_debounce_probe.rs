@@ -11,6 +11,7 @@
 //! - DPI は `RenderHandler::screen_info` の `device_scale_factor` で CEF へ通知する。
 //! - Windows では CEF の multi-threaded message loop を使用する。
 //! - Resize は Dock サイズ変化停止後 150ms で一度だけ `was_resized` を通知する。
+//! - Resize 通知後は `invalidate(VIEW)` を呼び、OSR 再描画を明示的に要求する。
 
 use cef::*;
 use eframe::egui;
@@ -506,6 +507,7 @@ impl ResizeRuntime {
         {
             if let Some(host) = browser.host() {
                 host.was_resized();
+                host.invalidate(PaintElementType::VIEW);
                 return true;
             }
             false
@@ -545,6 +547,7 @@ wrap_task! {
         fn execute(&self) {
             if let Some(host) = self.task.browser.host() {
                 host.was_resized();
+                host.invalidate(PaintElementType::VIEW);
             }
         }
     }
