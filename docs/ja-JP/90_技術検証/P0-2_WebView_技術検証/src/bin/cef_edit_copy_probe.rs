@@ -11,6 +11,7 @@
 //! - Windows Virtual-Key Code と CEF EVENTFLAG_CONTROL_DOWN の使用は本 Probe の検証実装である。
 //! - OS 差異をアプリ利用側へ公開する正式設計は本検証では定義しない。
 //! - Windows では CEF の multi-threaded message loop を使用する。
+//! - egui では Ctrl+C が Copy Event として消費される場合があるため、Copy Event と Key Event の双方を監視する。
 
 use cef::*;
 use eframe::egui;
@@ -61,7 +62,6 @@ wrap_render_handler! {
             }
         }
 
-        /// CEF BGRA Paint を RGBA8 に変換して最新フレームとして保持する。
         fn on_paint(
             &self,
             _browser: Option<&mut Browser>,
@@ -80,13 +80,11 @@ wrap_render_handler! {
             else {
                 return;
             };
-
             let source = unsafe { std::slice::from_raw_parts(buffer, byte_len) };
             let mut rgba = Vec::with_capacity(byte_len);
             for pixel in source.chunks_exact(4) {
                 rgba.extend_from_slice(&[pixel[2], pixel[1], pixel[0], pixel[3]]);
             }
-
             let Ok(mut state) = self.handler.state.lock() else {
                 return;
             };
@@ -212,7 +210,6 @@ wrap_browser_process_handler! {
                 ..Default::default()
             };
             let url = CefString::from(TEST_URL);
-
             let accepted = browser_host_create_browser(
                 Some(&window_info),
                 Some(&mut client),
@@ -222,9 +219,7 @@ wrap_browser_process_handler! {
                 None,
             );
             if accepted != 1 {
-                self.handler
-                    .browser_create_failed
-                    .store(true, Ordering::Release);
+                self.handler.browser_create_failed.store(true, Ordering::Release);
             }
         }
     }
@@ -262,8 +257,7 @@ impl CopyCefAppBuilder {
 }
 
 fn is_cef_subprocess(args: &[String]) -> bool {
-    args.iter()
-        .any(|arg| arg == "--type" || arg.starts_with("--type="))
+    args.iter().any(|arg| arg == "--type" || arg.starts_with("--type="))
 }
 
 fn run_subprocess() -> i32 {
@@ -278,14 +272,6 @@ fn run_subprocess() -> i32 {
     }
 }
 
-/// Dock 表示座標を Browser OSR 座標へ変換する。
-///
-/// # 引数
-/// - `rect`: Dock 内の Browser Surface 表示矩形。
-/// - `position`: egui が通知した Pointer 座標。
-///
-/// # 戻り値
-/// - 表示矩形内なら Browser OSR 座標を返す。
 fn map_pointer_to_browser(rect: egui::Rect, position: egui::Pos2) -> Option<(i32, i32)> {
     if !rect.contains(position) || rect.width() <= 0.0 || rect.height() <= 0.0 {
         return None;
@@ -335,9 +321,7 @@ impl<'a> TabViewer for CopyViewer<'a> {
     fn ui(&mut self, ui: &mut egui::Ui, _tab: &mut Self::Tab) {
         let available = ui.available_size();
         let Some(texture) = self.texture else {
-            ui.centered_and_justified(|ui| {
-                ui.label("Waiting for CEF OSR Paint...");
-            });
+            ui.centered_and_justified(|ui| ui.label("Waiting for CEF OSR Paint..."));
             return;
         };
 
@@ -439,23 +423,15 @@ impl CopyRuntime {
         do_message_loop_work();
     }
 
-    /// Browser の input 要素へフォーカスさせる Pointer click を転送する。
     fn request_click(&self, transfer: ClickTransfer) -> bool {
-        let Some(browser) = self
-            .browser
-            .lock()
-            .ok()
-            .and_then(|slot| slot.as_ref().cloned())
-        else {
+        let Some(browser) = self.browser.lock().ok().and_then(|slot| slot.as_ref().cloned()) else {
             return false;
         };
-
         #[cfg(target_os = "windows")]
         {
             let mut task = ClickTaskBuilder::build(browser, transfer);
             return post_task(ThreadId::UI, Some(&mut task)) == 1;
         }
-
         #[cfg(not(target_os = "windows"))]
         {
             send_click(&browser, transfer);
@@ -463,23 +439,15 @@ impl CopyRuntime {
         }
     }
 
-    /// Ctrl+C の Keyboard Event を CEF Browser へ転送する。
     fn request_copy_key(&self, transfer: CopyKeyTransfer) -> bool {
-        let Some(browser) = self
-            .browser
-            .lock()
-            .ok()
-            .and_then(|slot| slot.as_ref().cloned())
-        else {
+        let Some(browser) = self.browser.lock().ok().and_then(|slot| slot.as_ref().cloned()) else {
             return false;
         };
-
         #[cfg(target_os = "windows")]
         {
             let mut task = CopyKeyTaskBuilder::build(browser, transfer);
             return post_task(ThreadId::UI, Some(&mut task)) == 1;
         }
-
         #[cfg(not(target_os = "windows"))]
         {
             send_copy_key(&browser, transfer);
@@ -503,7 +471,7 @@ fn send_click(browser: &Browser, transfer: ClickTransfer) {
     println!("CEF copy focus click sent: x={}, y={}", transfer.x, transfer.y);
 }
 
-/// CEF BrowserHost へ Ctrl+C を送信する。
+/// CEF BrowserHost へ Ctrl+C の C キー DOWN / UP を送信する。
 ///
 /// @hldocs.ref doc-20260912-104800Z-WV15#sec_m2k6a8d1v4qs
 fn send_copy_key(browser: &Browser, transfer: CopyKeyTransfer) {
@@ -536,10 +504,7 @@ struct ClickTask {
 }
 
 wrap_task! {
-    struct ClickTaskBuilder {
-        task: ClickTask,
-    }
-
+    struct ClickTaskBuilder { task: ClickTask, }
     impl Task {
         fn execute(&self) {
             send_click(&self.task.browser, self.task.transfer);
@@ -560,10 +525,7 @@ struct CopyKeyTask {
 }
 
 wrap_task! {
-    struct CopyKeyTaskBuilder {
-        task: CopyKeyTask,
-    }
-
+    struct CopyKeyTaskBuilder { task: CopyKeyTask, }
     impl Task {
         fn execute(&self) {
             send_copy_key(&self.task.browser, self.task.transfer);
@@ -583,10 +545,7 @@ struct CloseBrowserTask {
 }
 
 wrap_task! {
-    struct CloseBrowserTaskBuilder {
-        task: CloseBrowserTask,
-    }
-
+    struct CloseBrowserTaskBuilder { task: CloseBrowserTask, }
     impl Task {
         fn execute(&self) {
             if let Some(host) = self.task.browser.host() {
@@ -604,12 +563,7 @@ impl CloseBrowserTaskBuilder {
 
 impl Drop for CopyRuntime {
     fn drop(&mut self) {
-        let browser = self
-            .browser
-            .lock()
-            .ok()
-            .and_then(|slot| slot.as_ref().cloned());
-
+        let browser = self.browser.lock().ok().and_then(|slot| slot.as_ref().cloned());
         if let Some(browser) = browser {
             #[cfg(target_os = "windows")]
             {
@@ -618,13 +572,11 @@ impl Drop for CopyRuntime {
                     eprintln!("WV-11-04-01 copy probe: failed to post browser close task");
                 }
             }
-
             #[cfg(not(target_os = "windows"))]
             if let Some(host) = browser.host() {
                 host.close_browser(true.into());
             }
         }
-
         let started = Instant::now();
         while !self.closed.load(Ordering::Acquire) && started.elapsed() < CLOSE_TIMEOUT {
             #[cfg(not(target_os = "windows"))]
@@ -673,15 +625,9 @@ impl CopyEframeApp {
             {
                 None
             } else {
-                Some((
-                    state.generation,
-                    state.width as usize,
-                    state.height as usize,
-                    state.rgba.clone(),
-                ))
+                Some((state.generation, state.width as usize, state.height as usize, state.rgba.clone()))
             }
         };
-
         let Some((generation, width, height, rgba)) = snapshot else {
             return;
         };
@@ -701,33 +647,40 @@ impl CopyEframeApp {
         self.applied_generation = generation;
     }
 
-    /// egui の Ctrl+C Event を検出して CEF へ転送する。
-    fn collect_copy_key(&mut self, ctx: &egui::Context) {
+    /// egui の Copy Event または Ctrl+C Key Event を検出して CEF へ転送する。
+    ///
+    /// egui 0.33 では Ctrl+C 押下が `Event::Copy` として通知され、C の key-down が
+    /// 通常の `Event::Key` として残らない場合がある。その場合も CEF には明示的な
+    /// C key-down / key-up を一組送る。
+    fn collect_copy_input(&mut self, ctx: &egui::Context) {
         if !self.browser_active {
             return;
         }
 
         let events = ctx.input(|input| input.events.clone());
         for event in events {
-            let egui::Event::Key {
-                key,
-                pressed,
-                modifiers,
-                ..
-            } = event
-            else {
-                continue;
-            };
-
-            if key != egui::Key::C || !modifiers.ctrl {
-                continue;
-            }
-
-            if self.runtime.request_copy_key(CopyKeyTransfer { pressed }) {
-                self.last_key_status = format!(
-                    "{} Ctrl+C",
-                    if pressed { "DOWN" } else { "UP" }
-                );
+            match event {
+                egui::Event::Copy => {
+                    let down = self.runtime.request_copy_key(CopyKeyTransfer { pressed: true });
+                    let up = self.runtime.request_copy_key(CopyKeyTransfer { pressed: false });
+                    if down && up {
+                        self.last_key_status = "COPY event -> Ctrl+C DOWN/UP".to_string();
+                    }
+                }
+                egui::Event::Key {
+                    key: egui::Key::C,
+                    pressed,
+                    modifiers,
+                    ..
+                } if modifiers.ctrl => {
+                    if self.runtime.request_copy_key(CopyKeyTransfer { pressed }) {
+                        self.last_key_status = format!(
+                            "{} Ctrl+C",
+                            if pressed { "DOWN" } else { "UP" }
+                        );
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -738,13 +691,7 @@ impl eframe::App for CopyEframeApp {
         self.runtime.pump();
         self.update_texture(ctx);
 
-        let generation = self
-            .runtime
-            .state
-            .lock()
-            .map(|state| state.generation)
-            .unwrap_or(0);
-
+        let generation = self.runtime.state.lock().map(|state| state.generation).unwrap_or(0);
         egui::TopBottomPanel::top("wv11_04_01_copy_status").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.label("WV-11-04-01 EDIT-IT-SPEC-003");
@@ -756,7 +703,7 @@ impl eframe::App for CopyEframeApp {
                     if self.browser_active { "ACTIVE" } else { "click text first" }
                 ));
                 ui.separator();
-                ui.label(format!("Last key: {}", self.last_key_status));
+                ui.label(format!("Last input: {}", self.last_key_status));
                 ui.separator();
                 ui.label(format!("Expected clipboard: {TEST_TEXT}"));
             });
@@ -775,8 +722,7 @@ impl eframe::App for CopyEframeApp {
         if let Some(click) = self.current_click {
             self.runtime.request_click(click);
         }
-        self.collect_copy_key(ctx);
-
+        self.collect_copy_input(ctx);
         ctx.request_repaint_after(MESSAGE_PUMP_INTERVAL);
     }
 }
