@@ -131,6 +131,61 @@ Browser Surface は、Browser Surface が入力対象である間、Keyboard の
 
 Browser Surface は、Browser Surface が入力対象である間、文字入力を Browser の編集可能要素へ反映可能でなければならない。
 
+### 3.21 Keyboard 範囲選択
+<!-- hldocs:sec_id=sec_f3n8q2v6m1ka -->
+
+Browser Surface は、編集可能要素内で Keyboard 操作による文字範囲選択を利用可能でなければならない。
+
+### 3.22 Pointer Drag 範囲選択
+<!-- hldocs:sec_id=sec_j7c1w9r4p5tx -->
+
+Browser Surface は、編集可能要素内で Pointer Drag による文字範囲選択を利用可能でなければならない。
+
+### 3.23 Copy
+<!-- hldocs:sec_id=sec_m2k6a8d1v4qs -->
+
+Browser Surface は、選択した文字列を OS Clipboard へ Copy 可能でなければならない。
+
+### 3.24 Paste
+<!-- hldocs:sec_id=sec_q9b3t7n1c5wy -->
+
+Browser Surface は、OS Clipboard の文字列を編集可能要素へ Paste 可能でなければならない。
+
+### 3.25 Cut
+<!-- hldocs:sec_id=sec_v1r5m8k2d7pa -->
+
+Browser Surface は、選択した文字列を編集可能要素から削除し、OS Clipboard へ反映可能でなければならない。
+
+### 3.26 Select All
+<!-- hldocs:sec_id=sec_c8x4p1m6r9bz -->
+
+Browser Surface は、編集可能要素内の対象文字列全体を選択可能でなければならない。
+
+### 3.27 IME 入力開始
+<!-- hldocs:sec_id=sec_n4q8c2v7m1kt -->
+
+Browser Surface は、編集可能要素を入力対象とした状態で OS IME の Composition を開始可能でなければならない。
+
+### 3.28 IME Composition 更新
+<!-- hldocs:sec_id=sec_b6m1r9p3x7da -->
+
+Browser Surface は、IME の未確定文字列および Composition 内の選択状態を編集可能要素へ反映可能でなければならない。
+
+### 3.29 IME 表示位置同期
+<!-- hldocs:sec_id=sec_t5k2w8c1q6vz -->
+
+Browser Surface は、IME Candidate Window または Composition UI の表示基準位置を Browser 内の入力位置へ対応付け可能でなければならない。
+
+### 3.30 IME Composition 確定
+<!-- hldocs:sec_id=sec_h9p4m1d7r2cx -->
+
+Browser Surface は、IME Composition で確定した文字列を編集可能要素へ反映し、Composition 状態を終了可能でなければならない。
+
+### 3.31 IME Composition キャンセル
+<!-- hldocs:sec_id=sec_w3c7n5a1m8qs -->
+
+Browser Surface は、進行中の IME Composition をキャンセルし、未確定文字列を確定文字列として残さず通常の入力状態へ復帰可能でなければならない。
+
 ## 4. OS 差異
 
 OS 固有のランタイム配置、プロセス起動方式、描画バックエンドその他の差異は Framework 内部で吸収する。
