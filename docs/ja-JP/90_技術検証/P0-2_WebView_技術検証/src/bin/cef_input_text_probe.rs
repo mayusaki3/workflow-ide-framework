@@ -4,6 +4,7 @@
 //! - INPUT-IT-SPEC-006 の文字入力を CEF OSR Browser の編集可能要素へ転送する。
 //! - Browser Surface 上の input 要素を Pointer Button でフォーカスした後、
 //!   egui の Text Event を CEF KEYEVENT_CHAR として送信する。
+//! - Backspace / Delete は egui の Key Event を CEF RAWKEYDOWN / KEYUP として送信する。
 //!
 //! 注意点:
 //! - 本ファイルは技術検証用であり、正式 Surface API ではない。
@@ -27,7 +28,7 @@ const VIEW_HEIGHT: i32 = 600;
 const MESSAGE_PUMP_INTERVAL: Duration = Duration::from_millis(10);
 const BROWSER_CREATE_TIMEOUT: Duration = Duration::from_secs(3);
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
-const TEST_URL: &str = "data:text/html,<html><body style='margin:0;background:rgb(26,36,50);color:white;font-family:sans-serif;height:100vh;display:flex;align-items:center;justify-content:center'><div style='text-align:center;width:90%'><h1 style='font-size:42px'>WV-11-04 TEXT INPUT</h1><div style='font-size:22px;margin:18px'>Click the input below, then type text.</div><input id='probe' type='text' value='' placeholder='TYPE HERE' style='width:80%;height:90px;font-size:38px;padding:12px;border:6px solid white;background:rgb(55,78,105);color:white;box-sizing:border-box'><div id='status' style='font-size:26px;margin-top:24px'>INPUT: waiting</div></div><script>let p=document.getElementById('probe');p.addEventListener('focus',function(){document.getElementById('status').textContent='INPUT: FOCUSED';});p.addEventListener('input',function(){document.getElementById('status').textContent='INPUT: '+p.value;});</script></body></html>";
+const TEST_URL: &str = "data:text/html,<html><body style='margin:0;background:rgb(26,36,50);color:white;font-family:sans-serif;height:100vh;display:flex;align-items:center;justify-content:center'><div style='text-align:center;width:90%'><h1 style='font-size:42px'>WV-11-04 TEXT INPUT</h1><div style='font-size:22px;margin:18px'>Click the input below, then type text. Backspace / Delete should edit it.</div><input id='probe' type='text' value='' placeholder='TYPE HERE' style='width:80%;height:90px;font-size:38px;padding:12px;border:6px solid white;background:rgb(55,78,105);color:white;box-sizing:border-box'><div id='status' style='font-size:26px;margin-top:24px'>INPUT: waiting</div></div><script>let p=document.getElementById('probe');p.addEventListener('focus',function(){document.getElementById('status').textContent='INPUT: FOCUSED';});p.addEventListener('input',function(){document.getElementById('status').textContent='INPUT: '+p.value;});</script></body></html>";
 
 /// 最新 CEF Paint を保持する共有状態。
 ///
@@ -300,6 +301,13 @@ struct TextTransfer {
     text: String,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct EditKeyTransfer {
+    windows_key_code: i32,
+    pressed: bool,
+    name: &'static str,
+}
+
 #[derive(Clone)]
 enum InputTextTab {
     Browser,
@@ -476,6 +484,30 @@ impl InputTextRuntime {
             true
         }
     }
+
+    /// Backspace / Delete の Keyboard Event を CEF Browser へ転送する。
+    fn request_edit_key(&self, transfer: EditKeyTransfer) -> bool {
+        let Some(browser) = self
+            .browser
+            .lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().cloned())
+        else {
+            return false;
+        };
+
+        #[cfg(target_os = "windows")]
+        {
+            let mut task = EditKeyTaskBuilder::build(browser, transfer);
+            return post_task(ThreadId::UI, Some(&mut task)) == 1;
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            send_edit_key(&browser, transfer);
+            true
+        }
+    }
 }
 
 fn send_click(browser: &Browser, transfer: ClickTransfer) {
@@ -513,6 +545,31 @@ fn send_text(browser: &Browser, text: &str) {
         host.send_key_event(Some(&event));
     }
     println!("CEF text sent: {:?}", text);
+}
+
+/// CEF BrowserHost へ編集キーの DOWN / UP を送信する。
+fn send_edit_key(browser: &Browser, transfer: EditKeyTransfer) {
+    let Some(host) = browser.host() else {
+        return;
+    };
+
+    let event = KeyEvent {
+        type_: if transfer.pressed {
+            KeyEventType::RAWKEYDOWN
+        } else {
+            KeyEventType::KEYUP
+        },
+        windows_key_code: transfer.windows_key_code,
+        native_key_code: transfer.windows_key_code,
+        ..Default::default()
+    };
+    host.send_key_event(Some(&event));
+    println!(
+        "CEF edit key sent: {} key={} vk={}",
+        if transfer.pressed { "DOWN" } else { "UP" },
+        transfer.name,
+        transfer.windows_key_code
+    );
 }
 
 #[derive(Clone)]
@@ -560,6 +617,30 @@ wrap_task! {
 impl TextTaskBuilder {
     fn build(browser: Browser, transfer: TextTransfer) -> Task {
         Self::new(TextTask { browser, transfer })
+    }
+}
+
+#[derive(Clone)]
+struct EditKeyTask {
+    browser: Browser,
+    transfer: EditKeyTransfer,
+}
+
+wrap_task! {
+    struct EditKeyTaskBuilder {
+        task: EditKeyTask,
+    }
+
+    impl Task {
+        fn execute(&self) {
+            send_edit_key(&self.task.browser, self.task.transfer);
+        }
+    }
+}
+
+impl EditKeyTaskBuilder {
+    fn build(browser: Browser, transfer: EditKeyTransfer) -> Task {
+        Self::new(EditKeyTask { browser, transfer })
     }
 }
 
@@ -687,24 +768,46 @@ impl InputTextEframeApp {
         self.applied_generation = generation;
     }
 
-    fn collect_text(&mut self, ctx: &egui::Context) {
+    /// egui の Text / 編集キー Event を検出して CEF へ転送する。
+    fn collect_input(&mut self, ctx: &egui::Context) {
         if !self.browser_active {
             return;
         }
 
-        let texts: Vec<String> = ctx.input(|i| {
-            i.events
-                .iter()
-                .filter_map(|event| match event {
-                    egui::Event::Text(text) if !text.is_empty() => Some(text.clone()),
-                    _ => None,
-                })
-                .collect()
-        });
-
-        for text in texts {
-            if self.runtime.request_text(TextTransfer { text: text.clone() }) {
-                self.last_text = text;
+        let events = ctx.input(|input| input.events.clone());
+        for event in events {
+            match event {
+                egui::Event::Text(text) if !text.is_empty() => {
+                    if self.runtime.request_text(TextTransfer { text: text.clone() }) {
+                        self.last_text = text;
+                    }
+                }
+                egui::Event::Key {
+                    key,
+                    pressed,
+                    ..
+                } => {
+                    let mapped = match key {
+                        egui::Key::Backspace => Some((0x08, "Backspace")),
+                        egui::Key::Delete => Some((0x2E, "Delete")),
+                        _ => None,
+                    };
+                    let Some((windows_key_code, name)) = mapped else {
+                        continue;
+                    };
+                    if self.runtime.request_edit_key(EditKeyTransfer {
+                        windows_key_code,
+                        pressed,
+                        name,
+                    }) {
+                        self.last_text = format!(
+                            "{} {}",
+                            if pressed { "DOWN" } else { "UP" },
+                            name
+                        );
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -733,7 +836,7 @@ impl eframe::App for InputTextEframeApp {
                     if self.browser_active { "ACTIVE" } else { "click input" }
                 ));
                 ui.separator();
-                ui.label(format!("Last text: {}", self.last_text));
+                ui.label(format!("Last input: {}", self.last_text));
             });
         });
 
@@ -750,7 +853,7 @@ impl eframe::App for InputTextEframeApp {
         if let Some(click) = self.current_click {
             self.runtime.request_click(click);
         }
-        self.collect_text(ctx);
+        self.collect_input(ctx);
 
         ctx.request_repaint_after(MESSAGE_PUMP_INTERVAL);
     }
