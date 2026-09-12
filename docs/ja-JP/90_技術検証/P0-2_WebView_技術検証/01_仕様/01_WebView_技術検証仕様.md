@@ -101,6 +101,36 @@ Browser Surface は、Dock Panel の表示領域変更に応じて Browser の O
 
 Browser Surface は、ブラウザ画面の変化に応じた継続的な Paint 更新を Dock Panel 内の表示へ反映可能でなければならない。
 
+### 3.15 Pointer 座標変換
+<!-- hldocs:sec_id=sec_v4c8n2q7m1px -->
+
+Browser Surface は、Dock Panel 内で取得した Pointer 座標を Browser OSR の論理表示領域に対応する座標へ変換可能でなければならない。
+
+### 3.16 Pointer 移動入力
+<!-- hldocs:sec_id=sec_k7w3f9r2d6ta -->
+
+Browser Surface は、Dock Panel 内の Pointer 移動を Browser へ転送可能でなければならない。
+
+### 3.17 Pointer Button 入力
+<!-- hldocs:sec_id=sec_p2m8x5c1q7vz -->
+
+Browser Surface は、Dock Panel 内の Pointer Button の押下および解放を Browser へ転送可能でなければならない。
+
+### 3.18 Wheel 入力
+<!-- hldocs:sec_id=sec_a6t1n9w4k3rb -->
+
+Browser Surface は、Dock Panel 内で発生した Wheel 入力を Browser へ転送可能でなければならない。
+
+### 3.19 Keyboard 入力
+<!-- hldocs:sec_id=sec_r5q9d2m8v1kc -->
+
+Browser Surface は、Browser Surface が入力対象である間、Keyboard の押下および解放を Browser へ転送可能でなければならない。
+
+### 3.20 Text 入力
+<!-- hldocs:sec_id=sec_c3x7p1t9m5wf -->
+
+Browser Surface は、Browser Surface が入力対象である間、文字入力を Browser の編集可能要素へ反映可能でなければならない。
+
 ## 4. OS 差異
 
 OS 固有のランタイム配置、プロセス起動方式、描画バックエンドその他の差異は Framework 内部で吸収する。
@@ -109,7 +139,6 @@ OS 固有のランタイム配置、プロセス起動方式、描画バック�
 
 ## 5. 今後の拡張
 
-- Browser Surface 入力転送
 - GPU Surface との共通化
 - Surface 共通 API
 - Runtime 統合
