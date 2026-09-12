@@ -9,6 +9,7 @@
 //! - 入力イベント転送は WV-11-04 で検証する。
 //! - Windows では CEF の multi-threaded message loop を使用する。
 //! - Windowless Browser は CEF UI thread の `on_context_initialized` から非同期生成する。
+//! - Browser 側の JavaScript タイマーだけに依存せず、Browser Process 側から定期的に JavaScript を実行して描画変化を発生させる。
 
 use cef::*;
 use eframe::egui;
@@ -26,8 +27,9 @@ const VIEW_HEIGHT: i32 = 600;
 const MESSAGE_PUMP_INTERVAL: Duration = Duration::from_millis(10);
 const BROWSER_CREATE_TIMEOUT: Duration = Duration::from_secs(3);
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
+const CONTINUOUS_TICK_INTERVAL: Duration = Duration::from_millis(500);
 const CONTINUOUS_PASS_GENERATION: u64 = 5;
-const TEST_URL: &str = "data:text/html,<html><body style='margin:0;background:rgb(235,245,255);color:rgb(20,30,45);font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden'><div style='text-align:center;border:12px solid rgb(20,30,45);padding:48px;min-width:560px'><h1 style='font-size:48px;margin:0 0 24px'>WV-11-03 CONTINUOUS</h1><div id='counter' style='font-size:92px;font-weight:bold'>0</div><p style='font-size:24px;margin:20px 0 0'>CEF OSR continuous Paint to egui Texture</p></div><script>let n=0;setInterval(function(){n=n+1;document.getElementById('counter').textContent=n;let r=120+(n*37)%120;let g=150+(n*53)%90;let b=170+(n*71)%80;document.body.style.backgroundColor='rgb('+r+','+g+','+b+')';},500);</script></body></html>";
+const TEST_URL: &str = "data:text/html,<html><body style='margin:0;background:rgb(235,245,255);color:rgb(20,30,45);font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden'><div style='text-align:center;border:12px solid rgb(20,30,45);padding:48px;min-width:560px'><h1 style='font-size:48px;margin:0 0 24px'>WV-11-03 CONTINUOUS</h1><div id='counter' style='font-size:92px;font-weight:bold'>0</div><p style='font-size:24px;margin:20px 0 0'>CEF OSR continuous Paint to egui Texture</p></div></body></html>";
 
 /// 最新 CEF Paint を保持する共有状態。
 ///
@@ -417,6 +419,36 @@ impl ContinuousRuntime {
         do_message_loop_work();
     }
 
+    /// Browser Process 側から表示内容を1回変更し、OSR 再描画を要求する。
+    ///
+    /// # 引数
+    /// - `counter`: 表示する連番。
+    ///
+    /// # 戻り値
+    /// - JavaScript 実行要求を CEF UI thread へ送信できた場合は `true`。
+    fn request_tick(&self, counter: u64) -> bool {
+        let browser = self
+            .browser
+            .lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().cloned());
+        let Some(browser) = browser else {
+            return false;
+        };
+
+        #[cfg(target_os = "windows")]
+        {
+            let mut task = ContinuousTickTaskBuilder::build(browser, counter);
+            return post_task(ThreadId::UI, Some(&mut task)) == 1;
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            execute_tick(&browser, counter);
+            true
+        }
+    }
+
     /// UI 診断表示用に最新 Paint 状態を取得する。
     fn diagnostics(&self) -> (u64, i32, i32, usize) {
         let Ok(state) = self.state.lock() else {
@@ -428,6 +460,65 @@ impl ContinuousRuntime {
             state.height,
             state.rgba.len(),
         )
+    }
+}
+
+/// Browser の DOM を更新し、OSR の再描画を要求する。
+///
+/// # 引数
+/// - `browser`: 更新対象 Browser。
+/// - `counter`: 表示する連番。
+fn execute_tick(browser: &Browser, counter: u64) {
+    let Some(frame) = browser.main_frame() else {
+        eprintln!("WV-11-03 continuous probe: main frame not available");
+        return;
+    };
+
+    let r = 120 + (counter * 37) % 120;
+    let g = 150 + (counter * 53) % 90;
+    let b = 170 + (counter * 71) % 80;
+    let script = format!(
+        "document.getElementById('counter').textContent='{counter}';document.body.style.backgroundColor='rgb({r},{g},{b})';"
+    );
+    let script = CefString::from(script.as_str());
+    let source_url = CefString::from("wv11-03-continuous-probe");
+    frame.execute_java_script(Some(&script), Some(&source_url), 1);
+
+    if let Some(host) = browser.host() {
+        host.invalidate(PaintElementType::VIEW);
+    }
+    println!("CEF OSR continuous tick requested: counter={counter}");
+}
+
+#[derive(Clone)]
+struct ContinuousTickTask {
+    browser: Browser,
+    counter: u64,
+}
+
+wrap_task! {
+    struct ContinuousTickTaskBuilder {
+        task: ContinuousTickTask,
+    }
+
+    impl Task {
+        fn execute(&self) {
+            execute_tick(&self.task.browser, self.task.counter);
+        }
+    }
+}
+
+impl ContinuousTickTaskBuilder {
+    /// CEF UI thread で実行する表示更新 Task を生成する。
+    ///
+    /// # 引数
+    /// - `browser`: 更新対象 Browser。
+    /// - `counter`: 表示する連番。
+    ///
+    /// # 戻り値
+    /// - CEF Task。
+    fn build(browser: Browser, counter: u64) -> Task {
+        Self::new(ContinuousTickTask { browser, counter })
     }
 }
 
@@ -497,6 +588,8 @@ struct ContinuousEframeApp {
     runtime: ContinuousRuntime,
     texture: Option<egui::TextureHandle>,
     applied_generation: u64,
+    next_tick: u64,
+    last_tick_at: Instant,
 }
 
 impl ContinuousEframeApp {
@@ -506,6 +599,8 @@ impl ContinuousEframeApp {
             runtime,
             texture: None,
             applied_generation: 0,
+            next_tick: 1,
+            last_tick_at: Instant::now(),
         }
     }
 
@@ -550,11 +645,24 @@ impl ContinuousEframeApp {
         }
         self.applied_generation = generation;
     }
+
+    /// 検証用の Browser 表示更新を一定間隔で発行する。
+    fn update_browser_content(&mut self) {
+        if self.last_tick_at.elapsed() < CONTINUOUS_TICK_INTERVAL {
+            return;
+        }
+
+        if self.runtime.request_tick(self.next_tick) {
+            self.next_tick = self.next_tick.saturating_add(1);
+            self.last_tick_at = Instant::now();
+        }
+    }
 }
 
 impl eframe::App for ContinuousEframeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.runtime.pump();
+        self.update_browser_content();
         self.update_texture(ctx);
 
         let (generation, paint_width, paint_height, rgba_bytes) = self.runtime.diagnostics();
