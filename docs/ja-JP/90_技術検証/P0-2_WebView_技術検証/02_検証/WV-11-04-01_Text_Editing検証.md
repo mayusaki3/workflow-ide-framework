@@ -179,7 +179,7 @@ Browser Surface 内の編集対象全体を Select All 操作で選択できる�
 
 | 動作対象 | Key Select | Drag Select | Copy | Paste | Cut | Select All |
 | --- | --- | --- | --- | --- | --- | --- |
-| Windows 実機 | ？ | ？ | ？ | ？ | ？ | ？ |
+| Windows 実機 | ○ | ？ | ？ | ？ | ？ | ？ |
 | Linux VM | ？ | ？ | ？ | ？ | ？ | ？ |
 | Linux X11 実機 | ？ | ？ | ？ | ？ | ？ | ？ |
 | Linux Wayland 実機 | ？ | ？ | ？ | ？ | ？ | ？ |
