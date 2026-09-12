@@ -9,6 +9,7 @@
 //! 注意点:
 //! - 本ファイルは技術検証用であり、正式 Surface API ではない。
 //! - Windows Virtual-Key Code と CEF EVENTFLAG_CONTROL_DOWN の使用は本 Probe の検証実装である。
+//! - Windows では CEF へ渡す native_key_code に Win32 の lParam 相当値を設定する。
 //! - OS 差異をアプリ利用側へ公開する正式設計は本検証では定義しない。
 //! - Windows では CEF の multi-threaded message loop を使用する。
 //! - egui では Ctrl+C が Copy Event として消費される場合があるため、Copy Event と Key Event の双方を監視する。
@@ -471,7 +472,30 @@ fn send_click(browser: &Browser, transfer: ClickTransfer) {
     println!("CEF copy focus click sent: x={}, y={}", transfer.x, transfer.y);
 }
 
-/// CEF BrowserHost へ Ctrl+C の C キー DOWN / UP を送信する。
+/// Windows の C key に対応する native_key_code を返す。
+///
+/// # 引数
+/// - `pressed`: key-down の場合 `true`、key-up の場合 `false`。
+///
+/// # 戻り値
+/// - Win32 の WM_KEYDOWN / WM_KEYUP で C key を受けた場合の lParam 相当値。
+#[cfg(target_os = "windows")]
+fn native_key_code_c(pressed: bool) -> i32 {
+    const SCAN_CODE_C: i32 = 0x2E;
+    let mut value = 1 | (SCAN_CODE_C << 16);
+    if !pressed {
+        value |= 1 << 30;
+        value |= 1u32.wrapping_shl(31) as i32;
+    }
+    value
+}
+
+#[cfg(not(target_os = "windows"))]
+fn native_key_code_c(_pressed: bool) -> i32 {
+    0x43
+}
+
+/// CEF BrowserHost へ Ctrl+C を送信する。
 ///
 /// @hldocs.ref doc-20260912-104800Z-WV15#sec_m2k6a8d1v4qs
 fn send_copy_key(browser: &Browser, transfer: CopyKeyTransfer) {
@@ -486,14 +510,15 @@ fn send_copy_key(browser: &Browser, transfer: CopyKeyTransfer) {
             KeyEventType::KEYUP
         },
         windows_key_code: 0x43,
-        native_key_code: 0x43,
+        native_key_code: native_key_code_c(transfer.pressed),
         modifiers: CEF_EVENTFLAG_CONTROL_DOWN,
         ..Default::default()
     };
     host.send_key_event(Some(&event));
     println!(
-        "CEF copy key sent: {} key=C vk=67 ctrl=true",
-        if transfer.pressed { "DOWN" } else { "UP" }
+        "CEF copy key sent: {} key=C vk=67 native={} ctrl=true",
+        if transfer.pressed { "DOWN" } else { "UP" },
+        event.native_key_code
     );
 }
 
@@ -504,7 +529,10 @@ struct ClickTask {
 }
 
 wrap_task! {
-    struct ClickTaskBuilder { task: ClickTask, }
+    struct ClickTaskBuilder {
+        task: ClickTask,
+    }
+
     impl Task {
         fn execute(&self) {
             send_click(&self.task.browser, self.task.transfer);
@@ -525,7 +553,10 @@ struct CopyKeyTask {
 }
 
 wrap_task! {
-    struct CopyKeyTaskBuilder { task: CopyKeyTask, }
+    struct CopyKeyTaskBuilder {
+        task: CopyKeyTask,
+    }
+
     impl Task {
         fn execute(&self) {
             send_copy_key(&self.task.browser, self.task.transfer);
@@ -545,7 +576,10 @@ struct CloseBrowserTask {
 }
 
 wrap_task! {
-    struct CloseBrowserTaskBuilder { task: CloseBrowserTask, }
+    struct CloseBrowserTaskBuilder {
+        task: CloseBrowserTask,
+    }
+
     impl Task {
         fn execute(&self) {
             if let Some(host) = self.task.browser.host() {
@@ -625,7 +659,12 @@ impl CopyEframeApp {
             {
                 None
             } else {
-                Some((state.generation, state.width as usize, state.height as usize, state.rgba.clone()))
+                Some((
+                    state.generation,
+                    state.width as usize,
+                    state.height as usize,
+                    state.rgba.clone(),
+                ))
             }
         };
         let Some((generation, width, height, rgba)) = snapshot else {
@@ -647,24 +686,22 @@ impl CopyEframeApp {
         self.applied_generation = generation;
     }
 
-    /// egui の Copy Event または Ctrl+C Key Event を検出して CEF へ転送する。
-    ///
-    /// egui 0.33 では Ctrl+C 押下が `Event::Copy` として通知され、C の key-down が
-    /// 通常の `Event::Key` として残らない場合がある。その場合も CEF には明示的な
-    /// C key-down / key-up を一組送る。
-    fn collect_copy_input(&mut self, ctx: &egui::Context) {
+    fn collect_copy_key(&mut self, ctx: &egui::Context) {
         if !self.browser_active {
             return;
         }
 
         let events = ctx.input(|input| input.events.clone());
+        let mut copy_event_seen = false;
         for event in events {
             match event {
                 egui::Event::Copy => {
-                    let down = self.runtime.request_copy_key(CopyKeyTransfer { pressed: true });
-                    let up = self.runtime.request_copy_key(CopyKeyTransfer { pressed: false });
-                    if down && up {
-                        self.last_key_status = "COPY event -> Ctrl+C DOWN/UP".to_string();
+                    copy_event_seen = true;
+                    if self.runtime.request_copy_key(CopyKeyTransfer { pressed: true }) {
+                        self.last_key_status = "DOWN Ctrl+C (Copy Event)".to_string();
+                    }
+                    if self.runtime.request_copy_key(CopyKeyTransfer { pressed: false }) {
+                        self.last_key_status = "UP Ctrl+C (Copy Event)".to_string();
                     }
                 }
                 egui::Event::Key {
@@ -672,10 +709,10 @@ impl CopyEframeApp {
                     pressed,
                     modifiers,
                     ..
-                } if modifiers.ctrl => {
+                } if modifiers.ctrl && !copy_event_seen => {
                     if self.runtime.request_copy_key(CopyKeyTransfer { pressed }) {
                         self.last_key_status = format!(
-                            "{} Ctrl+C",
+                            "{} Ctrl+C (Key Event)",
                             if pressed { "DOWN" } else { "UP" }
                         );
                     }
@@ -690,8 +727,13 @@ impl eframe::App for CopyEframeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.runtime.pump();
         self.update_texture(ctx);
+        let generation = self
+            .runtime
+            .state
+            .lock()
+            .map(|state| state.generation)
+            .unwrap_or(0);
 
-        let generation = self.runtime.state.lock().map(|state| state.generation).unwrap_or(0);
         egui::TopBottomPanel::top("wv11_04_01_copy_status").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.label("WV-11-04-01 EDIT-IT-SPEC-003");
@@ -703,7 +745,7 @@ impl eframe::App for CopyEframeApp {
                     if self.browser_active { "ACTIVE" } else { "click text first" }
                 ));
                 ui.separator();
-                ui.label(format!("Last input: {}", self.last_key_status));
+                ui.label(format!("Last key: {}", self.last_key_status));
                 ui.separator();
                 ui.label(format!("Expected clipboard: {TEST_TEXT}"));
             });
@@ -722,7 +764,8 @@ impl eframe::App for CopyEframeApp {
         if let Some(click) = self.current_click {
             self.runtime.request_click(click);
         }
-        self.collect_copy_input(ctx);
+        self.collect_copy_key(ctx);
+
         ctx.request_repaint_after(MESSAGE_PUMP_INTERVAL);
     }
 }
