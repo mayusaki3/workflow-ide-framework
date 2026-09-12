@@ -12,7 +12,8 @@
 //! - Windows では CEF へ渡す native_key_code に Win32 の lParam 相当値を設定する。
 //! - OS 差異をアプリ利用側へ公開する正式設計は本検証では定義しない。
 //! - Windows では CEF の multi-threaded message loop を使用する。
-//! - egui では Ctrl+C が Copy Event として消費される場合があるため、Copy Event と Key Event の双方を監視する。
+//! - egui では Ctrl+C が Copy Event と Key Event の両方として現れる場合があるため、
+//!   Copy Event を優先し、直後の重複 Key Event を抑止する。
 
 use cef::*;
 use eframe::egui;
@@ -30,6 +31,7 @@ const VIEW_HEIGHT: i32 = 600;
 const MESSAGE_PUMP_INTERVAL: Duration = Duration::from_millis(10);
 const BROWSER_CREATE_TIMEOUT: Duration = Duration::from_secs(3);
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
+const COPY_KEY_DUPLICATE_SUPPRESS: Duration = Duration::from_millis(100);
 const CEF_EVENTFLAG_CONTROL_DOWN: u32 = 1 << 2;
 const TEST_TEXT: &str = "COPY-ME-12345";
 const TEST_URL: &str = "data:text/html,<html><body style='margin:0;background:rgb(26,36,50);color:white;font-family:sans-serif;height:100vh;display:flex;align-items:center;justify-content:center'><div style='text-align:center;width:92%'><h1 style='font-size:38px'>WV-11-04-01 COPY</h1><div style='font-size:21px;margin:16px'>Click the input. The full text will be selected. Then press Ctrl+C.</div><input id='probe' type='text' value='COPY-ME-12345' style='width:82%;height:88px;font-size:38px;padding:12px;border:6px solid white;background:rgb(55,78,105);color:white;box-sizing:border-box'><div id='status' style='font-size:28px;margin-top:22px'>SELECTION: waiting</div><div id='selected' style='font-size:24px;margin-top:12px'>TEXT: none</div><div id='copy' style='font-size:24px;margin-top:12px'>COPY EVENT: waiting</div></div><script>let p=document.getElementById('probe');let update=function(){let s=p.selectionStart||0;let e=p.selectionEnd||0;document.getElementById('status').textContent='SELECTION: '+s+' - '+e;document.getElementById('selected').textContent='TEXT: '+(p.value.substring(s,e)||'none');};p.addEventListener('click',function(){p.select();update();});p.addEventListener('select',update);p.addEventListener('copy',function(){document.getElementById('copy').textContent='COPY EVENT: fired';});</script></body></html>";
@@ -632,6 +634,7 @@ struct CopyEframeApp {
     browser_active: bool,
     current_click: Option<ClickTransfer>,
     last_key_status: String,
+    suppress_copy_key_until: Option<Instant>,
 }
 
 impl CopyEframeApp {
@@ -644,6 +647,7 @@ impl CopyEframeApp {
             browser_active: false,
             current_click: None,
             last_key_status: "waiting".to_string(),
+            suppress_copy_key_until: None,
         }
     }
 
@@ -686,30 +690,40 @@ impl CopyEframeApp {
         self.applied_generation = generation;
     }
 
+    /// egui の Copy / Ctrl+C Event を CEF へ転送する。
+    ///
+    /// `Event::Copy` を受けた場合は Ctrl+C の DOWN/UP を一組送信し、直後に重複して届く
+    /// `Event::Key(C)` は短時間抑止する。
     fn collect_copy_key(&mut self, ctx: &egui::Context) {
         if !self.browser_active {
             return;
         }
 
         let events = ctx.input(|input| input.events.clone());
-        let mut copy_event_seen = false;
         for event in events {
             match event {
                 egui::Event::Copy => {
-                    copy_event_seen = true;
                     if self.runtime.request_copy_key(CopyKeyTransfer { pressed: true }) {
                         self.last_key_status = "DOWN Ctrl+C (Copy Event)".to_string();
                     }
                     if self.runtime.request_copy_key(CopyKeyTransfer { pressed: false }) {
                         self.last_key_status = "UP Ctrl+C (Copy Event)".to_string();
                     }
+                    self.suppress_copy_key_until = Some(Instant::now() + COPY_KEY_DUPLICATE_SUPPRESS);
                 }
                 egui::Event::Key {
                     key: egui::Key::C,
                     pressed,
                     modifiers,
                     ..
-                } if modifiers.ctrl && !copy_event_seen => {
+                } if modifiers.ctrl => {
+                    let suppress = self
+                        .suppress_copy_key_until
+                        .map(|until| Instant::now() <= until)
+                        .unwrap_or(false);
+                    if suppress {
+                        continue;
+                    }
                     if self.runtime.request_copy_key(CopyKeyTransfer { pressed }) {
                         self.last_key_status = format!(
                             "{} Ctrl+C (Key Event)",
@@ -719,6 +733,14 @@ impl CopyEframeApp {
                 }
                 _ => {}
             }
+        }
+
+        if self
+            .suppress_copy_key_until
+            .map(|until| Instant::now() > until)
+            .unwrap_or(false)
+        {
+            self.suppress_copy_key_until = None;
         }
     }
 }
