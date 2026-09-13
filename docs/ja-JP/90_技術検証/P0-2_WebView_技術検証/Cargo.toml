@@ -21,6 +21,7 @@ cef = { version = "=151.8.1", default-features = false }
 windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_Ime",
     "Win32_Graphics_Gdi"
 ] }
 
