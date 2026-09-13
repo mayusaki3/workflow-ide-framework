@@ -15,15 +15,15 @@
 use eframe::egui;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use std::sync::{Arc, Mutex};
-use windows::core::w;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::Ime::{
     ImmGetCompositionStringW, ImmGetContext, ImmGetOpenStatus, ImmReleaseContext, GCS_COMPSTR,
     GCS_CURSORPOS,
 };
+use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
-    DefSubclassProc, GetFocus, RemoveWindowSubclass, SetWindowSubclass, WM_IME_COMPOSITION,
-    WM_IME_ENDCOMPOSITION, WM_IME_SETCONTEXT, WM_IME_STARTCOMPOSITION,
+    GetFocus, WM_IME_COMPOSITION, WM_IME_ENDCOMPOSITION, WM_IME_SETCONTEXT,
+    WM_IME_STARTCOMPOSITION,
 };
 
 const SUBCLASS_ID: usize = 0x5749_4D45; // "WIME"
@@ -183,6 +183,7 @@ fn frame_hwnd(frame: &eframe::Frame) -> Option<HWND> {
 struct NativeImeMessageApp {
     state: Arc<Mutex<NativeImeMessageState>>,
     installed_hwnd: Option<HWND>,
+    input_text: String,
 }
 
 impl NativeImeMessageApp {
@@ -190,6 +191,7 @@ impl NativeImeMessageApp {
         Self {
             state: Arc::new(Mutex::new(NativeImeMessageState::default())),
             installed_hwnd: None,
+            input_text: String::new(),
         }
     }
 
@@ -283,11 +285,11 @@ impl eframe::App for NativeImeMessageApp {
             ui.separator();
             ui.label("Input target for eframe/winit IME:");
             ui.add(
-                egui::TextEdit::singleline(&mut String::new())
+                egui::TextEdit::singleline(&mut self.input_text)
                     .hint_text("Type Japanese IME here")
                     .desired_width(420.0),
             );
-            ui.label(w!("Observe WM_IME_* counts and GCS_COMPSTR in this window."));
+            ui.label("Observe WM_IME_* counts and GCS_COMPSTR in this window.");
         });
 
         ctx.request_repaint();
