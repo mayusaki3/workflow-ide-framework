@@ -25,8 +25,8 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::Ime::{
-    ImmGetCompositionStringW, ImmGetContext, ImmGetOpenStatus, ImmReleaseContext, GCS_COMPSTR,
-    GCS_CURSORPOS, GCS_RESULTSTR,
+    ImmGetCompositionStringW, ImmGetContext, ImmGetOpenStatus, ImmReleaseContext,
+    IME_COMPOSITION_STRING, GCS_COMPSTR, GCS_CURSORPOS, GCS_RESULTSTR,
 };
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -41,9 +41,6 @@ const CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
 const SUBCLASS_ID: usize = 0x5749_4D45;
 const TEST_URL: &str = "data:text/html,<html><body style='margin:0;background:rgb(26,36,50);color:white;font-family:sans-serif;height:100vh;display:flex;align-items:center;justify-content:center'><div style='text-align:center;width:92%'><h1 style='font-size:36px'>WV-11-04-02 NATIVE IME BRIDGE</h1><div style='font-size:20px;margin:16px'>Click input, enable Japanese IME, and type without confirming.</div><input id='probe' type='text' value='' style='width:82%;height:88px;font-size:38px;padding:12px;border:6px solid white;background:rgb(55,78,105);color:white;box-sizing:border-box'><div id='start' style='font-size:24px;margin-top:18px'>COMPOSITION START: waiting</div><div id='update' style='font-size:24px;margin-top:10px'>COMPOSITION TEXT: none</div><div id='value' style='font-size:24px;margin-top:10px'>VALUE: empty</div></div><script>let p=document.getElementById('probe');let s=document.getElementById('start');let u=document.getElementById('update');let v=document.getElementById('value');p.addEventListener('compositionstart',()=>s.textContent='COMPOSITION START: fired');p.addEventListener('compositionupdate',e=>u.textContent='COMPOSITION TEXT: '+(e.data||'<empty>'));p.addEventListener('input',()=>v.textContent='VALUE: '+(p.value||'<empty>'));</script></body></html>";
 
-/// CEF OSR Paint と IME range callback の共有状態。
-///
-/// @hldocs.ref doc-20260912-104801Z-WV16#sec_b6m1r9p3x7da
 #[derive(Debug, Default)]
 struct ProbeState {
     width: i32,
@@ -512,9 +509,9 @@ impl Drop for ProbeRuntime {
 
 #[derive(Debug, Clone)]
 enum NativeImeEvent {
+    Start,
     Composition(NativeCompositionTransfer),
     Result(String),
-    Start,
     End,
 }
 
@@ -542,7 +539,7 @@ static mut NATIVE_IME_STATE_PTR: *const Mutex<NativeImeState> = std::ptr::null()
 ///
 /// # 戻り値
 /// - 読み出した文字列。取得できない場合は空文字列。
-unsafe fn read_ime_string(hwnd: HWND, index: u32) -> String {
+unsafe fn read_ime_string(hwnd: HWND, index: IME_COMPOSITION_STRING) -> String {
     let himc = ImmGetContext(hwnd);
     if himc.0.is_null() {
         return String::new();
@@ -620,7 +617,8 @@ unsafe extern "system" fn native_ime_subclass_proc(
                 WM_IME_COMPOSITION => {
                     state.composition_count = state.composition_count.saturating_add(1);
                     state.ime_open = read_ime_open(hwnd);
-                    if (lparam.0 as u32 & GCS_COMPSTR) != 0 {
+                    let flags = IME_COMPOSITION_STRING(lparam.0 as u32);
+                    if flags.contains(GCS_COMPSTR) {
                         let text = read_ime_string(hwnd, GCS_COMPSTR);
                         let cursor_pos = read_cursor_pos(hwnd);
                         state.last_compstr = text.clone();
@@ -635,7 +633,7 @@ unsafe extern "system" fn native_ime_subclass_proc(
                             state.composition_count, text, cursor_pos, lparam.0
                         );
                     }
-                    if (lparam.0 as u32 & GCS_RESULTSTR) != 0 {
+                    if flags.contains(GCS_RESULTSTR) {
                         let result = read_ime_string(hwnd, GCS_RESULTSTR);
                         state.last_resultstr = result.clone();
                         if !result.is_empty() {
