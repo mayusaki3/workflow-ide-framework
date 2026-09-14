@@ -1,16 +1,16 @@
-//! WV-11-04-02 Windows native IME -> CEF bridge Probe。
-//!
-//! 役割:
-//! - eframe/winit の Win32 HWND で WM_IME_* を観測する。
-//! - HIMC から取得した GCS_COMPSTR を CEF OSR の ime_set_composition へ転送する。
-//! - egui::ImeEvent::Preedit を経由せず、Windows native IME 情報から Browser 側の
-//!   compositionstart / compositionupdate が成立するかを切り分ける。
-//! - GCS_RESULTSTR も観測し、後続 Commit 検証へ接続できることを確認する。
-//!
-//! 注意点:
-//! - 本ファイルは技術検証用であり、正式 Surface API ではない。
-//! - GCS_RESULTSTR は本 Probe では記録のみ行い、CEF へ Commit しない。
-//! - Candidate Window の位置同期は本 Probe の判定対象外。
+// WV-11-04-02 Windows native IME -> CEF bridge Probe。
+//
+// 役割:
+// - eframe/winit の Win32 HWND で WM_IME_* を観測する。
+// - HIMC から取得した GCS_COMPSTR を CEF OSR の ime_set_composition へ転送する。
+// - egui::ImeEvent::Preedit を経由せず、Windows native IME 情報から Browser 側の
+//   compositionstart / compositionupdate が成立するかを切り分ける。
+// - GCS_RESULTSTR も観測し、後続 Commit 検証へ接続できることを確認する。
+//
+// 注意点:
+// - 本ファイルは技術検証用であり、正式 Surface API ではない。
+// - GCS_RESULTSTR は本 Probe では記録のみ行い、CEF へ Commit しない。
+// - Candidate Window の位置同期は本 Probe の判定対象外。
 
 use cef::*;
 use eframe::egui;
