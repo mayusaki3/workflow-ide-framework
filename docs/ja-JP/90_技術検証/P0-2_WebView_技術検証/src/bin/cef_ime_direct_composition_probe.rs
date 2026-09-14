@@ -185,7 +185,7 @@ mod probe {
                         state.generation,
                         state.ime_range_callbacks,
                         state.character_bounds.len(),
-                        state.selected_range,
+                        state.selected_range.clone(),
                     )
                 })
                 .unwrap_or((0, 0, 0, None));
