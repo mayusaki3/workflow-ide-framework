@@ -142,7 +142,7 @@ mod probe {
                 browser_created: browser_created.clone(),
                 browser_create_failed: browser_create_failed.clone(),
                 closed: closed.clone(),
-                parent_window: sys::HWND(parent_hwnd.0),
+                parent_window: sys::HWND(parent_hwnd.0.cast()),
             };
             let mut app = ParentCefAppBuilder::build(handler);
             let initialized = initialize(
@@ -459,7 +459,7 @@ mod probe {
                     ui.label(format!("Bridge: {}", self.last_bridge_status));
                 });
                 if let Some(error) = self.init_error.as_ref() {
-                    ui.colored_label(egui::Color32::RED, format!("CEF init error: {error}"));
+                    ui.label(format!("Init error: {error}"));
                 }
             });
 
@@ -480,17 +480,15 @@ mod probe {
                             }
                         }
                     }
-                } else if self.init_error.is_some() {
-                    ui.centered_and_justified(|ui| ui.label("CEF initialization failed."));
                 } else {
-                    ui.centered_and_justified(|ui| ui.label("Waiting for eframe HWND / CEF Paint..."));
+                    ui.centered_and_justified(|ui| {
+                        ui.label("Waiting for parent-HWND CEF OSR Paint...")
+                    });
                 }
             });
 
-            if let Some(click) = self.current_click {
-                if let Some(runtime) = self.runtime.as_ref() {
-                    let _ = runtime.request_click(click);
-                }
+            if let (Some(runtime), Some(click)) = (self.runtime.as_ref(), self.current_click) {
+                let _ = runtime.request_click(click);
             }
             self.drain_native_ime_events();
             ctx.request_repaint_after(MESSAGE_PUMP_INTERVAL);
@@ -504,17 +502,17 @@ mod probe {
         }
 
         println!("WV-11-04-02 parent HWND CEF OSR IME probe start");
-        println!("CEF will be initialized after eframe exposes its Win32 HWND.");
+        println!("CEF initialization waits until the eframe HWND exists.");
 
         let native_options = eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
-                .with_title("WV-11-04-02 Parent HWND IME Probe")
+                .with_title("WV-11-04-02 Parent HWND CEF OSR IME Probe")
                 .with_inner_size([1100.0, 760.0]),
             ..Default::default()
         };
 
         eframe::run_native(
-            "WV-11-04-02 Parent HWND IME Probe",
+            "WV-11-04-02 Parent HWND CEF OSR IME Probe",
             native_options,
             Box::new(move |_cc| Ok(Box::new(ParentProbeApp::new()))),
         )
