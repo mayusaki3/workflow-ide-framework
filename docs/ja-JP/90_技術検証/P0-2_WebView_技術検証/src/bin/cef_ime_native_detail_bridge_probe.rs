@@ -83,7 +83,7 @@ mod probe {
 
     /// cefclient の `IsSelectionAttribute` と同じ条件で target 属性か判定する。
     fn is_target_attr(attr: u8) -> bool {
-        attr as i32 == ATTR_TARGET_CONVERTED || attr as i32 == ATTR_TARGET_NOTCONVERTED
+        attr as u32 == ATTR_TARGET_CONVERTED || attr as u32 == ATTR_TARGET_NOTCONVERTED
     }
 
     /// Windows native IME の属性・clause・cursor を保持して Bridge queue へ積む。
