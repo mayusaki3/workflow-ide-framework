@@ -23,7 +23,7 @@ mod probe {
         browser_created: Arc<AtomicBool>,
         browser_create_failed: Arc<AtomicBool>,
         closed: Arc<AtomicBool>,
-        parent_window: usize,
+        parent_window: sys::HWND,
     }
 
     wrap_browser_process_handler! {
@@ -43,7 +43,7 @@ mod probe {
                 // CEF cefclient の Windows OSR と同様に、実 native HWND を
                 // windowless Browser の parent として関連付ける。
                 let window_info = WindowInfo::default()
-                    .set_as_windowless(self.handler.parent_window as _);
+                    .set_as_windowless(self.handler.parent_window);
                 let browser_settings = BrowserSettings {
                     windowless_frame_rate: 30,
                     ..Default::default()
@@ -142,7 +142,7 @@ mod probe {
                 browser_created: browser_created.clone(),
                 browser_create_failed: browser_create_failed.clone(),
                 closed: closed.clone(),
-                parent_window: parent_hwnd.0 as usize,
+                parent_window: sys::HWND(parent_hwnd.0),
             };
             let mut app = ParentCefAppBuilder::build(handler);
             let initialized = initialize(
@@ -459,7 +459,7 @@ mod probe {
                     ui.label(format!("Bridge: {}", self.last_bridge_status));
                 });
                 if let Some(error) = self.init_error.as_ref() {
-                    ui.label(format!("CEF init error: {error}"));
+                    ui.colored_label(egui::Color32::RED, format!("CEF init error: {error}"));
                 }
             });
 
@@ -480,17 +480,17 @@ mod probe {
                             }
                         }
                     }
-                } else if let Some(error) = self.init_error.as_ref() {
-                    ui.centered_and_justified(|ui| ui.label(format!("CEF init failed: {error}")));
+                } else if self.init_error.is_some() {
+                    ui.centered_and_justified(|ui| ui.label("CEF initialization failed."));
                 } else {
-                    ui.centered_and_justified(|ui| {
-                        ui.label("Creating CEF OSR Browser with eframe parent HWND...")
-                    });
+                    ui.centered_and_justified(|ui| ui.label("Waiting for eframe HWND / CEF Paint..."));
                 }
             });
 
-            if let (Some(runtime), Some(click)) = (self.runtime.as_ref(), self.current_click) {
-                let _ = runtime.request_click(click);
+            if let Some(click) = self.current_click {
+                if let Some(runtime) = self.runtime.as_ref() {
+                    let _ = runtime.request_click(click);
+                }
             }
             self.drain_native_ime_events();
             ctx.request_repaint_after(MESSAGE_PUMP_INTERVAL);
@@ -503,19 +503,18 @@ mod probe {
             std::process::exit(run_subprocess());
         }
 
-        println!("WV-11-04-02 CEF OSR parent HWND IME probe start");
-        println!("CEF will initialize only after the eframe HWND exists.");
-        println!("Click Browser input, enable Japanese IME, and type without confirming.");
+        println!("WV-11-04-02 parent HWND CEF OSR IME probe start");
+        println!("CEF will be initialized after eframe exposes its Win32 HWND.");
 
         let native_options = eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
-                .with_title("WV-11-04-02 CEF OSR Parent HWND IME Probe")
+                .with_title("WV-11-04-02 Parent HWND IME Probe")
                 .with_inner_size([1100.0, 760.0]),
             ..Default::default()
         };
 
         eframe::run_native(
-            "WV-11-04-02 CEF OSR Parent HWND IME Probe",
+            "WV-11-04-02 Parent HWND IME Probe",
             native_options,
             Box::new(move |_cc| Ok(Box::new(ParentProbeApp::new()))),
         )
