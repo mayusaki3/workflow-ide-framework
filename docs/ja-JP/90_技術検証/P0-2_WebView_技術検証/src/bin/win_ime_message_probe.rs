@@ -22,8 +22,7 @@ use windows::Win32::UI::Input::Ime::{
 };
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetFocus, WM_IME_COMPOSITION, WM_IME_ENDCOMPOSITION, WM_IME_SETCONTEXT,
-    WM_IME_STARTCOMPOSITION,
+    WM_IME_COMPOSITION, WM_IME_ENDCOMPOSITION, WM_IME_SETCONTEXT, WM_IME_STARTCOMPOSITION,
 };
 
 const SUBCLASS_ID: usize = 0x5749_4D45; // "WIME"
@@ -34,7 +33,6 @@ const SUBCLASS_ID: usize = 0x5749_4D45; // "WIME"
 #[derive(Debug, Default)]
 struct NativeImeMessageState {
     hwnd: isize,
-    focused_hwnd: isize,
     setcontext_count: u64,
     start_count: u64,
     composition_count: u64,
@@ -103,7 +101,6 @@ unsafe extern "system" fn ime_subclass_proc(
         let state = &*STATE_PTR;
         if let Ok(mut state) = state.lock() {
             state.hwnd = hwnd.0 as isize;
-            state.focused_hwnd = GetFocus().0 as isize;
             state.last_lparam = lparam.0;
 
             match msg {
@@ -123,11 +120,7 @@ unsafe extern "system" fn ime_subclass_proc(
                     state.ime_open = ime_open;
                     println!(
                         "WM_IME_STARTCOMPOSITION count={} context={} open={} comp={:?} cursor={}",
-                        state.start_count,
-                        has_context,
-                        ime_open,
-                        state.last_compstr,
-                        cursor
+                        state.start_count, has_context, ime_open, state.last_compstr, cursor
                     );
                 }
                 WM_IME_COMPOSITION => {
@@ -156,11 +149,7 @@ unsafe extern "system" fn ime_subclass_proc(
                     state.ime_open = ime_open;
                     println!(
                         "WM_IME_ENDCOMPOSITION count={} context={} open={} comp={:?} cursor={}",
-                        state.end_count,
-                        has_context,
-                        ime_open,
-                        state.last_compstr,
-                        cursor
+                        state.end_count, has_context, ime_open, state.last_compstr, cursor
                     );
                 }
                 _ => {}
@@ -235,7 +224,6 @@ impl eframe::App for NativeImeMessageApp {
         let snapshot = self.state.lock().ok().map(|state| {
             (
                 state.hwnd,
-                state.focused_hwnd,
                 state.setcontext_count,
                 state.start_count,
                 state.composition_count,
@@ -255,7 +243,6 @@ impl eframe::App for NativeImeMessageApp {
 
             if let Some((
                 hwnd,
-                focused_hwnd,
                 setcontext_count,
                 start_count,
                 composition_count,
@@ -268,7 +255,6 @@ impl eframe::App for NativeImeMessageApp {
             )) = snapshot
             {
                 ui.monospace(format!("HWND                 : 0x{:X}", hwnd));
-                ui.monospace(format!("Focused HWND         : 0x{:X}", focused_hwnd));
                 ui.monospace(format!("WM_IME_SETCONTEXT    : {setcontext_count}"));
                 ui.monospace(format!("WM_IME_START         : {start_count}"));
                 ui.monospace(format!("WM_IME_COMPOSITION   : {composition_count}"));
