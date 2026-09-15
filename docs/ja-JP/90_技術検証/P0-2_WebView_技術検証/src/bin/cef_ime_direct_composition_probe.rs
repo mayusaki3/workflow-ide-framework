@@ -4,15 +4,19 @@
 // - Windows native IME / WM_IME_* を介さず、CEF BrowserHost::ImeSetComposition を直接呼ぶ。
 // - CEF 自身の OSR IME unit test と同等の replacement_range / selection_range を使用し、
 //   Browser 側 compositionstart / compositionupdate が成立するかを切り分ける。
-// - native IME 経路ではなく、CEF OSR 側の Composition 受理そのものを検証する。
+// - Browser input のクリック後、3種類の Composition 条件を時間差で自動送信し、
+//   egui 側の追加操作に依存せず CEF OSR 側の Composition 受理そのものを検証する。
 //
 // 注意点:
 // - 本ファイルは技術検証用であり、正式 Surface API ではない。
-// - Browser input をクリックして caret を表示した後、画面上部のボタンから Composition を送る。
+// - Browser input を1回クリックした後は操作不要。3方式を約1秒間隔で自動送信する。
+// - Windows IME を有効にする必要はない。
 // - IME-IT-SPEC-001/002/003 の合否は、この Probe 単独では確定しない。
 
 mod probe {
     include!("cef_ime_native_bridge_probe.rs");
+
+    const AUTO_STEP_INTERVAL: Duration = Duration::from_secs(1);
 
     #[derive(Clone, Copy, Debug)]
     enum DirectCompositionMode {
@@ -59,7 +63,7 @@ mod probe {
                             Some(&selection),
                         );
                         println!(
-                            "Direct CEF IME: unit-test style text={:?} replacement={}..{} selection={}..{}",
+                            "Direct CEF IME AUTO 1/3: unit-test style text={:?} replacement={}..{} selection={}..{}",
                             source, replacement.from, replacement.to, selection.from, selection.to
                         );
                     }
@@ -73,7 +77,7 @@ mod probe {
                             Some(&selection),
                         );
                         println!(
-                            "Direct CEF IME: Windows style text={:?} replacement=None selection={}..{}",
+                            "Direct CEF IME AUTO 2/3: Windows style text={:?} replacement=None selection={}..{}",
                             source, selection.from, selection.to
                         );
                     }
@@ -87,7 +91,7 @@ mod probe {
                             Some(&selection),
                         );
                         println!(
-                            "Direct CEF IME: collapsed selection text={:?} replacement=None selection=0..0",
+                            "Direct CEF IME AUTO 3/3: collapsed selection text={:?} replacement=None selection=0..0",
                             source
                         );
                     }
@@ -120,7 +124,8 @@ mod probe {
         texture: Option<egui::TextureHandle>,
         applied_generation: u64,
         current_click: Option<ClickTransfer>,
-        browser_active: bool,
+        auto_started_at: Option<Instant>,
+        auto_step: usize,
         last_status: String,
     }
 
@@ -131,8 +136,9 @@ mod probe {
                 texture: None,
                 applied_generation: 0,
                 current_click: None,
-                browser_active: false,
-                last_status: "Click Browser input first".to_string(),
+                auto_started_at: None,
+                auto_step: 0,
+                last_status: "Click Browser input once to start automatic test".to_string(),
             }
         }
 
@@ -170,11 +176,45 @@ mod probe {
             }
             self.applied_generation = generation;
         }
+
+        /// Browser input クリック後に3方式を約1秒間隔で自動送信する。
+        ///
+        /// # 戻り値
+        /// - なし。各送信結果は `last_status` とコンソールログへ記録する。
+        fn advance_auto_test(&mut self) {
+            let Some(started_at) = self.auto_started_at else { return; };
+            if self.auto_step >= 3 {
+                return;
+            }
+
+            let required_elapsed = AUTO_STEP_INTERVAL * ((self.auto_step + 1) as u32);
+            if started_at.elapsed() < required_elapsed {
+                return;
+            }
+
+            let (mode, label) = match self.auto_step {
+                0 => (DirectCompositionMode::CefUnitTestStyle, "1/3 CEF unit-test style"),
+                1 => (DirectCompositionMode::WindowsStyle, "2/3 Windows style"),
+                2 => (DirectCompositionMode::CollapsedSelection, "3/3 selection 0..0"),
+                _ => return,
+            };
+
+            if request_direct_composition(&self.runtime, mode) {
+                self.auto_step += 1;
+                self.last_status = format!("sent automatically: {label}");
+                if self.auto_step == 3 {
+                    self.last_status.push_str("; automatic sequence complete");
+                }
+            } else {
+                self.last_status = format!("failed to post automatically: {label}");
+            }
+        }
     }
 
     impl eframe::App for DirectProbeApp {
         fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
             self.update_texture(ctx);
+            self.advance_auto_test();
 
             let (generation, callbacks, bounds, selected_range) = self
                 .runtime
@@ -192,7 +232,7 @@ mod probe {
 
             egui::TopBottomPanel::top("status").show(ctx, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("WV-11-04-02 Direct CEF IME Composition");
+                    ui.label("WV-11-04-02 Direct CEF IME Composition - automatic");
                     ui.separator();
                     ui.label(format!("Paint: {generation}"));
                     ui.separator();
@@ -203,22 +243,7 @@ mod probe {
                     ui.label(format!("Selected: {:?}", selected_range));
                 });
                 ui.horizontal_wrapped(|ui| {
-                    let enabled = self.browser_active;
-                    if ui.add_enabled(enabled, egui::Button::new("1: CEF unit-test style")).clicked() {
-                        if request_direct_composition(&self.runtime, DirectCompositionMode::CefUnitTestStyle) {
-                            self.last_status = "sent: CEF unit-test style".to_string();
-                        }
-                    }
-                    if ui.add_enabled(enabled, egui::Button::new("2: Windows style")).clicked() {
-                        if request_direct_composition(&self.runtime, DirectCompositionMode::WindowsStyle) {
-                            self.last_status = "sent: Windows style".to_string();
-                        }
-                    }
-                    if ui.add_enabled(enabled, egui::Button::new("3: selection 0..0")).clicked() {
-                        if request_direct_composition(&self.runtime, DirectCompositionMode::CollapsedSelection) {
-                            self.last_status = "sent: collapsed selection".to_string();
-                        }
-                    }
+                    ui.label(format!("Auto step: {}/3", self.auto_step));
                     ui.separator();
                     ui.label(format!("Status: {}", self.last_status));
                 });
@@ -233,12 +258,19 @@ mod probe {
                             .fit_to_exact_size(available)
                             .sense(egui::Sense::click()),
                     );
-                    if response.clicked() {
+                    if response.clicked() && self.auto_started_at.is_none() {
                         if let Some(pointer) = response.interact_pointer_pos() {
                             if let Some((x, y)) = map_pointer_to_browser(response.rect, pointer) {
                                 self.current_click = Some(ClickTransfer { x, y });
-                                self.browser_active = true;
-                                self.last_status = "Browser input clicked; choose a direct composition mode".to_string();
+                                self.auto_started_at = Some(Instant::now());
+                                self.auto_step = 0;
+                                self.last_status =
+                                    "Browser input clicked; automatic sequence starts in 1 second"
+                                        .to_string();
+                                println!(
+                                    "Direct CEF IME automatic sequence armed after Browser click: x={} y={}",
+                                    x, y
+                                );
                             }
                         }
                     }
@@ -260,8 +292,8 @@ mod probe {
             std::process::exit(run_subprocess());
         }
 
-        println!("WV-11-04-02 direct CEF IME composition probe start");
-        println!("Click Browser input, then try buttons 1, 2, and 3 without enabling Windows IME.");
+        println!("WV-11-04-02 direct CEF IME composition automatic probe start");
+        println!("Click Browser input once. Three direct CEF composition modes are then sent automatically.");
 
         let runtime = match ProbeRuntime::new() {
             Ok(runtime) => runtime,
