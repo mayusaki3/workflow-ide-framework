@@ -9,7 +9,8 @@
 // 注意点:
 // - 本ファイルは技術検証用であり、正式 Surface API ではない。
 // - Composition の underline/range は cefclient 完全移植ではなく、Direct Probe で成立済みの条件を使う。
-// - Commit と Candidate Window 位置同期は後続検証とし、本 Probe では Composition start/update を判定する。
+// - Candidate Window 位置同期は後続検証とする。
+// - 終了時は Composition cancel -> focus解除 -> Browser close -> OnBeforeClose -> child HWND破棄 -> CEF shutdown の順序を守る。
 // - IME-IT-SPEC-001/002/003 の合否は、この Probe 単独では確定しない。
 
 mod probe {
@@ -351,8 +352,38 @@ mod probe {
     }
 
     #[derive(Clone)]
+    struct PrepareCloseTask {
+        browser: Browser,
+    }
+
+    wrap_task! {
+        struct PrepareCloseTaskBuilder { task: PrepareCloseTask, }
+        impl Task {
+            fn execute(&self) {
+                if let Some(host) = self.task.browser.host() {
+                    // Composition中でも未完了のcomposition nodeを残さず終了する。
+                    host.ime_cancel_composition();
+                    host.set_focus(false.into());
+                    unsafe {
+                        let _ = SetFocus(None);
+                    }
+                    host.close_browser(true.into());
+                    println!("CEF UI-thread IME canceled, focus cleared, browser close requested");
+                }
+            }
+        }
+    }
+
+    impl PrepareCloseTaskBuilder {
+        fn build(browser: Browser) -> Task {
+            Self::new(PrepareCloseTask { browser })
+        }
+    }
+
+    #[derive(Clone)]
     struct DestroyUiChildTask {
         child_hwnd: usize,
+        destroyed: Arc<AtomicBool>,
     }
 
     wrap_task! {
@@ -368,14 +399,15 @@ mod probe {
                     );
                     let _ = DestroyWindow(hwnd);
                 }
+                self.task.destroyed.store(true, Ordering::Release);
                 println!("CEF UI-thread IME child HWND destroyed");
             }
         }
     }
 
     impl DestroyUiChildTaskBuilder {
-        fn build(child_hwnd: usize) -> Task {
-            Self::new(DestroyUiChildTask { child_hwnd })
+        fn build(child_hwnd: usize, destroyed: Arc<AtomicBool>) -> Task {
+            Self::new(DestroyUiChildTask { child_hwnd, destroyed })
         }
     }
 
@@ -477,30 +509,60 @@ mod probe {
 
     impl Drop for UiChildRuntime {
         fn drop(&mut self) {
+            // CEFのcloseは非同期になり得る。OnBeforeClose完了前にchild HWNDを破棄したり
+            // CefShutdownへ進んだりしない。Composition中でも先にCEF側をcancelしてfocusを外す。
             let browser = self
                 .browser
                 .lock()
                 .ok()
                 .and_then(|slot| slot.as_ref().cloned());
             if let Some(browser) = browser {
-                let mut task = CloseBrowserTaskBuilder::build(browser);
-                let _ = post_task(ThreadId::UI, Some(&mut task));
+                let mut task = PrepareCloseTaskBuilder::build(browser);
+                if post_task(ThreadId::UI, Some(&mut task)) != 1 {
+                    eprintln!("Failed to post CEF UI-thread prepare-close task");
+                }
             }
+
             let started = Instant::now();
             while !self.closed.load(Ordering::Acquire) && started.elapsed() < CLOSE_TIMEOUT {
                 sleep(MESSAGE_PUMP_INTERVAL);
             }
-
-            let child = self.child_hwnd.load(Ordering::Acquire);
-            if child != 0 {
-                let mut task = DestroyUiChildTaskBuilder::build(child);
-                let _ = post_task(ThreadId::UI, Some(&mut task));
-                sleep(MESSAGE_PUMP_INTERVAL);
+            if !self.closed.load(Ordering::Acquire) {
+                eprintln!("CEF OnBeforeClose timeout; skip child destruction and CefShutdown");
+                unsafe { UI_CHILD_IME_STATE_PTR = ptr::null(); }
+                return;
             }
+            println!("CEF OnBeforeClose observed");
+
+            let child = self.child_hwnd.swap(0, Ordering::AcqRel);
+            if child != 0 {
+                let destroyed = Arc::new(AtomicBool::new(false));
+                let mut task = DestroyUiChildTaskBuilder::build(child, destroyed.clone());
+                if post_task(ThreadId::UI, Some(&mut task)) != 1 {
+                    eprintln!("Failed to post CEF UI-thread child destruction task; skip CefShutdown");
+                    unsafe { UI_CHILD_IME_STATE_PTR = ptr::null(); }
+                    return;
+                }
+                let started = Instant::now();
+                while !destroyed.load(Ordering::Acquire) && started.elapsed() < CLOSE_TIMEOUT {
+                    sleep(MESSAGE_PUMP_INTERVAL);
+                }
+                if !destroyed.load(Ordering::Acquire) {
+                    eprintln!("CEF child HWND destruction timeout; skip CefShutdown");
+                    unsafe { UI_CHILD_IME_STATE_PTR = ptr::null(); }
+                    return;
+                }
+            }
+
             unsafe {
                 UI_CHILD_IME_STATE_PTR = ptr::null();
             }
+            if let Ok(mut slot) = self.browser.lock() {
+                *slot = None;
+            }
+            println!("CEF shutdown start after browser close and child destruction");
             shutdown();
+            println!("CEF shutdown complete");
         }
     }
 
