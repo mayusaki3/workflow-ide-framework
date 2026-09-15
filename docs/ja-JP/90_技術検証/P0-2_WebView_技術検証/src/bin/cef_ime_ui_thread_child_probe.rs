@@ -25,7 +25,7 @@ mod probe {
 
     const CHILD_SUBCLASS_ID: usize = SUBCLASS_ID + 10;
 
-    #[derive(Debug, Default)]
+    #[derive(Default)]
     struct UiChildImeState {
         browser: Arc<Mutex<Option<Browser>>>,
         start_count: u64,
@@ -121,8 +121,6 @@ mod probe {
                 if let Some(browser) = browser {
                     if let Some(host) = browser.host() {
                         if !result.is_empty() {
-                            // Commit は本 Probe の主判定ではないが、cefclient と同様に
-                            // RESULTSTR を先に Browser へ渡し、その後 COMPSTR も処理する。
                             let text = CefString::from(result.as_str());
                             host.ime_commit_text(Some(&text), None, 0);
                             println!("UI-THREAD CHILD CEF IME commit: {:?}", result);
@@ -307,6 +305,31 @@ mod probe {
         }
     }
 
+    /// Browser へ focus と click を送る。
+    ///
+    /// # 引数
+    /// - `browser`: 対象 Browser。
+    /// - `transfer`: Browser view 座標の click 位置。
+    ///
+    /// # 戻り値
+    /// - なし。
+    fn send_focus_click(browser: &Browser, transfer: ClickTransfer) {
+        let Some(host) = browser.host() else { return; };
+        host.set_focus(true.into());
+        let event = MouseEvent {
+            x: transfer.x,
+            y: transfer.y,
+            ..Default::default()
+        };
+        host.send_mouse_move_event(Some(&event), 0);
+        host.send_mouse_click_event(Some(&event), MouseButtonType::LEFT, 0, 1);
+        host.send_mouse_click_event(Some(&event), MouseButtonType::LEFT, 1, 1);
+        println!(
+            "CEF UI-thread Browser focus click sent: x={} y={}",
+            transfer.x, transfer.y
+        );
+    }
+
     #[derive(Clone)]
     struct UiChildClickTask {
         browser: Browser,
@@ -443,12 +466,12 @@ mod probe {
             if browser_create_failed.load(Ordering::Acquire) {
                 shutdown();
                 unsafe { UI_CHILD_IME_STATE_PTR = ptr::null(); }
-                return Err("CEF UI-thread child Browser creation rejected".to_string());
+                return Err("CEF UI-thread child browser creation was rejected".to_string());
             }
             if !browser_created.load(Ordering::Acquire) {
                 shutdown();
                 unsafe { UI_CHILD_IME_STATE_PTR = ptr::null(); }
-                return Err("CEF UI-thread child Browser creation timed out".to_string());
+                return Err("CEF UI-thread child browser creation timed out".to_string());
             }
 
             Ok(Self {
@@ -466,10 +489,14 @@ mod probe {
                 .lock()
                 .ok()
                 .and_then(|slot| slot.as_ref().cloned())
-            else { return false; };
-            let child_hwnd = self.child_hwnd.load(Ordering::Acquire);
-            if child_hwnd == 0 { return false; }
-            let mut task = UiChildClickTaskBuilder::build(browser, child_hwnd, transfer);
+            else {
+                return false;
+            };
+            let child = self.child_hwnd.load(Ordering::Acquire);
+            if child == 0 {
+                return false;
+            }
+            let mut task = UiChildClickTaskBuilder::build(browser, child, transfer);
             post_task(ThreadId::UI, Some(&mut task)) == 1
         }
     }
@@ -490,13 +517,15 @@ mod probe {
                 sleep(MESSAGE_PUMP_INTERVAL);
             }
 
-            let child_hwnd = self.child_hwnd.swap(0, Ordering::AcqRel);
-            if child_hwnd != 0 {
-                let mut task = DestroyUiChildTaskBuilder::build(child_hwnd);
+            let child = self.child_hwnd.load(Ordering::Acquire);
+            if child != 0 {
+                let mut task = DestroyUiChildTaskBuilder::build(child);
                 let _ = post_task(ThreadId::UI, Some(&mut task));
-                sleep(Duration::from_millis(100));
+                sleep(MESSAGE_PUMP_INTERVAL);
             }
-            unsafe { UI_CHILD_IME_STATE_PTR = ptr::null(); }
+            unsafe {
+                UI_CHILD_IME_STATE_PTR = ptr::null();
+            }
             shutdown();
         }
     }
@@ -521,7 +550,9 @@ mod probe {
         }
 
         fn ensure_initialized(&mut self, frame: &eframe::Frame) {
-            if self.runtime.is_some() || self.init_error.is_some() { return; }
+            if self.runtime.is_some() || self.init_error.is_some() {
+                return;
+            }
             let Some(hwnd) = frame_hwnd(frame) else { return; };
             match UiChildRuntime::new(hwnd) {
                 Ok(runtime) => self.runtime = Some(runtime),
@@ -531,7 +562,8 @@ mod probe {
 
         fn update_texture(&mut self, ctx: &egui::Context) {
             let Some(runtime) = self.runtime.as_ref() else { return; };
-            let snapshot = runtime.state.lock().ok().and_then(|state| {
+            let snapshot = {
+                let Ok(state) = runtime.state.lock() else { return; };
                 if state.generation == self.applied_generation
                     || state.width <= 0
                     || state.height <= 0
@@ -546,7 +578,7 @@ mod probe {
                         state.rgba.clone(),
                     ))
                 }
-            });
+            };
             let Some((generation, width, height, rgba)) = snapshot else { return; };
             let image = egui::ColorImage::from_rgba_unmultiplied([width, height], &rgba);
             match self.texture.as_mut() {
@@ -555,7 +587,7 @@ mod probe {
                 }
                 _ => {
                     self.texture = Some(ctx.load_texture(
-                        "wv11_04_02_ui_thread_child",
+                        "wv11_04_02_ui_child_ime",
                         image,
                         egui::TextureOptions::LINEAR,
                     ));
@@ -569,52 +601,46 @@ mod probe {
         fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
             self.ensure_initialized(frame);
             self.update_texture(ctx);
-            self.current_click = None;
 
-            let (generation, callbacks, bounds, start, comp, end, compstr, resultstr, cursor, child) =
-                if let Some(runtime) = self.runtime.as_ref() {
+            let (generation, callbacks, bounds, start, comp, end, compstr, resultstr, cursor) = self
+                .runtime
+                .as_ref()
+                .map(|runtime| {
                     let (generation, callbacks, bounds) = runtime
                         .state
                         .lock()
-                        .map(|state| (
-                            state.generation,
-                            state.ime_range_callbacks,
-                            state.character_bounds.len(),
-                        ))
+                        .map(|state| {
+                            (
+                                state.generation,
+                                state.ime_range_callbacks,
+                                state.character_bounds.len(),
+                            )
+                        })
                         .unwrap_or((0, 0, 0));
                     let (start, comp, end, compstr, resultstr, cursor) = runtime
                         .ime_state
                         .lock()
-                        .map(|state| (
-                            state.start_count,
-                            state.composition_count,
-                            state.end_count,
-                            state.last_compstr.clone(),
-                            state.last_resultstr.clone(),
-                            state.last_cursor_pos,
-                        ))
+                        .map(|state| {
+                            (
+                                state.start_count,
+                                state.composition_count,
+                                state.end_count,
+                                state.last_compstr.clone(),
+                                state.last_resultstr.clone(),
+                                state.last_cursor_pos,
+                            )
+                        })
                         .unwrap_or((0, 0, 0, String::new(), String::new(), -1));
                     (
-                        generation,
-                        callbacks,
-                        bounds,
-                        start,
-                        comp,
-                        end,
-                        compstr,
-                        resultstr,
+                        generation, callbacks, bounds, start, comp, end, compstr, resultstr,
                         cursor,
-                        runtime.child_hwnd.load(Ordering::Acquire),
                     )
-                } else {
-                    (0, 0, 0, 0, 0, 0, String::new(), String::new(), -1, 0)
-                };
+                })
+                .unwrap_or((0, 0, 0, 0, 0, 0, String::new(), String::new(), -1));
 
-            egui::TopBottomPanel::top("ui_child_status").show(ctx, |ui| {
+            egui::TopBottomPanel::top("status").show(ctx, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("WV-11-04-02 CEF UI-thread Child HWND IME Probe");
-                    ui.separator();
-                    ui.label(format!("Child: 0x{child:X}"));
+                    ui.label("WV-11-04-02 CEF UI-thread child HWND IME Probe");
                     ui.separator();
                     ui.label(format!("Paint: {generation}"));
                     ui.separator();
@@ -623,19 +649,20 @@ mod probe {
                     ui.label(format!("Bounds: {bounds}"));
                     ui.separator();
                     ui.label(format!("Native start/comp/end: {start}/{comp}/{end}"));
+                    ui.separator();
+                    ui.label(format!("Cursor: {cursor}"));
                 });
                 ui.horizontal_wrapped(|ui| {
                     ui.label(format!("COMPSTR: {:?}", compstr));
                     ui.separator();
                     ui.label(format!("RESULTSTR: {:?}", resultstr));
-                    ui.separator();
-                    ui.label(format!("Cursor: {cursor}"));
                 });
                 if let Some(error) = self.init_error.as_ref() {
-                    ui.label(format!("Initialization error: {error}"));
+                    ui.colored_label(egui::Color32::RED, format!("Init error: {error}"));
                 }
             });
 
+            self.current_click = None;
             egui::CentralPanel::default().show(ctx, |ui| {
                 let available = ui.available_size();
                 if let Some(texture) = self.texture.as_ref() {
@@ -671,16 +698,16 @@ mod probe {
 
         println!("WV-11-04-02 CEF UI-thread child HWND IME probe start");
         println!("Click Browser input, enable Japanese IME, and type without confirming.");
-        println!("WM_IME_* is handled directly on the CEF UI-thread child HWND.");
 
         let native_options = eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
-                .with_title("WV-11-04-02 CEF UI-thread Child HWND IME Probe")
+                .with_title("WV-11-04-02 CEF UI-thread child HWND IME Probe")
                 .with_inner_size([1100.0, 760.0]),
             ..Default::default()
         };
+
         eframe::run_native(
-            "WV-11-04-02 CEF UI-thread Child HWND IME Probe",
+            "WV-11-04-02 CEF UI-thread child HWND IME Probe",
             native_options,
             Box::new(move |_cc| Ok(Box::new(UiChildProbeApp::new()))),
         )
