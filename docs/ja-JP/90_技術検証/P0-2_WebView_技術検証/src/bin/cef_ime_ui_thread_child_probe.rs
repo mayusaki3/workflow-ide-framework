@@ -10,7 +10,7 @@
 // - 本ファイルは技術検証用であり、正式 Surface API ではない。
 // - Composition の underline/range は cefclient 完全移植ではなく、Direct Probe で成立済みの条件を使う。
 // - Candidate Window 位置同期は後続検証とする。
-// - 終了時は Composition cancel -> focus解除 -> Browser close -> OnBeforeClose -> child HWND破棄 -> CEF shutdown の順序を守る。
+// - 終了時は Composition cancel -> focus解除 -> Browser close -> OnBeforeClose内child HWND破棄 -> CEF shutdown の順序を守る。
 // - IME-IT-SPEC-001/002/003 の合否は、この Probe 単独では確定しない。
 
 mod probe {
@@ -208,6 +208,108 @@ mod probe {
     }
 
     #[derive(Clone)]
+    struct UiChildLifeSpanHandler {
+        browser: Arc<Mutex<Option<Browser>>>,
+        browser_created: Arc<AtomicBool>,
+        closed: Arc<AtomicBool>,
+        child_hwnd: Arc<AtomicUsize>,
+    }
+
+    wrap_life_span_handler! {
+        struct UiChildLifeSpanHandlerBuilder {
+            handler: UiChildLifeSpanHandler,
+        }
+
+        impl LifeSpanHandler {
+            fn on_after_created(&self, browser: Option<&mut Browser>) {
+                let Some(browser) = browser.cloned() else { return; };
+                if let Ok(mut slot) = self.handler.browser.lock() {
+                    *slot = Some(browser);
+                    self.handler.browser_created.store(true, Ordering::Release);
+                }
+            }
+
+            fn on_before_close(&self, _browser: Option<&mut Browser>) {
+                if let Ok(mut slot) = self.handler.browser.lock() {
+                    *slot = None;
+                }
+
+                // on_before_close は CEF UI thread 上で呼ばれるため、最後のBrowserを閉じた後に
+                // 別Taskをpostせず、このcallback内でOSR child HWNDを同期破棄する。
+                let child = self.handler.child_hwnd.swap(0, Ordering::AcqRel);
+                if child != 0 {
+                    let hwnd = HWND(child as *mut c_void);
+                    unsafe {
+                        let _ = RemoveWindowSubclass(
+                            hwnd,
+                            Some(ui_child_ime_subclass_proc),
+                            CHILD_SUBCLASS_ID,
+                        );
+                        let _ = DestroyWindow(hwnd);
+                    }
+                    println!("CEF UI-thread IME child HWND destroyed in OnBeforeClose");
+                }
+
+                self.handler.closed.store(true, Ordering::Release);
+                println!("CEF OnBeforeClose completed with child destruction");
+            }
+        }
+    }
+
+    impl UiChildLifeSpanHandlerBuilder {
+        fn build(
+            browser: Arc<Mutex<Option<Browser>>>,
+            browser_created: Arc<AtomicBool>,
+            closed: Arc<AtomicBool>,
+            child_hwnd: Arc<AtomicUsize>,
+        ) -> LifeSpanHandler {
+            Self::new(UiChildLifeSpanHandler {
+                browser,
+                browser_created,
+                closed,
+                child_hwnd,
+            })
+        }
+    }
+
+    wrap_client! {
+        struct UiChildClientBuilder {
+            render_handler: RenderHandler,
+            life_span_handler: LifeSpanHandler,
+        }
+
+        impl Client {
+            fn render_handler(&self) -> Option<RenderHandler> {
+                Some(self.render_handler.clone())
+            }
+
+            fn life_span_handler(&self) -> Option<LifeSpanHandler> {
+                Some(self.life_span_handler.clone())
+            }
+        }
+    }
+
+    impl UiChildClientBuilder {
+        fn build(
+            state: Arc<Mutex<ProbeState>>,
+            browser: Arc<Mutex<Option<Browser>>>,
+            browser_created: Arc<AtomicBool>,
+            closed: Arc<AtomicBool>,
+            child_hwnd: Arc<AtomicUsize>,
+        ) -> Client {
+            Self::new(
+                ProbeRenderHandlerBuilder::build(state),
+                UiChildLifeSpanHandlerBuilder::build(
+                    browser,
+                    browser_created,
+                    closed,
+                    child_hwnd,
+                ),
+            )
+        }
+    }
+
+    #[derive(Clone)]
     struct UiChildBrowserProcessHandler {
         state: Arc<Mutex<ProbeState>>,
         browser: Arc<Mutex<Option<Browser>>>,
@@ -239,11 +341,12 @@ mod probe {
                     .child_hwnd
                     .store(child.0 as usize, Ordering::Release);
 
-                let mut client = ProbeClientBuilder::build(
+                let mut client = UiChildClientBuilder::build(
                     self.handler.state.clone(),
                     self.handler.browser.clone(),
                     self.handler.browser_created.clone(),
                     self.handler.closed.clone(),
+                    self.handler.child_hwnd.clone(),
                 );
                 let window_info = WindowInfo::default()
                     .set_as_windowless(sys::HWND(child.0.cast()));
@@ -380,37 +483,6 @@ mod probe {
         }
     }
 
-    #[derive(Clone)]
-    struct DestroyUiChildTask {
-        child_hwnd: usize,
-        destroyed: Arc<AtomicBool>,
-    }
-
-    wrap_task! {
-        struct DestroyUiChildTaskBuilder { task: DestroyUiChildTask, }
-        impl Task {
-            fn execute(&self) {
-                let hwnd = HWND(self.task.child_hwnd as *mut c_void);
-                unsafe {
-                    let _ = RemoveWindowSubclass(
-                        hwnd,
-                        Some(ui_child_ime_subclass_proc),
-                        CHILD_SUBCLASS_ID,
-                    );
-                    let _ = DestroyWindow(hwnd);
-                }
-                self.task.destroyed.store(true, Ordering::Release);
-                println!("CEF UI-thread IME child HWND destroyed");
-            }
-        }
-    }
-
-    impl DestroyUiChildTaskBuilder {
-        fn build(child_hwnd: usize, destroyed: Arc<AtomicBool>) -> Task {
-            Self::new(DestroyUiChildTask { child_hwnd, destroyed })
-        }
-    }
-
     struct UiChildRuntime {
         state: Arc<Mutex<ProbeState>>,
         browser: Arc<Mutex<Option<Browser>>>,
@@ -509,8 +581,8 @@ mod probe {
 
     impl Drop for UiChildRuntime {
         fn drop(&mut self) {
-            // CEFのcloseは非同期になり得る。OnBeforeClose完了前にchild HWNDを破棄したり
-            // CefShutdownへ進んだりしない。Composition中でも先にCEF側をcancelしてfocusを外す。
+            // CEFのcloseは非同期になり得る。OnBeforeClose完了前にCefShutdownへ進まない。
+            // child HWNDはOnBeforeCloseのCEF UI thread上で同期破棄する。
             let browser = self
                 .browser
                 .lock()
@@ -528,31 +600,11 @@ mod probe {
                 sleep(MESSAGE_PUMP_INTERVAL);
             }
             if !self.closed.load(Ordering::Acquire) {
-                eprintln!("CEF OnBeforeClose timeout; skip child destruction and CefShutdown");
+                eprintln!("CEF OnBeforeClose timeout; skip CefShutdown");
                 unsafe { UI_CHILD_IME_STATE_PTR = ptr::null(); }
                 return;
             }
-            println!("CEF OnBeforeClose observed");
-
-            let child = self.child_hwnd.swap(0, Ordering::AcqRel);
-            if child != 0 {
-                let destroyed = Arc::new(AtomicBool::new(false));
-                let mut task = DestroyUiChildTaskBuilder::build(child, destroyed.clone());
-                if post_task(ThreadId::UI, Some(&mut task)) != 1 {
-                    eprintln!("Failed to post CEF UI-thread child destruction task; skip CefShutdown");
-                    unsafe { UI_CHILD_IME_STATE_PTR = ptr::null(); }
-                    return;
-                }
-                let started = Instant::now();
-                while !destroyed.load(Ordering::Acquire) && started.elapsed() < CLOSE_TIMEOUT {
-                    sleep(MESSAGE_PUMP_INTERVAL);
-                }
-                if !destroyed.load(Ordering::Acquire) {
-                    eprintln!("CEF child HWND destruction timeout; skip CefShutdown");
-                    unsafe { UI_CHILD_IME_STATE_PTR = ptr::null(); }
-                    return;
-                }
-            }
+            println!("CEF OnBeforeClose observed; child destruction completed synchronously");
 
             unsafe {
                 UI_CHILD_IME_STATE_PTR = ptr::null();
