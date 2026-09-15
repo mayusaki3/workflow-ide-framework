@@ -38,12 +38,6 @@ mod probe {
 
     static mut UI_CHILD_IME_STATE_PTR: *const Mutex<UiChildImeState> = ptr::null();
 
-    /// CEF UI thread 上の OSR child HWND で Windows IME を処理する。
-    ///
-    /// `WM_IME_COMPOSITION` の処理中に CEF BrowserHost を直接呼び、eframe 側 queue と
-    /// `post_task` を介さない。Composition range は Direct Probe で成立した 0..len を使う。
-    ///
-    /// @hldocs.ref doc-20260912-104801Z-WV16#sec_n4q8c2v7m1kt
     unsafe extern "system" fn ui_child_ime_subclass_proc(
         hwnd: HWND,
         msg: u32,
@@ -59,8 +53,6 @@ mod probe {
         let state_mutex = &*UI_CHILD_IME_STATE_PTR;
         match msg {
             WM_IME_SETCONTEXT => {
-                // Composition UI は Browser 側で描画するが、Candidate UI の既定処理は
-                // 後続の位置同期検証まで Windows に残す。
                 return DefSubclassProc(hwnd, msg, wparam, lparam);
             }
             WM_IME_STARTCOMPOSITION => {
@@ -171,7 +163,6 @@ mod probe {
         DefSubclassProc(hwnd, msg, wparam, lparam)
     }
 
-    /// CEF UI thread 上で OSR 用 native child HWND を作る。
     fn create_ui_child_window(parent: sys::HWND) -> Result<HWND, String> {
         let parent = HWND(parent.0.cast());
         let child = unsafe {
@@ -305,14 +296,6 @@ mod probe {
         }
     }
 
-    /// Browser へ focus と click を送る。
-    ///
-    /// # 引数
-    /// - `browser`: 対象 Browser。
-    /// - `transfer`: Browser view 座標の click 位置。
-    ///
-    /// # 戻り値
-    /// - なし。
     fn send_focus_click(browser: &Browser, transfer: ClickTransfer) {
         let Some(host) = browser.host() else { return; };
         host.set_focus(true.into());
@@ -399,13 +382,18 @@ mod probe {
     struct UiChildRuntime {
         state: Arc<Mutex<ProbeState>>,
         browser: Arc<Mutex<Option<Browser>>>,
+        browser_created: Arc<AtomicBool>,
+        browser_create_failed: Arc<AtomicBool>,
         closed: Arc<AtomicBool>,
         child_hwnd: Arc<AtomicUsize>,
         ime_state: Arc<Mutex<UiChildImeState>>,
     }
 
     impl UiChildRuntime {
-        /// eframe HWND を親として、CEF UI thread 上に専用 OSR child HWND と Browser を作る。
+        /// eframe HWND を親として、CEF UI thread 上に専用 OSR child HWND と Browser の作成を開始する。
+        ///
+        /// Browser 作成完了をここでは待たない。eframe の初回 update 内で待機すると、Windows
+        /// message pump を止めてウィンドウ自体が表示されないためである。
         fn new(parent_hwnd: HWND) -> Result<Self, String> {
             let _ = api_hash(sys::CEF_API_VERSION_LAST, 0);
             let args = args::Args::new();
@@ -456,27 +444,13 @@ mod probe {
                 return Err(format!("cef_initialize returned {initialized}"));
             }
 
-            let started = Instant::now();
-            while !browser_created.load(Ordering::Acquire)
-                && !browser_create_failed.load(Ordering::Acquire)
-                && started.elapsed() < BROWSER_CREATE_TIMEOUT
-            {
-                sleep(MESSAGE_PUMP_INTERVAL);
-            }
-            if browser_create_failed.load(Ordering::Acquire) {
-                shutdown();
-                unsafe { UI_CHILD_IME_STATE_PTR = ptr::null(); }
-                return Err("CEF UI-thread child browser creation was rejected".to_string());
-            }
-            if !browser_created.load(Ordering::Acquire) {
-                shutdown();
-                unsafe { UI_CHILD_IME_STATE_PTR = ptr::null(); }
-                return Err("CEF UI-thread child browser creation timed out".to_string());
-            }
+            println!("CEF UI-thread child browser creation started asynchronously");
 
             Ok(Self {
                 state,
                 browser,
+                browser_created,
+                browser_create_failed,
                 closed,
                 child_hwnd,
                 ime_state,
@@ -536,6 +510,7 @@ mod probe {
         texture: Option<egui::TextureHandle>,
         applied_generation: u64,
         current_click: Option<ClickTransfer>,
+        init_started_at: Option<Instant>,
     }
 
     impl UiChildProbeApp {
@@ -546,6 +521,7 @@ mod probe {
                 texture: None,
                 applied_generation: 0,
                 current_click: None,
+                init_started_at: None,
             }
         }
 
@@ -555,8 +531,29 @@ mod probe {
             }
             let Some(hwnd) = frame_hwnd(frame) else { return; };
             match UiChildRuntime::new(hwnd) {
-                Ok(runtime) => self.runtime = Some(runtime),
+                Ok(runtime) => {
+                    self.runtime = Some(runtime);
+                    self.init_started_at = Some(Instant::now());
+                }
                 Err(error) => self.init_error = Some(error),
+            }
+        }
+
+        fn check_initialization(&mut self) {
+            let Some(runtime) = self.runtime.as_ref() else { return; };
+            if runtime.browser_create_failed.load(Ordering::Acquire) {
+                self.init_error = Some("CEF UI-thread child browser creation was rejected".to_string());
+                return;
+            }
+            if runtime.browser_created.load(Ordering::Acquire) {
+                return;
+            }
+            if self
+                .init_started_at
+                .map(|started| started.elapsed() >= BROWSER_CREATE_TIMEOUT)
+                .unwrap_or(false)
+            {
+                self.init_error = Some("CEF UI-thread child browser creation timed out".to_string());
             }
         }
 
@@ -600,9 +597,10 @@ mod probe {
     impl eframe::App for UiChildProbeApp {
         fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
             self.ensure_initialized(frame);
+            self.check_initialization();
             self.update_texture(ctx);
 
-            let (generation, callbacks, bounds, start, comp, end, compstr, resultstr, cursor) = self
+            let (generation, callbacks, bounds, start, comp, end, compstr, resultstr, cursor, created) = self
                 .runtime
                 .as_ref()
                 .map(|runtime| {
@@ -632,15 +630,25 @@ mod probe {
                         })
                         .unwrap_or((0, 0, 0, String::new(), String::new(), -1));
                     (
-                        generation, callbacks, bounds, start, comp, end, compstr, resultstr,
+                        generation,
+                        callbacks,
+                        bounds,
+                        start,
+                        comp,
+                        end,
+                        compstr,
+                        resultstr,
                         cursor,
+                        runtime.browser_created.load(Ordering::Acquire),
                     )
                 })
-                .unwrap_or((0, 0, 0, 0, 0, 0, String::new(), String::new(), -1));
+                .unwrap_or((0, 0, 0, 0, 0, 0, String::new(), String::new(), -1, false));
 
             egui::TopBottomPanel::top("status").show(ctx, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.label("WV-11-04-02 CEF UI-thread child HWND IME Probe");
+                    ui.separator();
+                    ui.label(format!("Browser created: {created}"));
                     ui.separator();
                     ui.label(format!("Paint: {generation}"));
                     ui.separator();
@@ -678,8 +686,10 @@ mod probe {
                             }
                         }
                     }
-                } else {
+                } else if created {
                     ui.centered_and_justified(|ui| ui.label("Waiting for CEF OSR Paint..."));
+                } else {
+                    ui.centered_and_justified(|ui| ui.label("Starting CEF UI-thread child browser..."));
                 }
             });
 
