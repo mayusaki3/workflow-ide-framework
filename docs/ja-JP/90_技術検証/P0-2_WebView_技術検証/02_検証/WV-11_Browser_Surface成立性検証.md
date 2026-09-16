@@ -331,7 +331,7 @@ Browser の画面更新に応じて OSR 描画更新が継続することを確�
 
 #### 参照仕様
 
-- doc-20260524-009601Z-R8M7#sec_sdnuof1lgo4n
+- doc-20260524-009601Z-WV11#sec_sdnuof1lgo4n
 
 ### CEF-IT-SPEC-008 Browser / CEF 終了
 <!-- hldocs:sec_id=sec_y5zildrpcolm -->
@@ -414,6 +414,43 @@ egui 側で受け取った入力イベントを Browser Surface へ転送でき�
 - キーボード入力を転送できる。
 - Focus 状態を管理できる。
 
+### WV-11-04 検証状態
+
+| 動作対象 | Mouse Move | Mouse Click | Wheel | Keyboard | Focus |
+| --- | --- | --- | --- | --- | --- |
+| Windows 実機 | ○ | ○ | ○ | ○ | ○ |
+| Linux VM | ？ | ？ | ？ | ？ | ？ |
+| Linux X11 実機 | ？ | ？ | ？ | ？ | ？ |
+| Linux Wayland 実機 | ？ | ？ | ？ | ？ | ？ |
+| macOS Apple Silicon | ？ | ？ | ？ | ？ | ？ |
+| macOS Intel | ？ | ？ | ？ | ？ | ？ |
+
+### Windows 実機検証結果
+
+`run_wv11_04_input_probes.ps1` により、Pointer Move / Pointer Click / Wheel / Keyboard / Focus の各 Probe を連続実行した。
+
+Windows 実機で以下を視覚確認し、すべて正常に動作した。
+
+- Browser Surface 上の Pointer 移動に応じて hover と Browser 座標が追従する。
+- Browser Surface 上のクリックが Browser 側へ転送される。
+- Browser Surface 上の Wheel 操作で Browser ページがスクロールする。
+- Browser Surface を Focus 後、Keyboard の keydown / keyup が Browser 側へ転送される。
+- Browser Surface の Focus を取得し、入力対象として管理できる。
+
+以上により、Windows 実機について WV-11-04 の正式な合格条件を満たしたため `○` とする。
+
+### Windows IME 追加検証
+
+IME は WV-11-04 の正式な合格条件には含めず、Windows 固有の追加検証として扱う。
+
+CEF OSR の Browser input に対し、Windows IME の composition 開始、composition 文字列更新、変換候補通知、CEF への composition 反映、確定文字列 commit、composition 終了まで成立することを確認した。
+
+CEF の IME composition range callback から取得した文字位置を Windows IMM の Composition Window / Candidate Window へ同期することで、変換候補ウィンドウを Browser input 付近へ表示できることも確認した。
+
+ただし、最初の Space による変換時、候補ウィンドウが一度消えた後に再表示される現象が残っている。候補ウィンドウ再表示後は Space による候補選択が可能で、Enter による確定と CEF への commit も正常に完了する。
+
+ログ上では最初の Space 付近で `IMN_CLOSECANDIDATE` の後に `IMN_OPENCANDIDATE` が発生しており、視覚確認結果と一致する。この現象は WV-11-04 の正式5条件とは分離し、Windows IME 追加検証の残課題として記録する。
+
 ## WV-11-05 Windows Dock 表示検証
 
 ### 目的
@@ -486,7 +523,7 @@ WV-11 は以下を満たした時点で完了とする。
 
 ## 次工程
 
-WV-11-02 CEF OSR 最小構成検証へ進む。
+WV-11-05 Windows Dock 表示検証へ進む。
 
 WV-11 完了後は、WV-12 GPU Surface 技術検証へ進む。
 
