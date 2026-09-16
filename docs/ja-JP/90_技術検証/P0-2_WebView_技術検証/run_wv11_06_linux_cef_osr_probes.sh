@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/tmp/workflow-ide-p0-2-target}"
+# CEF + GUI dependencies require substantially more than a small tmpfs.
+# Keep the default target under HOME while still allowing callers to override it.
+CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$HOME/cargo-target/workflow-ide-p0-2}"
 export CARGO_TARGET_DIR
 
 if [[ "$(uname -s)" != "Linux" ]]; then
@@ -14,6 +16,8 @@ if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
     echo "Run this from the Linux VM graphical desktop/session; WV-11-06 verifies Dock rendering visually." >&2
     exit 2
 fi
+
+mkdir -p "${CARGO_TARGET_DIR}"
 
 echo "WV-11-06 Linux CEF OSR verification"
 echo "Cargo target: ${CARGO_TARGET_DIR}"
