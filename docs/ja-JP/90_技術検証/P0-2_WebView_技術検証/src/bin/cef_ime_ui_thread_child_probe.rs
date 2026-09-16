@@ -16,9 +16,11 @@ mod probe {
     use std::ffi::c_void;
     use std::sync::atomic::AtomicUsize;
     use windows::core::w;
-    use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+    use windows::Win32::UI::Input::KeyboardAndMouse::{SetFocus, VK_RETURN, VK_SPACE};
     use windows::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, DestroyWindow, WS_CHILD, WS_VISIBLE, WINDOW_EX_STYLE,
+        CreateWindowExW, DestroyWindow, WM_CHAR, WM_IME_KEYDOWN, WM_IME_KEYUP, WM_KEYDOWN,
+        WM_KEYUP, WM_SYSCHAR, WM_SYSKEYDOWN, WM_SYSKEYUP, WS_CHILD, WS_VISIBLE,
+        WINDOW_EX_STYLE,
     };
 
     const CHILD_SUBCLASS_ID: usize = SUBCLASS_ID + 10;
@@ -49,6 +51,32 @@ mod probe {
         }
 
         let state_mutex = &*UI_CHILD_IME_STATE_PTR;
+
+        let key_message_name = match msg {
+            WM_KEYDOWN => Some("WM_KEYDOWN"),
+            WM_KEYUP => Some("WM_KEYUP"),
+            WM_SYSKEYDOWN => Some("WM_SYSKEYDOWN"),
+            WM_SYSKEYUP => Some("WM_SYSKEYUP"),
+            WM_CHAR => Some("WM_CHAR"),
+            WM_SYSCHAR => Some("WM_SYSCHAR"),
+            WM_IME_KEYDOWN => Some("WM_IME_KEYDOWN"),
+            WM_IME_KEYUP => Some("WM_IME_KEYUP"),
+            _ => None,
+        };
+        if let Some(name) = key_message_name {
+            let key = if wparam.0 == VK_SPACE.0 as usize {
+                "SPACE"
+            } else if wparam.0 == VK_RETURN.0 as usize {
+                "ENTER"
+            } else {
+                "OTHER"
+            };
+            println!(
+                "UI-THREAD CHILD KEY msg={} wparam=0x{:X} lparam=0x{:X} key={} route=DefSubclassProc",
+                name, wparam.0, lparam.0, key
+            );
+        }
+
         match msg {
             WM_IME_SETCONTEXT => return DefSubclassProc(hwnd, msg, wparam, lparam),
             WM_IME_STARTCOMPOSITION => {
