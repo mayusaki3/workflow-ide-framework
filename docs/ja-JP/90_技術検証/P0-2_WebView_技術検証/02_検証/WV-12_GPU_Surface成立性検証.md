@@ -21,7 +21,7 @@ Browser Surface と GPU Surface を共通 Surface アーキテクチャとして
 
 P0-2 の目的は、Browser Surface 単体の実装ではなく、Dock 上で Browser Surface / GPU Surface を扱える Surface 共通アーキテクチャの技術成立性を確認することである。
 
-WV-11 では Browser Surface の技術成立性を確認する。
+WV-11 では CEF OSR -> egui Texture -> Dock の経路により Browser Surface の技術成立性を確認した。
 
 WV-12 では GPU Surface の技術成立性を確認し、Browser Surface 側に寄りすぎた実験用インターフェースになっていないかを確認する。
 
@@ -29,11 +29,18 @@ WV-12 では GPU Surface の技術成立性を確認し、Browser Surface 側に
 
 - 対象ブランチは `develop` とする。
 - Windows を最優先対象とする。
-- Linux は次優先対象とし、同方式の成立性を確認する。
-- macOS は現時点では検証環境がないため、P0-2 では対象外とする。
+- Linux は次優先対象とし、利用可能な VM で基本検証を行う。
+- Linux 実機および macOS を含め、検証環境を用意できない項目は `？` とし、非対応とはみなさない。
+- Dock は1タブ1区画を前提としない。
 - P0-2 では Surface API の本仕様化、Runtime 統合、IDE 統合までは行わない。
 - WV-12 内で整理するインターフェースは技術検証用であり、正式 API 仕様ではない。
 - 正式 API 仕様は、WV-11 Browser Surface 技術検証、WV-12 GPU Surface 技術検証、および他 Dock Panel との整合を踏まえ、P0-2 完了後の仕様フェーズで定義する。
+
+## 検証状態の表記
+
+- `○`: 検証済み・動作
+- `×`: 検証済み・非動作
+- `？`: 未検証
 
 ## 検証方針
 
@@ -83,13 +90,31 @@ Windows を主対象としつつ、Linux へ展開可能な方式を優先する
 | 方式 | Windows | Linux | 評価 |
 | --- | --- | --- | --- |
 | wgpu | 可 | 可 | 主候補 |
-| DirectX 専用 | 可 | 不可 | Windows 専用のため共通方式から除外候補 |
+| DirectX 専用 | 可 | 不可 | Windows 専用のため共通方式から除外 |
 | OpenGL | 可 | 可 | 互換候補 |
-| Vulkan | 可 | 可 | 高性能候補だが検証負荷が高い |
+| Vulkan | 可 | 可 | 直接利用は検証負荷と API 固有依存が大きい |
 
-### 完了条件
+### 選定結果
 
-GPU Surface の主候補を判断し、WV-12-02 の検証方式を決定できること。
+WV-12 の主検証方式は `wgpu` とする。
+
+理由は以下とする。
+
+- Windows / Linux の双方で同じ Rust 側の描画モデルを使用できる。
+- 特定 OS の Native Child Window 埋め込みを Surface モデルの前提にする必要がない。
+- DirectX / Vulkan 等の Backend 差異を上位 Surface 境界から分離できる。
+- GPU 側で生成した動的な描画結果を Texture として Dock 描画へ接続する検証を構成できる。
+- Browser Surface と同じく、上位層では Resize / Input / Frame または Texture 更新 / Lifecycle を中心に比較できる。
+
+初期検証では zero-copy や GPU 間 Texture 共有を必須条件としない。まず GPU 描画 -> Dock 表示という Surface 境界の成立を優先する。
+
+DirectX 専用方式は Windows 専用となるため共通方式から除外する。OpenGL は互換候補として残す。Vulkan 直接利用は性能面の候補にはなるが、P0-2 の共通 Surface 成立性確認としては API 固有処理が増えるため主方式にはしない。
+
+### 判定
+
+WV-12-01 は完了とする。
+
+WV-12-02 では `wgpu` により GPU 描画結果を生成し、Native Child Window を使用せず egui / Dock 内へ表示する最小 Probe を作成して検証する。
 
 ## WV-12-02 GPU 描画結果の Dock 内表示検証
 
@@ -106,6 +131,7 @@ GPU 描画結果を egui / Dock 内へ表示できることを確認する。
 
 ### 評価対象外
 
+- zero-copy / GPU 間 Texture 共有の最適化
 - 正式 Surface API
 - Runtime 統合
 - IDE 統合
@@ -145,7 +171,7 @@ Browser Surface と GPU Surface の共通化可能な要素、共通化すべき
 
 ### 整理対象
 
-- Texture 更新
+- Texture / Frame 更新
 - Resize
 - Visibility
 - Lifecycle
@@ -201,9 +227,7 @@ WV-12 は以下を満たした時点で完了とする。
 
 ## 次工程
 
-WV-12-01 GPU Surface 実現方式の候補確認から開始する。
-
-WV-12 の検証仕様作成後、WV-11 の実装検証へ進む。
+WV-12-02 `wgpu` GPU 描画結果の Dock 内表示検証へ進む。
 
 ---
 
