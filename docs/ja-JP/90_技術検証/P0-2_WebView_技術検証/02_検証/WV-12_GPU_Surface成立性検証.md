@@ -39,7 +39,7 @@ WV-12 では GPU Surface の技術成立性を確認し、Browser Surface 側に
 ## 検証状態の表記
 
 - `○`: 検証済み・動作
-- `×`: 検証済み・非動作
+- `✕`: 検証済み・非動作
 - `？`: 未検証
 
 ## 検証方針
@@ -129,12 +129,44 @@ GPU 描画結果を egui / Dock 内へ表示できることを確認する。
 - Native Window 埋め込みに依存しない。
 - 継続更新できる。
 
+### Windows 実機検証結果
+
+| 動作対象 | GPU 描画 | Dock 内表示 | Native Child Window 不使用 | 継続更新 |
+| --- | --- | --- | --- | --- |
+| Windows 実機 | ○ | ○ | ○ | ○ |
+| Linux VM | ？ | ？ | ？ | ？ |
+| Linux 実機 | ？ | ？ | ？ | ？ |
+| macOS | ？ | ？ | ？ | ？ |
+
+`wgpu_dock_surface_probe` を Windows 実機で実行した。
+
+実行環境では NVIDIA GeForce RTX 4050 Laptop GPU が選択され、wgpu Backend は Vulkan となった。
+
+以下を確認した。
+
+- wgpu off-screen Texture を GPU RenderPass で継続更新できる。
+- off-screen Texture を egui native Texture として登録し、egui_dock の Dock 内へ表示できる。
+- GPU Surface の色が継続変化し、GPU frame generation が増加し続ける。
+- Probe Info と GPU Surface の表示を切り替えても更新が継続する。
+- Application Window をリサイズしても Dock 内表示が維持される。
+- Native Child Window を使用しない。
+
+実行ログでは GPU frame generation が 4560 まで継続し、異常終了は確認されなかった。
+
+以上により Windows 実機の WV-12-02 合格条件をすべて満たしたため `○` とする。
+
 ### 評価対象外
 
 - zero-copy / GPU 間 Texture 共有の最適化
 - 正式 Surface API
 - Runtime 統合
 - IDE 統合
+
+### 判定
+
+Windows 実機について WV-12-02 は完了とする。
+
+Linux VM については WV-12-03 以降と合わせて同一 wgpu Surface 経路を追加検証する。
 
 ## WV-12-03 Resize / Visibility / Lifecycle 検証
 
@@ -227,7 +259,7 @@ WV-12 は以下を満たした時点で完了とする。
 
 ## 次工程
 
-WV-12-02 `wgpu` GPU 描画結果の Dock 内表示検証へ進む。
+WV-12-03 Resize / Visibility / Lifecycle 検証へ進む。
 
 ---
 
