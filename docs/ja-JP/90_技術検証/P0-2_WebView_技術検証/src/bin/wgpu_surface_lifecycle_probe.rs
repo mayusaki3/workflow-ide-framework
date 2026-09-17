@@ -154,7 +154,10 @@ impl TabViewer for ProbeTabViewer<'_> {
                 if let Some([w,h]) = self.texture_size { ui.label(format!("Texture size: {w}x{h}")); } else { ui.label("Texture size: none"); }
                 ui.label(format!("Requested Dock size: {}x{}", self.requested_size[0], self.requested_size[1]));
                 ui.separator();
-                if ui.button(if *self.visible { "Hide GPU Surface" } else { "Show GPU Surface" }).clicked() {\n                    *self.visible = !*self.visible;\n                    println!("GPU Surface visibility: {}", if *self.visible { "shown" } else { "hidden" });\n                }
+                if ui.button(if *self.visible { "Hide GPU Surface" } else { "Show GPU Surface" }).clicked() {
+                    *self.visible = !*self.visible;
+                    println!("GPU Surface visibility: {}", if *self.visible { "shown" } else { "hidden" });
+                }
                 if ui.add_enabled(self.surface_enabled, egui::Button::new("Destroy GPU Surface")).clicked() { *self.destroy_requested = true; }
                 if ui.button(if self.surface_enabled { "Recreate GPU Surface" } else { "Create GPU Surface" }).clicked() { *self.create_requested = true; }
                 ui.separator();
