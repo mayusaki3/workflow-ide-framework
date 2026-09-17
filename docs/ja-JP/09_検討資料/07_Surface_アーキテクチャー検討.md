@@ -59,6 +59,8 @@ P0-2 の成立結果から、共通化候補は以下とする。
 - Wheel
 - Keyboard
 - Text / Composition の上位境界
+- IME Composition（Browser / GPU 共通入力能力）
+- caret / composition target 位置通知
 - Focus
 - 描画更新通知
 - 描画成果物を Dock へ接続する抽象境界
@@ -76,7 +78,7 @@ Browser Surface 固有:
 - Browser Runtime
 - CEF Browser / Frame / BrowserHost
 - Browser security / sandbox
-- OS / Browser Runtime 固有 IME bridge
+- 共通 IME event を CEF / OS API へ変換する Browser Runtime 固有 IME bridge
 
 GPU Surface 固有:
 
@@ -85,6 +87,9 @@ GPU Surface 固有:
 - GPU Texture の生成 / 再生成
 - GPU resource synchronization
 - Backend 固有処理
+- GPU Viewport / Runtime が文字入力を必要とする場合の共通 IME event の転送
+
+GPU Surface 自体に文字入力を必須とはしないが、GPU Surface 上の独自 UI や 3D UI が文字入力を持つ場合は共通 Surface IME model を利用する。Candidate Window の位置指定は Surface から caret / composition target rectangle を返し、Framework が OS IME へ接続する方式を候補とする。
 
 これらを共通 Surface trait に直接持ち込まない。
 
@@ -137,6 +142,8 @@ Command Bridge、Permission、Sandbox 等は Browser Panel / Browser Surface 固
 - zero-copy / GPU 間 Texture 共有
 - Device lost / GPU reset 復旧
 - IME Composition の共通イベント詳細
+- caret / composition target rectangle API
+- GPU Surface / GPU Viewport IME の実動作検証
 - Drag and Drop / Clipboard / Accessibility
 
 これらは技術成立性ではなく API / Runtime 設計事項として扱う。
