@@ -7,6 +7,20 @@
 ### 到達点
 
 - WV-10 完了。
+- WV-11-01 Browser Surface 方式選定完了。
+- WV-11-02 の検証条件を 8 検証単位へ分割し、testspec / spec のトレーサビリティを確定した。
+- WV-11-02 の検証基準は CEF `151.3.24+g2384915+chromium-151.0.7922.174` とする。
+- Rust バインディングは `cef 151.8.1+151.3.24` を使用する。
+- CEF Runtime / Symbol Probe は既存の `libloading` 実装を維持する。
+- CEF Initialize 以降は CEF C API ABI を手書きせず、検証基準 CEF と一致する `cef-rs` バインディングを Framework 内部の技術検証境界で使用する。
+- Windows 実機で CEF-IT-SPEC-001 Runtime load、CEF-IT-SPEC-002 Symbols、CEF-IT-SPEC-003 Initialize の合格を確認した。
+- Runtime / Symbol Probe は `cef-dll-sys` が実行バイナリ出力先へ配置した CEF ランタイムを既定対象とし、Initialize Probe と同一ランタイムを検証する構成へ統一した。
+- CEF subprocess は `main` 冒頭で Chromium の `--type` を判定し、renderer / gpu-process 等を通常の eframe / WebView 起動経路へ入れず `cef_execute_process` へ分岐する構成とした。
+- Windows では `cef-dll-sys` / `libcef_dll_wrapper` のビルド時に深い Cargo target パスで MSVC C1083 が発生したため、短い `CARGO_TARGET_DIR` を使用する必要がある。検証では `D:\cargo-target\workflow-ide-p0-2` を使用した。
+- Windows の管理者権限側では `cef_initialize returned 0` を確認し、通常権限 PowerShell では CEF Initialize / shutdown が成功した。WV-11-02 の Windows 実機検証は通常権限を基準とする。
+- CEF-IT-SPEC-004 Windowless Browser 作成 Probe の実装を開始し、`--cef-browser-probe` を追加した。実機実行結果は未検証。
+- WV-11-07 の位置付けを、正式 API 仕様ではなく技術検証用の実験用インターフェース整理として明確化済み。
+- Browser Surface の主候補は CEF OSR とする。
 - GTK / WebKitGTK Host Window 方式は Linux 主方式として終了する。
 - WV-10 の X11 reparent 確認では、Wayland セッションのため X11 reparent 検証が成立しないことを確認した。
 - WV-10 で GTK / WebKitGTK 生成なしの場合に応答なしが消えることを確認した。
@@ -16,7 +30,7 @@
 
 ## P0-2 の残作業
 
-P0-2 は、Windows を主対象として Surface 共通アーキテクチャの成立性を確認する方向へ移行する。
+P0-2 は、Surface 共通アーキテクチャの成立性を確認する方向へ移行する。
 
 P0-2 では、仕様設計、Runtime 統合、IDE 統合までは行わない。
 
@@ -27,11 +41,13 @@ P0-2 の残作業は以下の 2 検証で終了する。
 
 ## 更新対象
 
-- src/platform/linux_webview.rs
+- src/platform/cef/ffi.rs
+- src/platform/cef/mod.rs
+- src/main.rs
+- Cargo.toml
 - WV-11_Browser_Surface成立性検証.md
 - WV-12_GPU_Surface成立性検証.md
-- WV-10_WV07再現条件差分分析.md
-- WV-09_Linux応答なし原因特定.md
+- 01_WebView_技術検証仕様.md
 
 ## 現在の判断
 
@@ -39,17 +55,73 @@ WV-10 までの検証により、eframe / egui / Dock のみでは応答なし�
 
 Wayland 環境では Windows 版の Child Window や X11 reparent 相当の方式を主方式にできないため、Window 埋め込み方式ではなく、Surface として描画結果を Dock 内へ統合する方式を検討する。
 
-Windows 版は現状 WebView2 によりブラウザ表示が成立しているが、Windows / Linux の実装差を減らし、GPU Surface と共通化する観点では、Windows / Linux 共通で CEF OSR（Off-Screen Rendering）を用いた Browser Surface 方式を検証する価値が高い。
+Windows 版は現状 WebView2 によりブラウザ表示が成立しているが、Windows / Linux / macOS の実装差を減らし、GPU Surface と共通化する観点では、3 OS で利用可能な CEF OSR（Off-Screen Rendering）を用いた Browser Surface 方式を検証する価値が高い。
 
-## サポート優先度
+WV-11-01 により、WebView2 は Windows 専用、WebKitGTK は WV-10 の結果により主方式から外すため、Browser Surface の主候補は CEF OSR と判断した。
+
+WV-11-02 では、CEF Runtime / Symbol の存在確認は低レベル Probe として `libloading` を使用し、CEF Initialize 以降の ABI 境界は `cef-rs` の生成バインディングを使用する。これにより、CEF の大規模な C API 構造体を Framework 側で手書き複製しない。
+
+Windows 実機では、実行バイナリと同一ディレクトリの `libcef.dll` に対して Runtime load / Symbols が成功し、同一構成で CEF Initialize / shutdown も成功した。これにより CEF-IT-SPEC-001 / 002 / 003 は Windows 実機で成立したと判断する。
+
+WV-11 内で整理するインターフェースは技術検証用であり、Framework 利用アプリ向けの正式 API 仕様ではない。正式 API 仕様は、WV-12 GPU Surface 技術検証および他 Dock Panel との整合を踏まえ、P0-2 完了後の仕様フェーズで定義する。
+
+## 対応対象 OS
+
+Workflow IDE Framework の対応対象 OS は以下の 3 OS とする。
 
 1. Windows
 2. Linux
 3. macOS
 
-macOS は現時点で検証環境がないため、P0-2 ではサポート対象外とする。
+検証環境を用意できない対象は、対応対象から除外せず「未検証」として扱う。
 
-ただし、Surface 共通アーキテクチャは macOS 実装を将来追加できる構造を維持する。
+未検証は非対応を意味しない。
+
+## 検証環境方針
+
+### Windows
+
+利用可能な実環境で検証する。
+
+CEF WV-11-02 検証では通常権限 PowerShell を使用し、Cargo target の深いパスによる MSVC C1083 を回避するため短い `CARGO_TARGET_DIR` を使用する。
+
+### Linux
+
+基本検証は現在利用可能な VM 環境で実施する。
+
+VM で成立性を判断できる項目は VM 環境で検証済みとして扱う。
+
+実 GPU、GPU ドライバ、Display Server、入力デバイスその他の実環境依存性により VM だけでは判定できない項目は、Linux 実機環境では未検証として扱う。
+
+必要に応じて Linux / VM、Linux / X11 実機、Linux / Wayland 実機等を別の動作対象として記録する。
+
+### macOS
+
+対応対象とする。
+
+現時点で検証環境を用意できない項目は未検証として扱い、P0-2 の進行を停止する理由とはしない。
+
+## 検証状態の公開方針
+
+検証状態は、縦軸を動作対象、横軸を機能とするマトリクス表で公開する。
+
+状態記号は以下とする。
+
+- ○: 検証済み・動作
+- ×: 検証済み・非動作
+- ？: 未検証
+
+VM と実機等で検証条件が異なる場合は、状態記号を増やさず動作対象の行を分けて表現する。
+
+× は Framework 全体としての非対応を意味せず、記録された対象環境と検証条件において動作しなかったことを表す。
+
+未検証の対象環境については OSS の利点を生かし、GitHub 等で検証協力者を募る方向とする。
+
+## HLDocS フィードバック方針
+
+技術検証中に得られた HLDocS へのフィードバック候補は、現時点では整理・反映しない。
+
+P0-2 技術検証完了後に、検証中に得られた知見を基に HLDocS へのフィードバック要否と内容を再度検討する。
 
 ## 利用アプリ向け方針
 
@@ -57,29 +129,39 @@ Framework 利用アプリ開発者には、OS 依存コードを書かせない�
 
 OS 差異は Framework 側の Surface API が吸収する。
 
-利用アプリ側は、Browser Surface / GPU Surface を OS 非依存の API として利用できることを目標とする。
+ただし、P0-2 中に定義する Browser Surface インターフェースは技術検証用であり、正式 API 仕様ではない。
 
 P0-2 完了後、Framework 利用アプリ側と API を調整し、Surface API の仕様策定と Framework 本体実装へ進む。
 
 ## WV-11 Browser Surface 技術検証
 
-Windows を主対象として、Dock 上で Web ブラウザ機能を Browser Surface として成立させられるか確認する。
+Windows / Linux / macOS を対応対象として、Dock 上で Web ブラウザ機能を Browser Surface として成立させられるか確認する。
 
 主候補は CEF OSR とする。
 
 確認項目:
 
-- WV-11-01: Rust から利用可能な CEF バインディング / ラッパーの現状確認
-- WV-11-02: CEF OSR で描画バッファを取得できるか確認
+- WV-11-01: Browser Surface 方式選定（完了）
+- WV-11-02: CEF OSR で描画バッファを取得できるか確認（進行中）
+  - CEF-IT-SPEC-001: CEF ランタイムロード（Windows 実機 ○）
+  - CEF-IT-SPEC-002: 必須シンボル解決（Windows 実機 ○）
+  - CEF-IT-SPEC-003: CEF 初期化（Windows 実機 ○）
+  - CEF-IT-SPEC-004: Windowless Browser 作成（Windows 実機 未検証）
+  - CEF-IT-SPEC-005: Paint コールバック受信
+  - CEF-IT-SPEC-006: 描画バッファ取得
+  - CEF-IT-SPEC-007: 継続描画更新
+  - CEF-IT-SPEC-008: Browser / CEF 終了
 - WV-11-03: 取得した描画バッファを egui TextureHandle へ転送できるか確認
 - WV-11-04: egui 側イベントを CEF へ転送できるか確認
 - WV-11-05: Windows 上で Dock 内 Browser Surface として表示できるか確認
-- WV-11-06: Linux 上で同方式の成立性を確認
-- WV-11-07: 利用アプリ向け Browser Surface API の仮インターフェース案を整理
+- WV-11-06: Linux / macOS 上で同方式の成立性を確認
+- WV-11-07: Browser Surface 実験用インターフェース整理
+
+検証環境を用意できない動作対象・機能の組み合わせは未検証として残す。
 
 ## WV-12 GPU Surface 技術検証
 
-Windows を主対象として、Dock 上で GPU サーフェース機能を Surface として成立させられるか確認する。
+Windows / Linux / macOS を対応対象として、Dock 上で GPU サーフェース機能を Surface として成立させられるか確認する。
 
 Browser Surface と同じ Surface 共通モデルへ統合可能かを確認する。
 
@@ -92,15 +174,18 @@ Browser Surface と同じ Surface 共通モデルへ統合可能かを確認す�
 - WV-12-05: Browser Surface と共通化可能な Surface API 要素を整理
 - WV-12-06: 利用アプリ向け GPU Surface API の仮インターフェース案を整理
 
+検証環境を用意できない動作対象・機能の組み合わせは未検証として残す。
+
 ## P0-2 完了条件
 
 - WV-11 Browser Surface 技術検証が完了している。
 - WV-12 GPU Surface 技術検証が完了している。
 - Browser Surface と GPU Surface が、共通 Surface モデルとして成立する見込みを確認できている。
-- Windows を主対象として、Dock 上で Browser Surface / GPU Surface が成立することを確認できている。
-- Linux について、同方式を採用できる見込みを判断できている。
-- macOS は未検証だが、将来実装を追加可能な構造であることを確認できている。
-- Framework 利用アプリ側へ OS 非依存 API として提供できる見込みを確認できている。
+- Windows / Linux / macOS を対応対象としている。
+- 利用可能な環境では必要な技術検証を実施し、環境を用意できない項目は未検証として明示されている。
+- Linux の VM 検証結果と、実環境で追加確認が必要な項目が区別されている。
+- 検証状態を動作対象 × 機能の ○ / × / ？ マトリクスとして公開できる状態になっている。
+- 技術検証用インターフェースと正式 API 仕様を分離して扱う方針が明確になっている。
 
 ## P0-2 完了後の移行先
 
@@ -118,11 +203,17 @@ P0-2 完了後は、技術検証ではなく仕様フェーズへ移行する。
 
 これらは WV-13 以降の技術検証ではなく、本来の仕様側作業として扱う。
 
+P0-2 完了後、技術検証中に得られた知見を基に HLDocS へのフィードバック要否と内容を再検討する。
+
 ## 次工程
 
-WV-11 Browser Surface 技術検証を開始する。
+WV-11-02 CEF OSR 最小構成検証を継続する。
 
-最初の作業は WV-11-01 CEF OSR Rust 利用方式調査とする。
+CEF-IT-SPEC-001 / 002 / 003 は Windows 実機で合格済み。
+
+現在の次工程は、Windows 実機で `--cef-browser-probe` を実行し、CEF-IT-SPEC-004 Windowless Browser 作成を検証すること。
+
+CEF-IT-SPEC-004 が合格した後、CEF-IT-SPEC-005 Paint コールバック受信の設計・検証へ進む。
 
 ---
 

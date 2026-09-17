@@ -5,6 +5,12 @@
 Workflow IDE Framework は、IDE 型アプリケーションを構築するための Rust ベース IDE Platform Framework です。  
 Windows / macOS / Linux 上で動作する、Dock 型・Scene 型 UI を持つ IDE アプリケーション構築を目的とします。
 
+## 開発状態
+
+Phase 0 の初期技術検証を完了し、検証結果を `main` へ統合する段階に到達しました。現在は最初の開発版 **v0.1.0** の仕様・実装作業を `develop` ブランチで開始しています。
+
+初期検証で未検証または残課題となった OS / IME / GPU Driver 等の項目は記録を保持し、v0.1.0 以降の実装・検証で継続して扱います。
+
 ## 目的
 
 以下のような IDE 型アプリケーションを構築するための共通基盤を提供します。

@@ -11,60 +11,193 @@ canonical_document: true
 
 # WebView 技術検証仕様
 
-# 1. 概要
+## 1. 概要
 
-wry を利用した WebView Support Panel の成立性を確認する。
+P0-2 は、IDE の Dock 内でブラウザ描画を Browser Surface として扱える構造を対象とする。
 
-# 2. 検証対象
+Browser Surface は Native Window 埋め込みに依存せず、ブラウザ描画結果を Surface として取得し、Framework 側で扱える構造とする。
 
-- wry
-- egui coexist
-- Window coexist
+## 2. 対象
 
-# 3. 確認事項
+- 対象 OS は Windows / Linux / macOS とする。
+- Framework 利用アプリ側へ OS 依存コードを要求しない構造とする。
+- Browser Surface の主候補は CEF OSR とする。
+- 検証環境を用意できない動作対象は未検証として扱い、非対応とはみなさない。
+- P0-2 では正式 Surface API、Runtime 統合、IDE 統合の仕様確定は行わない。
 
-## 3.1 WebView 表示
+## 3. Browser Surface 成立条件
 
-WebView を表示可能であること。
+### 3.1 CEF ランタイムロード
+<!-- hldocs:sec_id=sec_10811wkg708i -->
 
-### WV-01-01
+対象 OS 用の CEF ランタイムを Framework 内部の技術検証境界からロード可能でなければならない。
 
-WebView を生成できること。
+### 3.2 CEF 必須シンボル
+<!-- hldocs:sec_id=sec_pkl5oq8fkmc6 -->
 
-### WV-01-02
+Browser Surface の成立性確認に必要な CEF C API シンボルを Framework 内部から解決可能でなければならない。
 
-固定URLを表示できること。
+### 3.3 CEF 初期化
+<!-- hldocs:sec_id=sec_aj1rfgg9rguj -->
 
-### WV-01-03
+対象 CEF の ABI と一致する定義を使用し、CEF を正常に初期化可能でなければならない。
 
-WebView の表示・非表示を切り替えられること。
+CEF のマルチプロセス動作に必要な subprocess 判定を `cef_execute_process` で初期化前に実行し、subprocess ではその戻り値に従ってアプリケーション本体の初期化処理へ進まず終了しなければならない。
 
-### WV-01-04
+メインの Browser Process のみが `cef_initialize` へ進み、初期化成功後に `cef_shutdown` を実行可能でなければならない。
 
-Dock追従中も異常終了しないこと。
+### 3.4 Windowless Browser
+<!-- hldocs:sec_id=sec_fjanz0cmlgpv -->
 
-## 3.2 egui coexist
+Browser Surface は、独立した Browser 用 Native Window を表示せずに Browser を生成可能でなければならない。
 
-WebView と egui を共存可能であること。
+### 3.5 Paint 通知
+<!-- hldocs:sec_id=sec_twsz1102y36h -->
 
-## 3.3 Multi Window
+Browser Surface は、OSR による描画更新を Paint 通知として取得可能でなければならない。
 
-複数 Window を扱えること。
+### 3.6 描画バッファ
+<!-- hldocs:sec_id=sec_brb8qsq5y25r -->
 
-## 3.4 Command Bridge
+Browser Surface は、Paint 通知から描画領域と画素バッファを取得可能でなければならない。
 
-WebView から IDE Command を呼び出せる構造を確認する。
+### 3.7 継続更新
+<!-- hldocs:sec_id=sec_sdnuof1lgo4n -->
 
-## 3.5 Focus
+Browser Surface は、ブラウザ画面の変化に応じて描画バッファを継続更新可能でなければならない。
 
-WebView と egui 間で Focus 切替可能であること。
+### 3.8 ライフサイクル
+<!-- hldocs:sec_id=sec_y5zildrpcolm -->
 
-# 4. 今後の拡張
+Browser Surface の Browser と CEF は、必要な処理完了後に正常な順序で終了可能でなければならない。
 
-- JavaScript Bridge
-- IDE Control
-- AI Chat
-- Help System
+### 3.9 Texture 画素形式
+<!-- hldocs:sec_id=sec_3n8qk2v5u7am -->
+
+Browser Surface は、CEF OSR が提供する BGRA 画素バッファを egui Texture が解釈可能な RGBA8 画素列へ正規化可能でなければならない。
+
+### 3.10 egui Texture 生成
+<!-- hldocs:sec_id=sec_r8m4t2x9c6kp -->
+
+Browser Surface は、正規化した描画バッファと描画領域サイズから egui の Texture を生成可能でなければならない。
+
+### 3.11 Texture 更新
+<!-- hldocs:sec_id=sec_q6f1w9n3z8bd -->
+
+Browser Surface は、CEF OSR の新しい Paint 通知に応じて既存の egui Texture を更新可能でなければならない。
+
+### 3.12 Dock Panel 表示
+<!-- hldocs:sec_id=sec_h5v2c8m7p1rs -->
+
+Browser Surface は、Browser 用の独立 Native Window を表示せず、egui Texture として Dock Panel 内へ表示可能でなければならない。
+
+### 3.13 描画サイズ同期
+<!-- hldocs:sec_id=sec_b4j7k1s9d3wx -->
+
+Browser Surface は、Dock Panel の表示領域変更に応じて Browser の OSR 描画領域と Texture のサイズを同期可能でなければならない。
+
+### 3.14 表示継続更新
+<!-- hldocs:sec_id=sec_m9a2e6r4t7yc -->
+
+Browser Surface は、ブラウザ画面の変化に応じた継続的な Paint 更新を Dock Panel 内の表示へ反映可能でなければならない。
+
+### 3.15 Pointer 座標変換
+<!-- hldocs:sec_id=sec_v4c8n2q7m1px -->
+
+Browser Surface は、Dock Panel 内で取得した Pointer 座標を Browser OSR の論理表示領域に対応する座標へ変換可能でなければならない。
+
+### 3.16 Pointer 移動入力
+<!-- hldocs:sec_id=sec_k7w3f9r2d6ta -->
+
+Browser Surface は、Dock Panel 内の Pointer 移動を Browser へ転送可能でなければならない。
+
+### 3.17 Pointer Button 入力
+<!-- hldocs:sec_id=sec_p2m8x5c1q7vz -->
+
+Browser Surface は、Dock Panel 内の Pointer Button の押下および解放を Browser へ転送可能でなければならない。
+
+### 3.18 Wheel 入力
+<!-- hldocs:sec_id=sec_a6t1n9w4k3rb -->
+
+Browser Surface は、Dock Panel 内で発生した Wheel 入力を Browser へ転送可能でなければならない。
+
+### 3.19 Keyboard 入力
+<!-- hldocs:sec_id=sec_r5q9d2m8v1kc -->
+
+Browser Surface は、Browser Surface が入力対象である間、Keyboard の押下および解放を Browser へ転送可能でなければならない。
+
+### 3.20 Text 入力
+<!-- hldocs:sec_id=sec_c3x7p1t9m5wf -->
+
+Browser Surface は、Browser Surface が入力対象である間、文字入力を Browser の編集可能要素へ反映可能でなければならない。
+
+### 3.21 Keyboard 範囲選択
+<!-- hldocs:sec_id=sec_f3n8q2v6m1ka -->
+
+Browser Surface は、編集可能要素内で Keyboard 操作による文字範囲選択を利用可能でなければならない。
+
+### 3.22 Pointer Drag 範囲選択
+<!-- hldocs:sec_id=sec_j7c1w9r4p5tx -->
+
+Browser Surface は、編集可能要素内で Pointer Drag による文字範囲選択を利用可能でなければならない。
+
+### 3.23 Copy
+<!-- hldocs:sec_id=sec_m2k6a8d1v4qs -->
+
+Browser Surface は、選択した文字列を OS Clipboard へ Copy 可能でなければならない。
+
+### 3.24 Paste
+<!-- hldocs:sec_id=sec_q9b3t7n1c5wy -->
+
+Browser Surface は、OS Clipboard の文字列を編集可能要素へ Paste 可能でなければならない。
+
+### 3.25 Cut
+<!-- hldocs:sec_id=sec_v1r5m8k2d7pa -->
+
+Browser Surface は、選択した文字列を編集可能要素から削除し、OS Clipboard へ反映可能でなければならない。
+
+### 3.26 Select All
+<!-- hldocs:sec_id=sec_c8x4p1m6r9bz -->
+
+Browser Surface は、編集可能要素内の対象文字列全体を選択可能でなければならない。
+
+### 3.27 IME 入力開始
+<!-- hldocs:sec_id=sec_n4q8c2v7m1kt -->
+
+Browser Surface は、編集可能要素を入力対象とした状態で OS IME の Composition を開始可能でなければならない。
+
+### 3.28 IME Composition 更新
+<!-- hldocs:sec_id=sec_b6m1r9p3x7da -->
+
+Browser Surface は、IME の未確定文字列および Composition 内の選択状態を編集可能要素へ反映可能でなければならない。
+
+### 3.29 IME 表示位置同期
+<!-- hldocs:sec_id=sec_t5k2w8c1q6vz -->
+
+Browser Surface は、IME Candidate Window または Composition UI の表示基準位置を Browser 内の入力位置へ対応付け可能でなければならない。
+
+### 3.30 IME Composition 確定
+<!-- hldocs:sec_id=sec_h9p4m1d7r2cx -->
+
+Browser Surface は、IME Composition で確定した文字列を編集可能要素へ反映し、Composition 状態を終了可能でなければならない。
+
+### 3.31 IME Composition キャンセル
+<!-- hldocs:sec_id=sec_w3c7n5a1m8qs -->
+
+Browser Surface は、進行中の IME Composition をキャンセルし、未確定文字列を確定文字列として残さず通常の入力状態へ復帰可能でなければならない。
+
+## 4. OS 差異
+
+OS 固有のランタイム配置、プロセス起動方式、描画バックエンドその他の差異は Framework 内部で吸収する。
+
+利用可能な検証環境で成立性を確認し、環境がない動作対象は未検証状態として保持する。
+
+## 5. 今後の拡張
+
+- GPU Surface との共通化
+- Surface 共通 API
+- Runtime 統合
+- IDE 統合
 
 ---
 

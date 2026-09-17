@@ -13,9 +13,9 @@ canonical_document: true
 
 ## 目的
 
-Windows を主対象として、Dock 上で Web ブラウザ機能を Browser Surface として成立させられるか確認する。
+Windows / Linux / macOS を対象として、Dock 上で Web ブラウザ機能を Browser Surface として成立させられるか確認する。
 
-Linux は次優先として、同方式を採用できる見込みを確認する。
+手元で利用可能な環境から検証し、環境を用意できない対象は未検証として明示する。
 
 本検証では、Framework 利用アプリ側に OS 依存コードを書かせず、Framework 側の Surface API が OS 差異を吸収できる構造を想定する。
 
@@ -30,11 +30,27 @@ WV-10 までの検証により、Linux では GTK / WebKitGTK を生成・表示
 ## 前提
 
 - 対象ブランチは `develop` とする。
-- Windows を最優先対象とする。
-- Linux は次優先対象とし、同方式の成立性を確認する。
-- macOS は現時点では検証環境がないため、P0-2 では対象外とする。
-- ただし、将来 macOS 実装を追加できる Surface 共通アーキテクチャを維持する。
+- 対象 OS は Windows / Linux / macOS とする。
+- Windows は現在利用可能な実機環境で検証する。
+- Linux は現在利用可能な VM 環境で基本検証を行う。
+- Linux 実機、X11 / Wayland、実 GPU、ドライバ等に依存する項目は、必要に応じて実環境で追加検証する。
+- macOS を含め、検証環境を用意できない項目は未検証として扱い、非対応とはみなさない。
+- 未検証環境については OSS の利点を生かし、検証手順と期待結果を公開して協力者を募る。
 - P0-2 では Surface API の本仕様化、Runtime 統合、IDE 統合までは行わない。
+- WV-11 内で整理するインターフェースは技術検証用であり、正式 API 仕様ではない。
+- 正式 API 仕様は、WV-12 GPU Surface 技術検証および他 Dock Panel との整合を踏まえ、P0-2 完了後の仕様フェーズで定義する。
+
+## 検証状態の表記
+
+検証状態は、動作対象を縦軸、機能を横軸とした表で公開する。
+
+- `○`: 検証済み・動作
+- `×`: 検証済み・非動作
+- `？`: 未検証
+
+`×` は当該検証環境と検証時点で動作しなかったことを示し、Framework 全体として恒久的に非対応であることを意味しない。
+
+VM と実機で結果に差が出る可能性がある場合は、同一 OS でも動作対象を別行として扱う。
 
 ## 検証方針
 
@@ -49,8 +65,8 @@ CEF OSR により、ブラウザを独立 Window として表示せず、描画�
 3. Browser Surface Texture 転送検証
 4. 入力イベント転送検証
 5. Windows 上の Dock 表示検証
-6. Linux 上の成立性確認
-7. 利用アプリ向け API 仮整理
+6. Linux / macOS 上の成立性確認
+7. Browser Surface 実験用インターフェース整理
 
 ## 検証項目
 
@@ -61,8 +77,8 @@ CEF OSR により、ブラウザを独立 Window として表示せず、描画�
 | WV-11-03 | Browser Surface Texture 転送検証 | 取得した描画結果を egui Texture として Dock 内へ表示できる |
 | WV-11-04 | 入力イベント転送検証 | egui 側の入力イベントを Browser Surface へ転送できる |
 | WV-11-05 | Windows Dock 表示検証 | Windows 上で Browser Surface が Dock 内で動作する |
-| WV-11-06 | Linux 成立性確認 | Linux 上でも同方式を採用できる見込みを判断できる |
-| WV-11-07 | 利用アプリ向け API 仮整理 | OS 非依存 API として提供できる見込みを判断できる |
+| WV-11-06 | Linux / macOS 成立性確認 | Linux / macOS 上で同方式を採用できる見込みを判断できる |
+| WV-11-07 | Browser Surface 実験用インターフェース整理 | 技術検証に必要な最小インターフェースを正式仕様と分離して記録できる |
 
 ## WV-11-01 Browser Surface 方式選定
 
@@ -77,7 +93,8 @@ Framework 内部で Surface として扱えることを最優先とする。
 必須条件は以下とする。
 
 - Windows 対応
-- 将来 Linux 対応可能
+- Linux 対応可能
+- macOS 対応可能
 - Off-Screen Rendering 対応
 - 描画バッファ取得
 - 入力イベント転送
@@ -86,11 +103,29 @@ Framework 内部で Surface として扱えることを最優先とする。
 
 ### 評価対象
 
-| 方式 | Windows | Linux | OSR | 評価 |
-| --- | --- | --- | --- | --- |
-| WebView2 | 可 | 不可 | 不可 | Windows 専用のため共通方式から除外 |
-| WebKitGTK | 不可 | 可 | 不可 | WV-10 で Host Window 方式を終了 |
-| CEF OSR | 可 | 可 | 可 | 主候補 |
+| 方式 | Windows | Linux | macOS | OSR | 評価 |
+| --- | --- | --- | --- | --- | --- |
+| WebView2 | 可 | 不可 | 不可 | 不可 | Windows 専用のため共通方式から除外 |
+| WebKitGTK | 不可 | 可 | 不可 | 不可 | WV-10 で Host Window 方式を終了 |
+| CEF OSR | 可 | 可 | 可 | 可 | 主候補 |
+
+### 調査結果
+
+CEF は Windows / Linux / macOS で利用可能な Chromium ベースの埋め込みフレームワークである。
+
+CEF 本体は C / C++ を主対象とするため、Rust から利用する場合は以下のいずれかを検討する。
+
+- 既存 Rust バインディングまたはラッパーを評価する。
+- 既存ラッパーで OSR / OnPaint / 入力転送を扱えない場合、CEF C API への FFI 境界を Framework 内部に閉じ込める。
+- Framework 利用アプリには CEF 依存を公開せず、Browser Surface API のみを公開する。
+
+現時点の判断では、WebView2 は Windows 専用、WebKitGTK は WV-10 の結果により Linux 主方式から外すため、Browser Surface の主候補は CEF OSR とする。
+
+### 判定
+
+WV-11-01 は完了とする。
+
+Browser Surface 方式は CEF OSR を主候補として次工程へ進める。
 
 ### 完了条件
 
@@ -104,6 +139,12 @@ CEF OSR が Browser Surface の描画元として利用可能か確認する。
 
 本検証では Dock、egui、GPU Surface、Surface API は対象外とし、CEF 単体で描画バッファを取得できることを確認する。
 
+### 検証基準 CEF
+
+WV-11-02 の検証基準は stable 系の `151.3.24+g2384915+chromium-151.0.7922.174` とし、対応する Rust バインディングは `cef 151.8.1+151.3.24` を使用する。
+
+検証結果には実際に使用した CEF バージョンを記録し、将来の Framework 実装で恒久固定するバージョンとは区別する。
+
 ### 合格条件
 
 - CEF 初期化に成功する。
@@ -112,6 +153,7 @@ CEF OSR が Browser Surface の描画元として利用可能か確認する。
 - Paint コールバックを受信できる。
 - RGBA バッファを取得できる。
 - 画面更新が継続する。
+- Browser を終了し、CEF を正常に shutdown できる。
 
 ### 評価対象外
 
@@ -120,6 +162,212 @@ CEF OSR が Browser Surface の描画元として利用可能か確認する。
 - GPU Surface
 - Surface API
 - 入力イベント
+
+### CEF-IT-SPEC-001 CEF ランタイムロード
+<!-- hldocs:sec_id=sec_10811wkg708i -->
+
+#### 概要
+
+CEF ランタイムを Framework の技術検証プロセスからロードできることを確認する。
+
+#### 前提条件
+
+- 対象 OS 用の CEF ランタイムが配置されている。
+- 検証対象 CEF バージョンを識別できる。
+
+#### 検証内容
+
+- CEF ライブラリを指定配置または明示パスからロードする。
+
+#### 期待結果
+
+- CEF ライブラリのロードに成功する。
+- 使用した CEF ライブラリのパスを識別できる。
+
+#### 参照仕様
+
+- doc-20260524-009601Z-R8M7#sec_10811wkg708i
+
+### CEF-IT-SPEC-002 必須シンボル解決
+<!-- hldocs:sec_id=sec_pkl5oq8fkmc6 -->
+
+#### 概要
+
+WV-11-02 に必要な CEF C API シンボルを解決できることを確認する。
+
+#### 前提条件
+
+- CEF ランタイムのロードに成功している。
+
+#### 検証内容
+
+- 初期化、メッセージループ、Browser 作成、終了処理に必要な CEF シンボルを解決する。
+
+#### 期待結果
+
+- WV-11-02 で使用する必須シンボルをすべて解決できる。
+
+#### 参照仕様
+
+- doc-20260524-009601Z-R8M7#sec_pkl5oq8fkmc6
+
+### CEF-IT-SPEC-003 CEF 初期化
+<!-- hldocs:sec_id=sec_aj1rfgg9rguj -->
+
+#### 概要
+
+CEF の初期化処理が成功することを確認する。
+
+#### 前提条件
+
+- CEF ランタイムのロードと必須シンボル解決に成功している。
+- 使用する CEF バージョンと一致する ABI 定義を使用している。
+
+#### 検証内容
+
+- プラットフォームに必要な main args と最小 settings を構成し、CEF を初期化する。
+
+#### 期待結果
+
+- CEF 初期化が成功を返す。
+- 初期化中に異常終了しない。
+
+#### 参照仕様
+
+- doc-20260524-009601Z-R8M7#sec_aj1rfgg9rguj
+
+### CEF-IT-SPEC-004 Windowless Browser 作成
+<!-- hldocs:sec_id=sec_fjanz0cmlgpv -->
+
+#### 概要
+
+Native Window を表示せずに Browser を生成できることを確認する。
+
+#### 前提条件
+
+- CEF 初期化に成功している。
+
+#### 検証内容
+
+- Windowless Rendering を有効にした Browser を生成する。
+
+#### 期待結果
+
+- Browser 作成に成功する。
+- Browser 用の独立 Native Window を表示しない。
+
+#### 参照仕様
+
+- doc-20260524-009601Z-R8M7#sec_fjanz0cmlgpv
+
+### CEF-IT-SPEC-005 Paint コールバック受信
+<!-- hldocs:sec_id=sec_twsz1102y36h -->
+
+#### 概要
+
+OSR 描画更新を Paint コールバックとして受信できることを確認する。
+
+#### 前提条件
+
+- Windowless Browser の作成に成功している。
+- 描画対象 URL が読み込まれている。
+
+#### 検証内容
+
+- CEF のメッセージ処理を継続し、Paint コールバック発生を観測する。
+
+#### 期待結果
+
+- Paint コールバックを1回以上受信できる。
+- 描画領域の幅と高さを取得できる。
+
+#### 参照仕様
+
+- doc-20260524-009601Z-R8M7#sec_twsz1102y36h
+
+### CEF-IT-SPEC-006 描画バッファ取得
+<!-- hldocs:sec_id=sec_brb8qsq5y25r -->
+
+#### 概要
+
+Paint コールバックから Browser Surface の描画元となる画素バッファを取得できることを確認する。
+
+#### 前提条件
+
+- Paint コールバックを受信できている。
+
+#### 検証内容
+
+- Paint コールバックで渡される画素バッファとサイズを取得する。
+
+#### 期待結果
+
+- 描画領域に対応する画素データを取得できる。
+- 後続の Texture 転送検証で利用可能なバッファとして保持できる。
+
+#### 参照仕様
+
+- doc-20260524-009601Z-R8M7#sec_brb8qsq5y25r
+
+### CEF-IT-SPEC-007 継続描画更新
+<!-- hldocs:sec_id=sec_sdnuof1lgo4n -->
+
+#### 概要
+
+Browser の画面更新に応じて OSR 描画更新が継続することを確認する。
+
+#### 前提条件
+
+- Paint コールバックから画素バッファを取得できている。
+
+#### 検証内容
+
+- 初回描画後も CEF のメッセージ処理を継続し、複数回の描画更新を観測する。
+
+#### 期待結果
+
+- Paint コールバックを複数回受信できる。
+- 画面更新に応じて新しい画素バッファを取得できる。
+
+#### 参照仕様
+
+- doc-20260524-009601Z-R8M7#sec_sdnuof1lgo4n
+
+### CEF-IT-SPEC-008 Browser / CEF 終了
+<!-- hldocs:sec_id=sec_y5zildrpcolm -->
+
+#### 概要
+
+Browser と CEF を正常な順序で終了できることを確認する。
+
+#### 前提条件
+
+- CEF 初期化後に Browser を生成している。
+
+#### 検証内容
+
+- Browser を終了し、必要なメッセージ処理完了後に CEF を shutdown する。
+
+#### 期待結果
+
+- Browser を正常に終了できる。
+- CEF shutdown が完了する。
+- 終了処理中に異常終了しない。
+
+#### 参照仕様
+
+- doc-20260524-009601Z-R8M7#sec_y5zildrpcolm
+
+### WV-11-02 検証状態
+
+| 動作対象 | Runtime | Symbols | Initialize | Browser | Paint | Buffer | Update | Shutdown |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Windows 実機 | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
+| Linux VM | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
+| Linux X11 実機 | ？ | ？ | ？ | ？ | ？ | ？ | ？ | ？ |
+| Linux Wayland 実機 | ？ | ？ | ？ | ？ | ？ | ？ | ？ | ？ |
+| macOS Apple Silicon | ？ | ？ | ？ | ？ | ？ | ？ | ？ | ？ |
+| macOS Intel | ？ | ？ | ？ | ？ | ？ | ？ | ？ | ？ |
 
 ## WV-11-03 Browser Surface Texture 転送検証
 
@@ -131,7 +379,7 @@ Browser Surface は Native Window を表示せず、Framework の Dock 上へ描
 
 ### 合格条件
 
-- OnPaint から取得した RGBA バッファを利用できる。
+- OnPaint から取得した描画バッファを利用できる。
 - egui Texture を生成できる。
 - Texture を継続更新できる。
 - Dock 内へ表示できる。
@@ -139,7 +387,7 @@ Browser Surface は Native Window を表示せず、Framework の Dock 上へ描
 
 ### 評価項目
 
-- RGBA から Texture を作成できること。
+- 描画バッファから Texture を作成できること。
 - Texture を更新できること。
 - Dock Panel 内へ描画できること。
 - Dock サイズ変更へ追従できること。
@@ -166,6 +414,43 @@ egui 側で受け取った入力イベントを Browser Surface へ転送でき�
 - キーボード入力を転送できる。
 - Focus 状態を管理できる。
 
+### WV-11-04 検証状態
+
+| 動作対象 | Mouse Move | Mouse Click | Wheel | Keyboard | Focus |
+| --- | --- | --- | --- | --- | --- |
+| Windows 実機 | ○ | ○ | ○ | ○ | ○ |
+| Linux VM | ？ | ？ | ？ | ？ | ？ |
+| Linux X11 実機 | ？ | ？ | ？ | ？ | ？ |
+| Linux Wayland 実機 | ？ | ？ | ？ | ？ | ？ |
+| macOS Apple Silicon | ？ | ？ | ？ | ？ | ？ |
+| macOS Intel | ？ | ？ | ？ | ？ | ？ |
+
+### Windows 実機検証結果
+
+`run_wv11_04_input_probes.ps1` により、Pointer Move / Pointer Click / Wheel / Keyboard / Focus の各 Probe を連続実行した。
+
+Windows 実機で以下を視覚確認し、すべて正常に動作した。
+
+- Browser Surface 上の Pointer 移動に応じて hover と Browser 座標が追従する。
+- Browser Surface 上のクリックが Browser 側へ転送される。
+- Browser Surface 上の Wheel 操作で Browser ページがスクロールする。
+- Browser Surface を Focus 後、Keyboard の keydown / keyup が Browser 側へ転送される。
+- Browser Surface の Focus を取得し、入力対象として管理できる。
+
+以上により、Windows 実機について WV-11-04 の正式な合格条件を満たしたため `○` とする。
+
+### Windows IME 追加検証
+
+IME は WV-11-04 の正式な合格条件には含めず、Windows 固有の追加検証として扱う。
+
+CEF OSR の Browser input に対し、Windows IME の composition 開始、composition 文字列更新、変換候補通知、CEF への composition 反映、確定文字列 commit、composition 終了まで成立することを確認した。
+
+CEF の IME composition range callback から取得した文字位置を Windows IMM の Composition Window / Candidate Window へ同期することで、変換候補ウィンドウを Browser input 付近へ表示できることも確認した。
+
+ただし、最初の Space による変換時、候補ウィンドウが一度消えた後に再表示される現象が残っている。候補ウィンドウ再表示後は Space による候補選択が可能で、Enter による確定と CEF への commit も正常に完了する。
+
+ログ上では最初の Space 付近で `IMN_CLOSECANDIDATE` の後に `IMN_OPENCANDIDATE` が発生しており、視覚確認結果と一致する。この現象は WV-11-04 の正式5条件とは分離し、Windows IME 追加検証の残課題として記録する。
+
 ## WV-11-05 Windows Dock 表示検証
 
 ### 目的
@@ -175,57 +460,179 @@ Windows 上で Browser Surface が Dock 内で動作することを確認する�
 ### 合格条件
 
 - Browser Surface が Dock 内に表示される。
-- Dock 移動、リサイズ、タブ切替に追従する。
+- Browser Surface が Dock 区画のリサイズに追従する。
 - 基本入力が利用できる。
 - 利用アプリから OS 非依存 API として扱える見込みを確認できる。
 
-## WV-11-06 Linux 成立性確認
+Dock 移動およびタブ切替は、1タブ1区画を前提としない本 Framework の構成では WV-11-05 の合格条件に含めない。
+
+### Windows 実機検証結果
+
+| 動作対象 | Dock 内表示 | リサイズ追従 | 基本入力 |
+| --- | --- | --- | --- |
+| Windows 実機 | ○ | ○ | ○ |
+
+`run_wv11_05_windows_dock_probes.ps1` を用いて、Dock 内表示、Dock 区画のリサイズ追従、基本入力を確認した。
+
+Dock 移動およびタブ挙動は本 Framework の Dock モデル上の判定対象外とする。
+
+## WV-11-06 Linux / macOS 成立性確認
 
 ### 目的
 
-Linux 上で同方式を採用できる見込みを確認する。
+Linux / macOS 上で同方式を採用できる見込みを確認する。
+
+検証環境を用意できない動作対象は未検証として残し、OSS 上で検証協力を募る。
 
 ### 合格条件
 
-- GTK / WebKitGTK Host Window 方式に戻らず検証できる。
-- Wayland 上で Window 埋め込み方式を前提にしない。
-- CEF OSR または同等方式で Surface 化できる見込みを判断できる。
+- Linux では GTK / WebKitGTK Host Window 方式に戻らず検証できる。
+- Linux Wayland 上で Window 埋め込み方式を前提にしない。
+- Linux で CEF OSR または同等方式により Surface 化できる見込みを判断できる。
+- macOS で Window 埋め込み方式を前提とせず Surface 化できる構造であることを確認できる。
+- 手元に検証環境がない項目は `？` として明示できる。
 
-## WV-11-07 利用アプリ向け API 仮整理
+### 検証状態
+
+| 動作対象 | CEF OSR | Dock 表示 | リサイズ追従 |
+| --- | --- | --- | --- |
+| Linux VM / Wayland | ○ | ○ | ○ |
+| Linux X11 実機 | ？ | ？ | ？ |
+| Linux Wayland 実機 | ？ | ？ | ？ |
+| macOS Apple Silicon | ？ | ？ | ？ |
+| macOS Intel | ？ | ？ | ？ |
+
+### Linux VM / Wayland 検証結果
+
+`run_wv11_06_linux_cef_osr_probes.sh` を Linux VM の Wayland GUI セッション上で実行した。
+
+以下を確認した。
+
+- CEF OSR の最小経路が起動し、Paint callback から描画バッファを取得できる。
+- GTK / WebKitGTK Host Window を生成せず、CEF OSR の描画結果を egui Texture として Dock 内へ表示できる。
+- Application Window のリサイズに応じて Browser Surface の要求サイズが更新され、Paint / Texture 更新が継続する。
+- 一連の Probe を正常終了できる。
+
+最初の実行では Cargo target を `/tmp` に配置したため VM の tmpfs 容量制限により `Disk quota exceeded` となった。これは CEF/Linux の成立性とは無関係であり、Cargo target を `$HOME/cargo-target/workflow-ide-p0-2` へ変更して再実行した結果、正常動作を確認した。
+
+VM の GPU process では DRM / EGL / Mesa 関連エラーが記録されたが、CEF OSR の Paint callback および Dock 描画は継続した。このため Linux VM / Wayland の本検証項目は `○` とするが、Linux 実機 GPU / driver 依存部分は未検証として `？` を維持する。
+
+macOS は検証環境がないため `？` とし、非対応とは判定しない。
+
+## WV-11-07 Browser Surface 実験用インターフェース整理
 
 ### 目的
 
-Framework 利用アプリが OS 依存コードを書かずに Browser Surface を扱える見込みを確認する。
+Browser Surface 技術検証で必要になった最小インターフェースを整理する。
 
-### 整理対象
+本項目で整理するインターフェースは、技術検証用の実験的な内部インターフェースであり、Framework 利用アプリ向けの正式 API 仕様ではない。
 
-- Browser Surface 作成
-- URL 読み込み
-- リサイズ
-- 入力イベント
-- Texture 更新
-- ライフサイクル
-- エラー通知
+### 位置付け
 
-### 完了条件
+- Browser Surface の成立性を確認するための検証用インターフェースとする。
+- Framework 内部での実装切り分けに使用する。
+- 他 Dock Panel との整合は本項目では扱わない。
+- GPU Surface との共通化は WV-12 の結果を踏まえて判断する。
+- 正式 API 仕様は P0-2 完了後の仕様フェーズで定義する。
 
-Framework 利用アプリ向けに OS 非依存 API を提供できる見込みを判断できること。
+### 実験用インターフェース
 
-## WV-11 完了条件
+```rust
+struct BrowserSurfaceConfig {
+    initial_url: String,
+    width: u32,
+    height: u32,
+}
 
-WV-11 は以下を満たした時点で完了とする。
+struct SurfaceSize {
+    width: u32,
+    height: u32,
+}
 
-- Windows 上で Browser Surface が Dock 内に表示できる。
-- Browser Surface がリサイズに追従できる。
-- Browser Surface に基本入力を転送できる。
-- Linux でも同方式を採用できる見込みを判断できる。
-- Framework 利用アプリから OS 非依存 API として扱える見込みを判断できる。
+struct SurfaceFrame {
+    width: u32,
+    height: u32,
+    rgba: Vec<u8>,
+    generation: u64,
+}
+
+enum PointerButton {
+    Primary,
+    Secondary,
+    Middle,
+}
+
+enum BrowserSurfaceInput {
+    PointerMove { x: f32, y: f32 },
+    PointerButton { button: PointerButton, pressed: bool, x: f32, y: f32 },
+    Wheel { delta_x: f32, delta_y: f32, x: f32, y: f32 },
+    Key { key: String, pressed: bool, repeat: bool },
+}
+
+trait BrowserSurfaceExperimental {
+    type Error;
+
+    fn create(config: BrowserSurfaceConfig) -> Result<Self, Self::Error>
+    where
+        Self: Sized;
+
+    fn load_url(&mut self, url: &str) -> Result<(), Self::Error>;
+    fn resize(&mut self, size: SurfaceSize) -> Result<(), Self::Error>;
+    fn send_input(&mut self, input: BrowserSurfaceInput) -> Result<(), Self::Error>;
+    fn set_focus(&mut self, focused: bool) -> Result<(), Self::Error>;
+    fn poll_frame(&mut self) -> Result<Option<SurfaceFrame>, Self::Error>;
+    fn close(&mut self) -> Result<(), Self::Error>;
+}
+```
+
+### 境界
+
+- `create` は CEF Runtime 初期化や Browser 作成の詳細を利用側へ公開しない。
+- `load_url` は CEF Frame / BrowserHost 等の CEF 固有型を公開しない。
+- `resize` は Dock の論理サイズを Surface 実装へ渡し、CEF `view_rect` / `was_resized` 等への変換を内部へ閉じ込める。
+- `send_input` は egui 入力を Surface 共通表現へ変換した後に利用する想定とし、Windows message / CEF event 等を上位層へ公開しない。
+- `set_focus` は OS / Browser Runtime 固有の Focus 処理を内部へ閉じ込める。
+- `poll_frame` は Browser Runtime の Paint callback を直接 Dock 側へ公開せず、描画可能な Frame として受け渡す。
+- `close` は Browser と Runtime の終了順序を実装側へ閉じ込める。
+
+### WV-11 で確定しない事項
+
+以下は本実験用インターフェースの正式要件とはしない。
+
+- IME の共通入力モデル
+- Drag and Drop
+- Clipboard
+- Browser navigation API の詳細
+- GPU Texture の直接共有
+- dirty rect / partial update の公開方法
+- Browser Surface と GPU Surface の共通 trait
+- Runtime の共有単位と複数 Browser Surface 管理
+- 非同期 API / callback / channel の最終形
+- エラー型の正式分類
+
+これらは WV-12 GPU Surface 技術検証および P0-2 完了後の仕様フェーズで必要性を判断する。
+
+### 判定
+
+WV-11-07 は完了とする。
+
+Browser Surface の技術検証に必要な最小境界を、正式 API 仕様と分離した実験用インターフェースとして整理できた。
+
+## WV-11 完了判定
+
+WV-11 は完了とする。
+
+- Windows 実機で Browser Surface の CEF OSR、Dock 内表示、リサイズ追従、基本入力を確認した。
+- Linux VM / Wayland で GTK / WebKitGTK Host Window に戻らず、CEF OSR -> egui Texture -> Dock の経路、Dock 内表示、リサイズ追従を確認した。
+- Linux 実機および macOS は検証環境がないため `？` として維持し、非対応とは判定しない。
+- Browser Surface の実験用内部インターフェースを正式 API と分離して整理した。
+- Windows IME の最初の Space で候補ウィンドウが一度消えて再表示される現象は、正式合格条件外の残課題として維持する。
+
+以上により、WV-11 の完了条件を満たした。
 
 ## 次工程
 
-WV-11-01 Browser Surface 方式選定から開始する。
-
-WV-11 完了後は、WV-12 GPU Surface 技術検証へ進む。
+WV-12 GPU Surface 技術検証へ進む。
 
 ---
 
