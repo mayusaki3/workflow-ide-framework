@@ -86,9 +86,9 @@ impl ProbeApp {
 
     fn render_gpu_frame(&mut self) {
         let t = self.started.elapsed().as_secs_f64();
-        let r = (0.25 + 0.20 * t.sin()) as f64;
-        let g = (0.30 + 0.20 * (t * 0.73).sin()) as f64;
-        let b = (0.55 + 0.20 * (t * 1.21).sin()) as f64;
+        let r = 0.25 + 0.20 * t.sin();
+        let g = 0.30 + 0.20 * (t * 0.73).sin();
+        let b = 0.55 + 0.20 * (t * 1.21).sin();
 
         let view = self
             .gpu
@@ -116,7 +116,6 @@ impl ProbeApp {
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
-                multiview_mask: None,
             });
         }
 
