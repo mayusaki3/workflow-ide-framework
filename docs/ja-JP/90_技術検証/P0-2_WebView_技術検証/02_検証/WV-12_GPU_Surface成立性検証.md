@@ -134,7 +134,7 @@ GPU 描画結果を egui / Dock 内へ表示できることを確認する。
 | 動作対象 | GPU 描画 | Dock 内表示 | Native Child Window 不使用 | 継続更新 |
 | --- | --- | --- | --- | --- |
 | Windows 実機 | ○ | ○ | ○ | ○ |
-| Linux VM | ？ | ？ | ？ | ？ |
+| Linux VM | ○ | ○ | ○ | ○ |
 | Linux 実機 | ？ | ？ | ？ | ？ |
 | macOS | ？ | ？ | ？ | ？ |
 
@@ -155,7 +155,7 @@ GPU 描画結果を egui / Dock 内へ表示できることを確認する。
 
 以上により Windows 実機の WV-12-02 合格条件をすべて満たしたため `○` とする。
 
-### 評価対象外
+Linux VM では `llvmpipe (LLVM 21.1.8)` / Vulkan Backend が選択され、generation 1320 まで継続描画した。libEGL / ZINK の警告は発生したが、wgpu Adapter の生成、Dock 内表示、継続描画は成立したため検証失敗とは扱わない。\n\n### 評価対象外
 
 - zero-copy / GPU 間 Texture 共有の最適化
 - 正式 Surface API
@@ -181,7 +181,7 @@ GPU Surface が Dock の状態変化に追従できることを確認する。
 - Surface の生成 / 破棄を制御できる。
 - 再生成時にリソース破棄漏れがない見込みを判断できる。
 
-## WV-12-04 入力イベント転送検証
+### Windows / Linux VM 検証結果\n\n| 動作対象 | Resize | Visibility | 生成 / 破棄 | 再生成時リソース管理 |\n| --- | --- | --- | --- | --- |\n| Windows 実機 | ○ | ○ | ○ | ○ |\n| Linux VM | ○ | ○ | ○ | ○ |\n| Linux 実機 | ？ | ？ | ？ | ？ |\n| macOS | ？ | ？ | ？ | ？ |\n\nLinux VM では Dock サイズ変更に応じて Texture の破棄 / 再生成が繰り返され、instance 1 から 19 まで生成・破棄後も描画継続を確認した。補足検証では `GPU Surface visibility: hidden` / `shown` が記録され、Show 後も同一 instance で generation が増加した。\n\n明示的な Destroy / Create と再生成時の旧 egui Texture 登録解除および wgpu Texture drop 経路が成立している。これはリソース管理経路の成立確認であり、VRAM leak が存在しないことを保証するものではない。\n\n## WV-12-04 入力イベント転送検証
 
 ### 目的
 
@@ -195,7 +195,7 @@ Dock 上の入力イベントを GPU Surface 側へ転送できることを確�
 - キーボード入力を転送できる。
 - Focus 状態を管理できる。
 
-## WV-12-05 Browser Surface との比較整理
+### Windows / Linux VM 検証結果\n\n| 動作対象 | PointerMove | PointerButton | Wheel | Keyboard / Text | Focus |\n| --- | --- | --- | --- | --- | --- |\n| Windows 実機 | ○ | ○ | ○ | ○ | ○ |\n| Linux VM | ○ | ○ | ○ | ○ | ○ |\n| Linux 実機 | ？ | ？ | ？ | ？ | ？ |\n| macOS | ？ | ？ | ？ | ？ | ？ |\n\nLinux VM の初回検証では PointerMove=1050、PointerButton=3、Keyboard=12、Focus=3 を確認した。Wheel は初回操作されなかったため補足検証を行い、上下方向の Wheel event を 16 件確認した。これにより Linux VM の基本入力5項目をすべて `○` とする。\n\n## WV-12-05 Browser Surface との比較整理
 
 ### 目的
 
@@ -246,7 +246,7 @@ GPU Surface 技術検証で必要になった最小インターフェースを�
 
 GPU Surface の技術検証に必要な最小インターフェースを整理し、正式仕様とは分離して記録できること。
 
-## WV-12 完了条件
+### 判定\n\nWV-12-05 は [WV-12-05 Browser Surface と GPU Surface 比較整理](WV-12-05_Browser_SurfaceとGPU_Surface比較整理.md) に記録し、完了とする。\n\nWV-12-06 は [WV-12-06 GPU Surface 実験用インターフェース整理](WV-12-06_GPU_Surface実験用インターフェース整理.md) に記録し、完了とする。\n\n## WV-12 完了条件
 
 WV-12 は以下を満たした時点で完了とする。
 
