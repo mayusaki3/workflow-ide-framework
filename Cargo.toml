@@ -1,0 +1,9 @@
+[package]
+name = "workflow-ide-framework"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Framework for building dockable workflow IDE applications"
+
+[dependencies]
+eframe = "0.34.2"
