@@ -11,3 +11,7 @@ eframe = "0.34.2"
 [[example]]
 name = "step1_minimal"
 path = "examples/step1_minimal.rs"
+
+[[example]]
+name = "step2_application_config"
+path = "examples/step2_application_config.rs"
