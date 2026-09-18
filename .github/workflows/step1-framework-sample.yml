@@ -1,0 +1,25 @@
+name: Step 1 Framework Sample
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libx11-dev libxkbcommon-dev libwayland-dev
+      - name: Build framework library
+        run: cargo build --lib
+      - name: Build Step 1 sample
+        run: cargo build --example step1_minimal
