@@ -7,3 +7,7 @@ description = "Framework for building dockable workflow IDE applications"
 
 [dependencies]
 eframe = "0.34.2"
+
+[[example]]
+name = "step1_minimal"
+path = "examples/step1_minimal.rs"
