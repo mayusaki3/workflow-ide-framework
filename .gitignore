@@ -27,6 +27,7 @@ dock_layout.json
 # Local fonts
 *.otf
 *.ttf
+*.ttc
 
 # Keep directory
 !assets/fonts/default/.gitkeep
