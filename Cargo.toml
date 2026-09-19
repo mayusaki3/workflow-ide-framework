@@ -35,3 +35,7 @@ path = "examples/step3_5_logging_probe.rs"
 [[example]]
 name = "step4_initial_dock_layout"
 path = "examples/step4_initial_dock_layout.rs"
+
+[[example]]
+name = "step4_5_probe_panel"
+path = "examples/step4_5_probe_panel.rs"
