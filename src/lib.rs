@@ -86,12 +86,37 @@ impl Default for WindowConfig {
 #[derive(Debug, Clone)]
 pub struct AppearanceConfig {
     pub ui_scale: Option<f32>,
+    /// Optional application font file. When set, WFIDE loads it into egui
+    /// before the first frame and gives it priority for proportional text.
+    pub font_path: Option<std::path::PathBuf>,
 }
 
 impl Default for AppearanceConfig {
     fn default() -> Self {
-        Self { ui_scale: None }
+        Self {
+            ui_scale: None,
+            font_path: None,
+        }
     }
+}
+
+fn install_application_font(
+    ctx: &egui::Context,
+    path: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let bytes = std::fs::read(path)?;
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "wfide_application_font".to_owned(),
+        egui::FontData::from_owned(bytes).into(),
+    );
+    fonts
+        .families
+        .entry(egui::FontFamily::Proportional)
+        .or_default()
+        .insert(0, "wfide_application_font".to_owned());
+    ctx.set_fonts(fonts);
+    Ok(())
 }
 
 pub struct Application {
@@ -182,6 +207,22 @@ impl Application {
             Box::new(move |cc| {
                 if let Some(scale) = config.appearance.ui_scale {
                     cc.egui_ctx.set_zoom_factor(scale);
+                }
+                if let Some(font_path) = config.appearance.font_path.as_deref() {
+                    if let Err(error) = install_application_font(&cc.egui_ctx, font_path) {
+                        tracing::warn!(
+                            target: "wfide::font",
+                            path = %font_path.display(),
+                            %error,
+                            "failed to load application font; using egui defaults"
+                        );
+                    } else {
+                        tracing::info!(
+                            target: "wfide::font",
+                            path = %font_path.display(),
+                            "application font loaded"
+                        );
+                    }
                 }
 
                 Ok(Box::new(FrameworkHost { config, dock_state }))
