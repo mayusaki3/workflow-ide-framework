@@ -26,3 +26,4 @@ path = "examples/step3_panel_declaration.rs"
 [[example]]
 name = "step3_5_logging"
 path = "examples/step3_5_logging.rs"
+\n[[example]]\nname = "step3_5_logging_probe"\npath = "examples/step3_5_logging_probe.rs"\n
