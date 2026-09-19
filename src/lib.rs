@@ -3,6 +3,7 @@ pub mod logging;
 pub mod layout;
 pub mod localization;
 pub mod probe;
+pub mod table;
 pub use layout::{LayoutConfig, SplitDirection};
 pub use tracing;
 
@@ -377,18 +378,8 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
             ui.heading("WFIDE Probe");
             ui.label("Framework maintenance diagnostics; not a Consumer panel.");
             ui.separator();
-            egui::Grid::new("wfide_probe_grid").striped(true).show(ui, |ui| {
-                ui.strong("Area");
-                ui.strong("Result");
-                ui.strong("Detail");
-                ui.end_row();
-                for row in probe::collect(true, self.dock_active) {
-                    ui.label(row.area);
-                    ui.label(row.status.symbol());
-                    ui.label(row.detail);
-                    ui.end_row();
-                }
-            });
+            let model = probe::table_model(true, self.dock_active);
+            table::show(ui, "wfide_probe_table", &model);
             return;
         }
 
