@@ -10,6 +10,7 @@ fn main() {
     config.window.min_size = Some([760.0, 520.0]);
     config.logging.directory = "logs/step4-5".into();
     config.logging.file_prefix = "wfide-step4-5".into();
+    config.localization.default_locale = workflow_ide_framework::localization::JA_JP.to_owned();
     config.appearance.font_path = Some(
         "assets/fonts/default/NotoSansCJK-Regular.ttc".into(),
     );
@@ -28,6 +29,7 @@ fn main() {
         .layout(layout)
         .framework_probe_panel()
         .logging_settings_panel()
+        .language_settings_panel()
         .run()
         .expect("failed to start Step 4.5 Probe Panel sample");
 }
