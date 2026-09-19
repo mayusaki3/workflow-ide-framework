@@ -54,18 +54,18 @@ cargo run --example step4_initial_dock_layout
 
 | 項目 | 結果 |
 | --- | --- |
-| library build | ？ |
-| Step 4 Sample run | ？ |
-| Window起動 | ？ |
-| Dock UI表示 | ？ |
-| horizontal split | ？ |
-| vertical split | ？ |
-| nested split | ？ |
-| 同一areaの複数Panel/tab | ？ |
-| selected Panel | ？ |
-| split resize操作 | ？ |
-| Panel tab切替 | ？ |
-| Consumer APIがPanel IDのみでlayoutを参照 | ？ |
+| library build | ○ |
+| Step 4 Sample run | ○ |
+| Window起動 | ○ |
+| Dock UI表示 | ○ |
+| horizontal split | ○ |
+| vertical split | ○ |
+| nested split | ○ |
+| 同一areaの複数Panel/tab | ○ |
+| selected Panel | ○ |
+| split resize操作 | ○ |
+| Panel tab切替 | ○ |
+| Consumer APIがPanel IDのみでlayoutを参照 | ○ |
 | backend Tree / NodeIndex非公開 | ○（API構造確認） |
 | Linux | ？ |
 | macOS | ？ |
@@ -83,3 +83,17 @@ cargo run --example step4_initial_dock_layout
 - Log Panel Viewer接続
 
 WFIDE LoggingのConsumer実環境確認は、Step 4 Framework検証完了後のMeridian Consumer検証指示へ併記する。
+
+## Windows 11 実機確認記録
+
+2026-09-19、Step 4 SampleをWindows 11で実行して確認した。
+
+- 初期状態で Runtime Control / Runtime Status / Simulation View / Log のnested Dock構成を表示: ○
+- Simulation View と Help の同一area tab構成: ○
+- Simulation View / Help のtab切替: ○
+- split境界のドラッグによるhorizontal / vertical resize: ○
+- resize後も各Panel ID / kindを維持: ○
+- Window縮小時にもDock構成を維持: ○
+- Framework表示名が `workflow-ide-framework v0.1.0 Sample` に整理されていること: ○
+
+Panelのclose操作、Dock移動、Layout永続化はStep 4の必須検証対象には含めない。
