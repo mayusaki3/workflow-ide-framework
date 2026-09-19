@@ -7,6 +7,9 @@ description = "Framework for building dockable workflow IDE applications"
 
 [dependencies]
 eframe = "0.34.2"
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
 
 [[example]]
 name = "step1_minimal"
@@ -19,3 +22,7 @@ path = "examples/step2_application_config.rs"
 [[example]]
 name = "step3_panel_declaration"
 path = "examples/step3_panel_declaration.rs"
+
+[[example]]
+name = "step3_5_logging"
+path = "examples/step3_5_logging.rs"
