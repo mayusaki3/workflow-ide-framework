@@ -106,7 +106,7 @@ impl Application {
     pub fn run(self) -> eframe::Result<()> {
         let config = self.config;
         let _logging_guard = logging::init(&config.id, &config.logging)
-            .map_err(|error| eframe::Error::AppCreation(Box::new(error)))?;
+            .map_err(eframe::Error::AppCreation)?;
         tracing::info!(target: "wfide::application", application_id = %config.id, "WFIDE application starting");
         let window_title = config
             .window
