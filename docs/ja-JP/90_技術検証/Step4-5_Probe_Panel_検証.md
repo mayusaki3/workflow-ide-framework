@@ -169,3 +169,22 @@ Runtime Log Levelの既定値をTRACEからINFOへ変更した状態でも、Ubu
 - 原因: 未確定。VM環境による描画・仮想GPU等の影響が候補だが、本結果だけでは断定しない。
 
 したがって、以前の重さをTRACE/DEBUGログ出力だけに起因するとは判断しない。Linux物理実機または追加の性能計測が可能になるまで、性能面は未検証として扱う。
+
+## Step 4.5 判定
+
+Step 4.5 の最小マイルストーンは **完了** とする。
+
+完了根拠:
+
+- Framework-only Probe Panel: Windows 11 ○ / Linux VM ○
+- Window / Host、Dock / Layout、WFIDE Logging、Lifecycle: Windows 11 ○ / Linux VM ○
+- Consumer相当Sample PanelとProbe Panelの分離: Windows 11 ○ / Linux VM ○
+- Framework標準 Logging Settings Panel: Windows 11 ○ / Linux VM ○
+- Runtime Log Level既定INFOおよび実行中切替: Windows 11 ○
+- Embedded FontによるFramework UI日本語表示: Windows 11 ○ / Linux VM ○
+- Linux VM性能: ？（機能成立性とは分離）
+- Linux物理実機 / macOS: ？
+
+Browser Surface / GPU Surface / Input / IME はStep 4.5 Hostへ未統合のため？を維持する。これらはPhase 0での個別成立結果をStep 4.5の○へ読み替えない。Probe Coreへの追加統合は継続課題とし、Step 5のPanel実装API設計を開始することを妨げない。
+
+Step 5以降もFramework + SampleとConsumerの二系統検証を継続する。
