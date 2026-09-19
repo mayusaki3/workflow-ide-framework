@@ -1,4 +1,4 @@
-use crate::logging;
+use crate::{logging, table::{TableColumn, TableColumnType, TableModel, TableRow, TableValue}};
 
 pub const PANEL_ID: &str = "__wfide_probe";
 
@@ -36,4 +36,26 @@ pub fn collect(window_active: bool, dock_active: bool) -> Vec<ProbeRow> {
         ProbeRow { area: "Input / IME", status: ProbeStatus::Unknown, detail: "dedicated probe integration pending".into() },
         ProbeRow { area: "Lifecycle", status: ProbeStatus::Pass, detail: "Application -> Logging -> Host startup path reached".into() },
     ]
+}
+
+
+pub fn table_model(window_active: bool, dock_active: bool) -> TableModel {
+    let mut model = TableModel::new(vec![
+        TableColumn::new("area", "Area", TableColumnType::Text),
+        TableColumn::new("result", "Result", TableColumnType::Status),
+        TableColumn::new("detail", "Detail", TableColumnType::Text),
+    ]);
+
+    for (index, row) in collect(window_active, dock_active).into_iter().enumerate() {
+        model.rows.push(TableRow::new(
+            format!("probe-{index}"),
+            vec![
+                TableValue::Text(row.area.to_owned()),
+                TableValue::Status(row.status.symbol().to_owned()),
+                TableValue::Text(row.detail),
+            ],
+        ));
+    }
+
+    model
 }
