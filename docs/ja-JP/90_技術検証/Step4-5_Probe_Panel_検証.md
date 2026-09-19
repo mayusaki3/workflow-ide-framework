@@ -135,3 +135,14 @@ P0-1b EmbeddedFont技術検証の成果をFramework Applicationへ接続し、`A
 font asset本体は従来方針どおりrepositoryへ含めないため、未配置環境ではP0-1bのsetup_fontsスクリプトで準備する。読み込み失敗時はWARNを記録し、egui既定fontで継続する。
 
 この追加部分のWindows/Linux VM表示結果は再確認後に○/✕/？を更新する。
+
+### Windows 日本語表示 再確認
+
+2026-09-20、Framework default font assetをsetup後、Windows 11のStep 4.5 SampleでLogging Settingsを表示し、日本語説明が欠字（□）なしで描画されることを画面確認した。
+
+- Framework default font経由の日本語表示: ○
+- Logging Settings日本語説明: ○
+- ERROR / WARN / INFO / DEBUG / TRACE説明表示: ○
+- Dock内での日本語描画: ○
+
+前回の欠字表示はfont asset未配置によるもので、Framework側の `assets/fonts/default/NotoSansCJK-Regular.ttc` を準備した状態では解消した。Linux VMでの同経路は未再確認のため？を維持する。
