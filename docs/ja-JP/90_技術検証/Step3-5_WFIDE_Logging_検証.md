@@ -62,3 +62,22 @@ Step 4 は Dock Layout を扱い、Log Panel の実際の Viewer 接続は Panel
 これらの実動作確認は省略対象ではなく、v0.1.0 の正式なテスト仕様に含める。現段階では仕様策定を後続工程としているため、テスト仕様整理時に rotation 境界条件・保持上限超過時の旧ログ削除をテストケースとして定義し、その時点で実施・記録する。
 
 in-memory buffer取得およびConsumer/Applicationからの `wfide::tracing` 利用は、このSample実行だけでは直接確認していないため引き続き？とする。
+
+## in-memory / Consumer logging Probe
+
+残る成立性確認用に `examples/step3_5_logging_probe.rs` を追加した。
+
+実行:
+
+```powershell
+cargo run --example step3_5_logging_probe
+```
+
+成功時は次を出力し、assertion が成功すること。
+
+```text
+WFIDE_LOGGING_PROBE framework_in_memory=true
+WFIDE_LOGGING_PROBE consumer_in_memory=true
+```
+
+このProbeは `wfide::tracing` からFramework系targetとConsumer系targetのイベントを発行し、同じWFIDE in-memory bufferから両方を取得できることを確認する。
