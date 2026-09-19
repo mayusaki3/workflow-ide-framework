@@ -159,3 +159,13 @@ font asset本体は従来方針どおりrepositoryへ含めないため、未配
 - Runtime Log Level既定値 INFO: ○
 
 本結果はUbuntu Linux VM上の確認であり、Linux物理実機の結果にはしない。
+
+### Linux VM 操作感
+
+Runtime Log Levelの既定値をTRACEからINFOへ変更した状態でも、Ubuntu Linux VM上の主観的な操作感には明確な改善を確認できなかった。
+
+- INFO既定化: ○（設定・ログ出力量の抑制は確認済み）
+- GUI操作感の改善: ？（明確な差を確認できず）
+- 原因: 未確定。VM環境による描画・仮想GPU等の影響が候補だが、本結果だけでは断定しない。
+
+したがって、以前の重さをTRACE/DEBUGログ出力だけに起因するとは判断しない。Linux物理実機または追加の性能計測が可能になるまで、性能面は未検証として扱う。
