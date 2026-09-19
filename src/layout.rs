@@ -1,6 +1,6 @@
 use std::{collections::HashSet, error::Error, fmt};
 
-use egui_dock::{DockState, NodeIndex};
+use egui_dock::DockState;
 
 use crate::PanelDefinition;
 
