@@ -323,16 +323,10 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
             ui.separator();
 
             let current = localization::current_locale();
-            for (locale, label_key) in [
-                (localization::EN_US, "language.english"),
-                (localization::JA_JP, "language.japanese"),
-            ] {
-                if !localization::supported_locales().iter().any(|item| item == locale) {
-                    continue;
-                }
+            for (locale, name) in localization::locales() {
                 let selected = current == locale;
-                if ui.radio(selected, localization::text(label_key)).clicked() && !selected {
-                    if let Err(error) = localization::set_locale(locale) {
+                if ui.radio(selected, name).clicked() && !selected {
+                    if let Err(error) = localization::set_locale(&locale) {
                         tracing::error!(target: "wfide::i18n", %error, %locale, "failed to change locale");
                     }
                 }
