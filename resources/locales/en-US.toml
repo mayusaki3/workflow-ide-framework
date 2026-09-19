@@ -1,0 +1,16 @@
+locale = "en-US"
+name = "English"
+
+[strings]
+"logging.title" = "Logging Settings"
+"logging.framework_panel" = "Framework standard panel"
+"logging.runtime_level" = "Runtime Log Level"
+"logging.description" = "Controls the minimum severity recorded at runtime. Changes apply immediately to console, file, and in-memory output."
+"logging.error" = "ERROR: errors only"
+"logging.warn" = "WARN: warnings and errors"
+"logging.info" = "INFO: normal operational information, warnings, and errors (default)"
+"logging.debug" = "DEBUG: INFO plus debugging information"
+"logging.trace" = "TRACE: DEBUG plus the most detailed internal processing"
+"logging.load_warning" = "DEBUG/TRACE can significantly increase log volume and processing load."
+"language.title" = "Language Settings"
+"language.description" = "Change the display language at runtime."
