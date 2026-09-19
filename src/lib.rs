@@ -1,11 +1,44 @@
 use eframe::egui;
 
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PanelKind {
+    StandardUi,
+    GpuViewport,
+    Browser,
+}
+
+#[derive(Debug, Clone)]
+pub struct PanelDefinition {
+    pub id: String,
+    pub name: String,
+    pub kind: PanelKind,
+    pub initially_visible: bool,
+}
+
+impl PanelDefinition {
+    pub fn new(id: impl Into<String>, name: impl Into<String>, kind: PanelKind) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            kind,
+            initially_visible: true,
+        }
+    }
+
+    pub fn initially_visible(mut self, visible: bool) -> Self {
+        self.initially_visible = visible;
+        self
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ApplicationConfig {
     pub id: String,
     pub name: String,
     pub window: WindowConfig,
     pub appearance: AppearanceConfig,
+    pub panels: Vec<PanelDefinition>,
 }
 
 impl ApplicationConfig {
@@ -15,6 +48,7 @@ impl ApplicationConfig {
             name: name.into(),
             window: WindowConfig::default(),
             appearance: AppearanceConfig::default(),
+            panels: Vec::new(),
         }
     }
 }
@@ -58,6 +92,11 @@ impl Application {
 
     pub fn with_config(config: ApplicationConfig) -> Self {
         Self { config }
+    }
+
+    pub fn panel(mut self, panel: PanelDefinition) -> Self {
+        self.config.panels.push(panel);
+        self
     }
 
     pub fn run(self) -> eframe::Result<()> {
@@ -104,5 +143,16 @@ impl eframe::App for FrameworkHost {
         ui.heading(&self.config.name);
         ui.label(format!("Application ID: {}", self.config.id));
         ui.label("workflow-ide-framework v0.1.0 Step 1 sample");
+
+        if !self.config.panels.is_empty() {
+            ui.separator();
+            ui.label("Declared panels:");
+            for panel in &self.config.panels {
+                ui.label(format!(
+                    "{} [{}] {:?} visible={}",
+                    panel.name, panel.id, panel.kind, panel.initially_visible
+                ));
+            }
+        }
     }
 }
