@@ -34,8 +34,8 @@ Sample は出力先を `logs/step3-5/`、prefix を `wfide-step3-5`、保持数�
 | `logs/step3-5/` にログファイル生成 | ○ |
 | 日次 rotation 設定 | ○（設定確認） |
 | 最大保持数 7 の設定 | ○（設定確認） |
-| in-memory buffer 取得 | ？ |
-| Consumer/Application から `wfide::tracing` 利用 | ？ |
+| in-memory buffer 取得 | ○ |
+| Consumer/Application から `wfide::tracing` 利用 | ○ |
 | Linux | ？ |
 | macOS | ？ |
 
@@ -81,3 +81,16 @@ WFIDE_LOGGING_PROBE consumer_in_memory=true
 ```
 
 このProbeは `wfide::tracing` からFramework系targetとConsumer系targetのイベントを発行し、同じWFIDE in-memory bufferから両方を取得できることを確認する。
+
+## in-memory / Consumer logging Windows 11 実機結果
+
+2026-09-19、`cargo run --example step3_5_logging_probe` をWindows 11で実行し、build/run成功を確認した。
+
+- `wfide::probe` の INFO event 出力: ○
+- `consumer::sample` の WARN event 出力: ○
+- `framework_in_memory=true`: ○
+- `consumer_in_memory=true`: ○
+
+これにより、Framework系・Consumer系の双方が `wfide::tracing` 経由でWFIDE Loggingへイベントを送り、同じin-memory bufferから取得できることを確認した。
+
+Step 3.5の実装成立性確認はWindows 11で完了とする。rotationの日跨ぎ・保持上限超過等の境界動作は、v0.1.0テスト仕様策定時の正式テストへ引き継ぐ。
