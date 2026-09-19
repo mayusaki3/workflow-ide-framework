@@ -146,3 +146,16 @@ font asset本体は従来方針どおりrepositoryへ含めないため、未配
 - Dock内での日本語描画: ○
 
 前回の欠字表示はfont asset未配置によるもので、Framework側の `assets/fonts/default/NotoSansCJK-Regular.ttc` を準備した状態では解消した。Linux VMでの同経路は未再確認のため？を維持する。
+
+### Linux VM 日本語表示 再確認
+
+2026-09-20、Ubuntu Linux VMでFramework default font assetをsetup後、Step 4.5 SampleのLogging Settingsを表示し、日本語説明が欠字なしで描画されることを画面確認した。
+
+- Font asset存在確認（Font OK）: ○
+- Framework default font load: ○（`wfide::font: application font loaded path=assets/fonts/default/NotoSansCJK-Regular.ttc`）
+- Logging Settings日本語説明: ○
+- ERROR / WARN / INFO / DEBUG / TRACE説明表示: ○
+- Dock内での日本語描画: ○
+- Runtime Log Level既定値 INFO: ○
+
+本結果はUbuntu Linux VM上の確認であり、Linux物理実機の結果にはしない。
