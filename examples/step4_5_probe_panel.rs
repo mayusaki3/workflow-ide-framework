@@ -24,6 +24,7 @@ fn main() {
         .panel(wfide::PanelDefinition::new("log", "Log", wfide::PanelKind::StandardUi))
         .layout(layout)
         .framework_probe_panel()
+        .logging_settings_panel()
         .run()
         .expect("failed to start Step 4.5 Probe Panel sample");
 }
