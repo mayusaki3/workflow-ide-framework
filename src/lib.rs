@@ -260,10 +260,14 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
             ui.separator();
 
             let current = logging::level();
-            ui.label("Runtime Log Level");
-            ui.label("Controls the minimum severity recorded by WFIDE Logging at runtime.");
-            ui.label("Changes apply immediately to console, file, and in-memory output.");
-            ui.label("INFO is the default; DEBUG/TRACE can significantly increase log volume and processing load.");
+            ui.label("Runtime Log Level / 実行時ログレベル");
+            ui.label("実行中に記録する最小重要度を指定します。変更はコンソール、ファイル、メモリ出力へ即時反映されます。");
+            ui.label("ERROR: エラーのみ");
+            ui.label("WARN: 警告とエラー");
+            ui.label("INFO: 通常の動作情報、警告、エラー（既定値）");
+            ui.label("DEBUG: INFOに加えてデバッグ情報");
+            ui.label("TRACE: DEBUGに加えて最も詳細な内部処理");
+            ui.label("DEBUG/TRACEはログ量と処理負荷が大きくなる場合があります。");
             ui.add_space(4.0);
             for level in [
                 logging::LogLevel::Error,
