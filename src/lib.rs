@@ -1,6 +1,7 @@
 use eframe::egui;
 pub mod logging;
 pub mod layout;
+pub mod probe;
 pub use layout::{LayoutConfig, SplitDirection};
 pub use tracing;
 
@@ -45,6 +46,7 @@ pub struct ApplicationConfig {
     pub panels: Vec<PanelDefinition>,
     pub logging: logging::LoggingConfig,
     pub layout: Option<LayoutConfig>,
+    pub probe_panel: bool,
 }
 
 impl ApplicationConfig {
@@ -57,6 +59,7 @@ impl ApplicationConfig {
             panels: Vec::new(),
             logging: logging::LoggingConfig::default(),
             layout: None,
+            probe_panel: false,
         }
     }
 }
@@ -112,8 +115,23 @@ impl Application {
         self
     }
 
+    /// Enables the Framework-maintenance Probe Panel.
+    /// Consumer applications should not enable this in normal builds.
+    pub fn framework_probe_panel(mut self) -> Self {
+        self.config.probe_panel = true;
+        self
+    }
+
     pub fn run(self) -> eframe::Result<()> {
-        let config = self.config;
+        let mut config = self.config;
+        if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
+            config.panels.push(
+                PanelDefinition::new(probe::PANEL_ID, "WFIDE Probe", PanelKind::StandardUi)
+            );
+            if let Some(layout) = &mut config.layout {
+                layout.root_panel_ids.push(probe::PANEL_ID.to_owned());
+            }
+        }
         let _logging_guard = logging::init(&config.id, &config.logging)
             .map_err(eframe::Error::AppCreation)?;
         tracing::info!(target: "wfide::application", application_id = %config.id, "WFIDE application starting");
@@ -171,6 +189,8 @@ impl eframe::App for FrameworkHost {
             ui.separator();
             let mut viewer = FrameworkTabViewer {
                 panels: &self.config.panels,
+                probe_enabled: self.config.probe_panel,
+                dock_active: true,
             };
             egui_dock::DockArea::new(dock_state).show_inside(ui, &mut viewer);
         } else if !self.config.panels.is_empty() {
@@ -189,6 +209,8 @@ impl eframe::App for FrameworkHost {
 
 struct FrameworkTabViewer<'a> {
     panels: &'a [PanelDefinition],
+    probe_enabled: bool,
+    dock_active: bool,
 }
 
 impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
@@ -208,6 +230,25 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        if self.probe_enabled && tab == probe::PANEL_ID {
+            ui.heading("WFIDE Probe");
+            ui.label("Framework maintenance diagnostics; not a Consumer panel.");
+            ui.separator();
+            egui::Grid::new("wfide_probe_grid").striped(true).show(ui, |ui| {
+                ui.strong("Area");
+                ui.strong("Result");
+                ui.strong("Detail");
+                ui.end_row();
+                for row in probe::collect(true, self.dock_active) {
+                    ui.label(row.area);
+                    ui.label(row.status.symbol());
+                    ui.label(row.detail);
+                    ui.end_row();
+                }
+            });
+            return;
+        }
+
         if let Some(panel) = self.panels.iter().find(|panel| panel.id == *tab) {
             ui.heading(&panel.name);
             ui.label(format!("Panel ID: {}", panel.id));
