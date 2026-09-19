@@ -52,17 +52,17 @@ cargo run --example step4_5_probe_panel
 
 | 項目 | 結果 |
 | --- | --- |
-| library build | ？ |
-| Probe Sample run | ？ |
-| Probe PanelがDock内に表示 | ？ |
-| Window / Host | ？ |
-| Dock / Layout | ？ |
-| WFIDE Logging | ？ |
-| Lifecycle | ？ |
+| library build | ○ |
+| Probe Sample run | ○ |
+| Probe PanelがDock内に表示 | ○ |
+| Window / Host | ○ |
+| Dock / Layout | ○ |
+| WFIDE Logging | ○ |
+| Lifecycle | ○ |
 | Browser Surface | ？ |
 | GPU Surface | ？ |
 | Input / IME | ？ |
-| Consumer PanelとProbe Panelの分離 | ？ |
+| Consumer PanelとProbe Panelの分離 | ○ |
 | Linux VM | ？ |
 | Linux実機 | ？ |
 | macOS | ？ |
@@ -74,3 +74,23 @@ Windows 11でStep 4.5成立後、同じcommitをLinux VMで検証する。
 Linux VMでは最低限、build/run、Window、Dock、WFIDE Logging、Lifecycle、Probe Panel表示を確認する。Browser/GPU/Input/IMEはProbeへ統合されていない限り？のままとし、Phase 0の個別検証結果と混同しない。
 
 Linux VMでGPU backendがllvmpipe/Vulkan software rendererの場合、その事実を記録し、物理Linux GPU検証とは扱わない。
+
+## Windows 11 実機確認結果
+
+2026-09-19、`step4_5_probe_panel` をWindows 11で実行し、Dock内の `WFIDE Probe` Panel表示を確認した。
+
+Probe表示結果:
+
+- Window / Host: ○
+- Dock / Layout: ○
+- WFIDE Logging: ○
+- Browser Surface: ？
+- GPU Surface: ？
+- Input / IME: ？
+- Lifecycle: ○
+
+Runtime Control / Runtime Status / Simulation View / LogはConsumer相当Sample Panelとして維持され、WFIDE ProbeはFramework maintenance diagnosticsとして別Panelに表示された。したがってConsumer PanelとProbe Panelの分離も○とする。
+
+Browser Surface / GPU Surface / Input / IMEはStep 4.5 Hostからまだ実行していないため？を維持する。
+
+Windows 11でのStep 4.5基本Probe Panel成立性確認は完了。次に同一Framework revisionをLinux VMで検証する。
