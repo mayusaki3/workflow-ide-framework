@@ -15,6 +15,7 @@ const DEFAULT_MEMORY_LINES: usize = 2_000;
 static MEMORY: OnceLock<Arc<Mutex<VecDeque<String>>>> = OnceLock::new();
 static LEVEL_RELOAD: OnceLock<reload::Handle<LevelFilter, tracing_subscriber::Registry>> = OnceLock::new();
 static CURRENT_LEVEL: OnceLock<Mutex<LogLevel>> = OnceLock::new();
+static LEVEL_CHANGE_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogLevel {
@@ -76,32 +77,36 @@ pub fn level() -> LogLevel {
 }
 
 pub fn set_level(level: LogLevel) -> Result<(), &'static str> {
+    let _change_guard = LEVEL_CHANGE_LOCK
+        .lock()
+        .map_err(|_| "WFIDE log level change lock is poisoned")?;
     let handle = LEVEL_RELOAD.get().ok_or("WFIDE logging is not initialized")?;
     let previous = self::level();
+
+    if previous == level {
+        return Ok(());
+    }
+
+    // Log-level changes are control-plane events and are always recorded as INFO.
+    // Temporarily enable INFO when the current filter is WARN/ERROR, emit the
+    // transition, then apply the requested level while holding the change lock.
+    if matches!(previous, LogLevel::Error | LogLevel::Warn) {
+        handle.reload(LevelFilter::INFO)
+            .map_err(|_| "failed to temporarily enable INFO for WFIDE log level change")?;
+    }
+
+    tracing::info!(
+        target: "wfide::logging",
+        from = ?previous,
+        to = ?level,
+        "runtime log level changed"
+    );
 
     handle.reload(level.filter()).map_err(|_| "failed to reload WFIDE log level")?;
     if let Some(current) = CURRENT_LEVEL.get() {
         if let Ok(mut current) = current.lock() {
             *current = level;
         }
-    }
-
-    // A level change is normally an informational event. When the new filter
-    // would suppress INFO, raise only this control event enough to remain
-    // visible in every output.
-    match level {
-        LogLevel::Error => tracing::error!(
-            target: "wfide::logging", from = ?previous, to = ?level,
-            "runtime log level changed"
-        ),
-        LogLevel::Warn => tracing::warn!(
-            target: "wfide::logging", from = ?previous, to = ?level,
-            "runtime log level changed"
-        ),
-        LogLevel::Info | LogLevel::Debug | LogLevel::Trace => tracing::info!(
-            target: "wfide::logging", from = ?previous, to = ?level,
-            "runtime log level changed"
-        ),
     }
 
     Ok(())
