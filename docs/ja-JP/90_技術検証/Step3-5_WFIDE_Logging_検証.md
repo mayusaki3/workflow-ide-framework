@@ -57,6 +57,8 @@ Step 4 は Dock Layout を扱い、Log Panel の実際の Viewer 接続は Panel
 
 2026-09-19、Windows 11でSampleを実行し、Window起動、consoleへのtracing出力、ログファイル生成を確認した。生成ログには eframe / wgpu を含む tracing event が記録されている。
 
-日次rotationおよび最大7ファイル保持は実装設定として確認済み。実際の日跨ぎ・8世代目生成による削除動作は今回の実機確認では未実施。
+日次rotationおよび最大7ファイル保持は実装設定として確認済み。実際の日跨ぎ・8世代目生成による削除動作は今回の実装成立性確認では未実施とする。
+
+これらの実動作確認は省略対象ではなく、v0.1.0 の正式なテスト仕様に含める。現段階では仕様策定を後続工程としているため、テスト仕様整理時に rotation 境界条件・保持上限超過時の旧ログ削除をテストケースとして定義し、その時点で実施・記録する。
 
 in-memory buffer取得およびConsumer/Applicationからの `wfide::tracing` 利用は、このSample実行だけでは直接確認していないため引き続き？とする。
