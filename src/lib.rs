@@ -47,6 +47,7 @@ pub struct ApplicationConfig {
     pub logging: logging::LoggingConfig,
     pub layout: Option<LayoutConfig>,
     pub probe_panel: bool,
+    pub logging_settings_panel: bool,
 }
 
 impl ApplicationConfig {
@@ -60,6 +61,7 @@ impl ApplicationConfig {
             logging: logging::LoggingConfig::default(),
             layout: None,
             probe_panel: false,
+            logging_settings_panel: false,
         }
     }
 }
@@ -122,6 +124,12 @@ impl Application {
         self
     }
 
+    /// Enables the Framework standard Logging Settings Panel.
+    pub fn logging_settings_panel(mut self) -> Self {
+        self.config.logging_settings_panel = true;
+        self
+    }
+
     pub fn run(self) -> eframe::Result<()> {
         let mut config = self.config;
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
@@ -130,6 +138,14 @@ impl Application {
             );
             if let Some(layout) = &mut config.layout {
                 layout.root_panel_ids.push(probe::PANEL_ID.to_owned());
+            }
+        }
+        if config.logging_settings_panel && !config.panels.iter().any(|panel| panel.id == "__wfide_logging_settings") {
+            config.panels.push(
+                PanelDefinition::new("__wfide_logging_settings", "Logging Settings", PanelKind::StandardUi)
+            );
+            if let Some(layout) = &mut config.layout {
+                layout.root_panel_ids.push("__wfide_logging_settings".to_owned());
             }
         }
         let _logging_guard = logging::init(&config.id, &config.logging)
@@ -190,7 +206,11 @@ impl eframe::App for FrameworkHost {
             let mut viewer = FrameworkTabViewer {
                 panels: &self.config.panels,
                 probe_enabled: self.config.probe_panel,
+                logging_settings_enabled: self.config.logging_settings_panel,
                 dock_active: true,
+                logging_directory: self.config.logging.directory.clone(),
+                logging_file_prefix: self.config.logging.file_prefix.clone(),
+                logging_retention: self.config.logging.retention_days,
             };
             egui_dock::DockArea::new(dock_state).show_inside(ui, &mut viewer);
         } else if !self.config.panels.is_empty() {
@@ -210,7 +230,11 @@ impl eframe::App for FrameworkHost {
 struct FrameworkTabViewer<'a> {
     panels: &'a [PanelDefinition],
     probe_enabled: bool,
+    logging_settings_enabled: bool,
     dock_active: bool,
+    logging_directory: std::path::PathBuf,
+    logging_file_prefix: String,
+    logging_retention: usize,
 }
 
 impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
@@ -230,6 +254,39 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        if self.logging_settings_enabled && tab == "__wfide_logging_settings" {
+            ui.heading("Logging Settings");
+            ui.label("Framework standard panel");
+            ui.separator();
+
+            let current = logging::level();
+            ui.label("Runtime Log Level");
+            for level in [
+                logging::LogLevel::Error,
+                logging::LogLevel::Warn,
+                logging::LogLevel::Info,
+                logging::LogLevel::Debug,
+                logging::LogLevel::Trace,
+            ] {
+                let selected = current == level;
+                if ui.radio(selected, format!("{level:?}")).clicked() && !selected {
+                    if let Err(error) = logging::set_level(level) {
+                        tracing::error!(target: "wfide::logging", %error, "failed to change runtime log level");
+                    } else {
+                        tracing::info!(target: "wfide::logging", ?level, "runtime log level changed");
+                    }
+                }
+            }
+
+            ui.separator();
+            ui.label(format!("File directory: {}", self.logging_directory.display()));
+            ui.label(format!("File prefix: {}", self.logging_file_prefix));
+            ui.label(format!("Rotation: Daily"));
+            ui.label(format!("Retention: {} files", self.logging_retention));
+            ui.label("File settings are startup configuration in v0.1.0.");
+            return;
+        }
+
         if self.probe_enabled && tab == probe::PANEL_ID {
             ui.heading("WFIDE Probe");
             ui.label("Framework maintenance diagnostics; not a Consumer panel.");
