@@ -11,7 +11,7 @@ fn main() {
     config.logging.directory = "logs/step4-5".into();
     config.logging.file_prefix = "wfide-step4-5".into();
     config.appearance.font_path = Some(
-        "docs/ja-JP/90_技術検証/P0-1b_EmbeddedFont_技術検証/assets/fonts/default/NotoSansCJK-Regular.ttc".into(),
+        "assets/fonts/default/NotoSansCJK-Regular.ttc".into(),
     );
 
     let layout = wfide::LayoutConfig::new(["simulation-view"])
