@@ -63,7 +63,7 @@ cargo run --example step4_5_probe_panel
 | GPU Surface | ？ |
 | Input / IME | ？ |
 | Consumer PanelとProbe Panelの分離 | ○ |
-| Linux VM | ？ |
+| Linux VM | ○ |
 | Linux実機 | ？ |
 | macOS | ？ |
 
@@ -94,3 +94,25 @@ Runtime Control / Runtime Status / Simulation View / LogはConsumer相当Sample 
 Browser Surface / GPU Surface / Input / IMEはStep 4.5 Hostからまだ実行していないため？を維持する。
 
 Windows 11でのStep 4.5基本Probe Panel成立性確認は完了。次に同一Framework revisionをLinux VMで検証する。
+
+## Linux VM 実機確認結果
+
+2026-09-19、Ubuntu Linux VM上でStep 4.5 Probe Panel Sampleを実行し、GUI表示を確認した。
+
+- Probe Sample run: ○
+- Window / Host: ○
+- Dock / Layout: ○
+- WFIDE Logging: ○
+- Lifecycle: ○
+- Probe Panel表示: ○
+- Consumer相当Sample PanelとProbe Panelの分離: ○
+- Wayland経路でのWindow/event loop動作: ○（実行ログ・画面確認）
+- Browser Surface: ？
+- GPU Surface: ？
+- Input / IME: ？
+
+画面上で `WFIDE Probe` がDock内に表示され、Window / Host、Dock / Layout、WFIDE Logging、Lifecycleが○となることを確認した。Runtime Control / Runtime Status / Simulation View / Logも維持されている。
+
+Browser Surface / GPU Surface / Input / IMEはStep 4.5 Hostから未実行のため？を維持する。Linux VMでのStep 4.5基本Probe Panel成立性は○とする。
+
+なお、本確認はLinux VMであり、Linux物理実機の検証結果にはしない。GPU rendererについても本Step 4.5画面のみから物理GPU/llvmpipeの判定は行わない。Phase 0で確認済みのllvmpipe/Vulkan結果とは区別する。
