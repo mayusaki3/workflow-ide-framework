@@ -15,3 +15,7 @@ path = "examples/step1_minimal.rs"
 [[example]]
 name = "step2_application_config"
 path = "examples/step2_application_config.rs"
+
+[[example]]
+name = "step3_panel_declaration"
+path = "examples/step3_panel_declaration.rs"
