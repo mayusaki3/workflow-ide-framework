@@ -116,3 +116,22 @@ Windows 11でのStep 4.5基本Probe Panel成立性確認は完了。次に同一
 Browser Surface / GPU Surface / Input / IMEはStep 4.5 Hostから未実行のため？を維持する。Linux VMでのStep 4.5基本Probe Panel成立性は○とする。
 
 なお、本確認はLinux VMであり、Linux物理実機の検証結果にはしない。GPU rendererについても本Step 4.5画面のみから物理GPU/llvmpipeの判定は行わない。Phase 0で確認済みのllvmpipe/Vulkan結果とは区別する。
+
+## Logging Settings / 日本語表示の追加検証
+
+Step 4.5 SampleにはFramework標準のLogging Settings Panelを含める。
+
+- Runtime Log Levelの既定値はINFO。
+- ERROR / WARN / INFO / DEBUG / TRACEを実行中に変更可能。
+- level変更イベントはINFOとして記録する。現在levelがWARN/ERRORの場合は、排他下で一時的にINFOを有効化して変更イベントを記録してから要求levelへ切り替える。
+- ERROR: エラーのみ。
+- WARN: 警告とエラー。
+- INFO: 通常の動作情報、警告、エラー。既定値。
+- DEBUG: INFOに加えてデバッグ情報。
+- TRACE: DEBUGに加えて最も詳細な内部処理。ログ量・処理負荷増大に注意する。
+
+P0-1b EmbeddedFont技術検証の成果をFramework Applicationへ接続し、`AppearanceConfig::font_path` でeguiへアプリケーションfontを登録できるようにする。Step 4.5 SampleではP0-1bのNotoSansCJK-Regular.ttcを指定し、Logging Settings内の日本語説明を実際のFramework Sampleで確認する。
+
+font asset本体は従来方針どおりrepositoryへ含めないため、未配置環境ではP0-1bのsetup_fontsスクリプトで準備する。読み込み失敗時はWARNを記録し、egui既定fontで継続する。
+
+この追加部分のWindows/Linux VM表示結果は再確認後に○/✕/？を更新する。
