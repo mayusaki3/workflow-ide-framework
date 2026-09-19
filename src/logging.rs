@@ -79,21 +79,31 @@ pub fn set_level(level: LogLevel) -> Result<(), &'static str> {
     let handle = LEVEL_RELOAD.get().ok_or("WFIDE logging is not initialized")?;
     let previous = self::level();
 
-    // Emit the transition before applying the new filter so that lowering the
-    // level to WARN/ERROR cannot hide the setting change itself.
-    tracing::warn!(
-        target: "wfide::logging",
-        from = ?previous,
-        to = ?level,
-        "runtime log level changing"
-    );
-
     handle.reload(level.filter()).map_err(|_| "failed to reload WFIDE log level")?;
     if let Some(current) = CURRENT_LEVEL.get() {
         if let Ok(mut current) = current.lock() {
             *current = level;
         }
     }
+
+    // A level change is normally an informational event. When the new filter
+    // would suppress INFO, raise only this control event enough to remain
+    // visible in every output.
+    match level {
+        LogLevel::Error => tracing::error!(
+            target: "wfide::logging", from = ?previous, to = ?level,
+            "runtime log level changed"
+        ),
+        LogLevel::Warn => tracing::warn!(
+            target: "wfide::logging", from = ?previous, to = ?level,
+            "runtime log level changed"
+        ),
+        LogLevel::Info | LogLevel::Debug | LogLevel::Trace => tracing::info!(
+            target: "wfide::logging", from = ?previous, to = ?level,
+            "runtime log level changed"
+        ),
+    }
+
     Ok(())
 }
 
