@@ -10,7 +10,7 @@ eframe = "0.34.2"
 egui_dock = "0.19.1"
 tracing = "0.1"
 tracing-appender = "0.2"
-tracing-subscriber = { version = "0.3", features = ["fmt"] }
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 
 [[example]]
 name = "step1_minimal"
