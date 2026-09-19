@@ -261,6 +261,10 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
 
             let current = logging::level();
             ui.label("Runtime Log Level");
+            ui.label("Controls the minimum severity recorded by WFIDE Logging at runtime.");
+            ui.label("Changes apply immediately to console, file, and in-memory output.");
+            ui.label("INFO is the default; DEBUG/TRACE can significantly increase log volume and processing load.");
+            ui.add_space(4.0);
             for level in [
                 logging::LogLevel::Error,
                 logging::LogLevel::Warn,
@@ -272,8 +276,6 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                 if ui.radio(selected, format!("{level:?}")).clicked() && !selected {
                     if let Err(error) = logging::set_level(level) {
                         tracing::error!(target: "wfide::logging", %error, "failed to change runtime log level");
-                    } else {
-                        tracing::info!(target: "wfide::logging", ?level, "runtime log level changed");
                     }
                 }
             }
