@@ -10,7 +10,8 @@ fn main() {
     config.window.min_size = Some([760.0, 520.0]);
 
     let layout = wfide::LayoutConfig::new(["simulation-view", "help"])
-        .split_left("simulation-view", 0.72, ["runtime-control", "runtime-status"])
+        .split_left("simulation-view", 0.72, ["runtime-control"])
+        .split_below("runtime-control", 0.50, ["runtime-status"])
         .split_below("simulation-view", 0.72, ["log"])
         .selected("simulation-view");
 
