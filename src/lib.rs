@@ -1,6 +1,7 @@
 use eframe::egui;
 pub mod logging;
 pub mod layout;
+pub mod localization;
 pub mod probe;
 pub use layout::{LayoutConfig, SplitDirection};
 pub use tracing;
@@ -48,6 +49,8 @@ pub struct ApplicationConfig {
     pub layout: Option<LayoutConfig>,
     pub probe_panel: bool,
     pub logging_settings_panel: bool,
+    pub language_settings_panel: bool,
+    pub localization: localization::LocalizationConfig,
 }
 
 impl ApplicationConfig {
@@ -62,6 +65,8 @@ impl ApplicationConfig {
             layout: None,
             probe_panel: false,
             logging_settings_panel: false,
+            language_settings_panel: false,
+            localization: localization::LocalizationConfig::default(),
         }
     }
 }
@@ -155,6 +160,12 @@ impl Application {
         self
     }
 
+    /// Enables the Framework standard Language Settings Panel.
+    pub fn language_settings_panel(mut self) -> Self {
+        self.config.language_settings_panel = true;
+        self
+    }
+
     pub fn run(self) -> eframe::Result<()> {
         let mut config = self.config;
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
@@ -173,6 +184,15 @@ impl Application {
                 layout.root_panel_ids.push("__wfide_logging_settings".to_owned());
             }
         }
+        if config.language_settings_panel && !config.panels.iter().any(|panel| panel.id == "__wfide_language_settings") {
+            config.panels.push(
+                PanelDefinition::new("__wfide_language_settings", "Language Settings", PanelKind::StandardUi)
+            );
+            if let Some(layout) = &mut config.layout {
+                layout.root_panel_ids.push("__wfide_language_settings".to_owned());
+            }
+        }
+        localization::init(&config.localization);
         let _logging_guard = logging::init(&config.id, &config.logging)
             .map_err(eframe::Error::AppCreation)?;
         tracing::info!(target: "wfide::application", application_id = %config.id, "WFIDE application starting");
@@ -248,6 +268,7 @@ impl eframe::App for FrameworkHost {
                 panels: &self.config.panels,
                 probe_enabled: self.config.probe_panel,
                 logging_settings_enabled: self.config.logging_settings_panel,
+                language_settings_enabled: self.config.language_settings_panel,
                 dock_active: true,
                 logging_directory: self.config.logging.directory.clone(),
                 logging_file_prefix: self.config.logging.file_prefix.clone(),
@@ -272,6 +293,7 @@ struct FrameworkTabViewer<'a> {
     panels: &'a [PanelDefinition],
     probe_enabled: bool,
     logging_settings_enabled: bool,
+    language_settings_enabled: bool,
     dock_active: bool,
     logging_directory: std::path::PathBuf,
     logging_file_prefix: String,
@@ -295,20 +317,43 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        if self.language_settings_enabled && tab == "__wfide_language_settings" {
+            ui.heading(localization::text("language.title"));
+            ui.label(localization::text("language.description"));
+            ui.separator();
+
+            let current = localization::current_locale();
+            for (locale, label_key) in [
+                (localization::EN_US, "language.english"),
+                (localization::JA_JP, "language.japanese"),
+            ] {
+                if !localization::supported_locales().iter().any(|item| item == locale) {
+                    continue;
+                }
+                let selected = current == locale;
+                if ui.radio(selected, localization::text(label_key)).clicked() && !selected {
+                    if let Err(error) = localization::set_locale(locale) {
+                        tracing::error!(target: "wfide::i18n", %error, %locale, "failed to change locale");
+                    }
+                }
+            }
+            return;
+        }
+
         if self.logging_settings_enabled && tab == "__wfide_logging_settings" {
-            ui.heading("Logging Settings");
-            ui.label("Framework standard panel");
+            ui.heading(localization::text("logging.title"));
+            ui.label(localization::text("logging.framework_panel"));
             ui.separator();
 
             let current = logging::level();
-            ui.label("Runtime Log Level / 実行時ログレベル");
-            ui.label("実行中に記録する最小重要度を指定します。変更はコンソール、ファイル、メモリ出力へ即時反映されます。");
-            ui.label("ERROR: エラーのみ");
-            ui.label("WARN: 警告とエラー");
-            ui.label("INFO: 通常の動作情報、警告、エラー（既定値）");
-            ui.label("DEBUG: INFOに加えてデバッグ情報");
-            ui.label("TRACE: DEBUGに加えて最も詳細な内部処理");
-            ui.label("DEBUG/TRACEはログ量と処理負荷が大きくなる場合があります。");
+            ui.label(localization::text("logging.runtime_level"));
+            ui.label(localization::text("logging.description"));
+            ui.label(localization::text("logging.error"));
+            ui.label(localization::text("logging.warn"));
+            ui.label(localization::text("logging.info"));
+            ui.label(localization::text("logging.debug"));
+            ui.label(localization::text("logging.trace"));
+            ui.label(localization::text("logging.load_warning"));
             ui.add_space(4.0);
             for level in [
                 logging::LogLevel::Error,
