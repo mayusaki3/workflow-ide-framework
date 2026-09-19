@@ -8,10 +8,34 @@ use std::{
 
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_appender::rolling::{Builder, Rotation};
+use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, reload, util::SubscriberInitExt};
 
 const DEFAULT_MEMORY_LINES: usize = 2_000;
 
 static MEMORY: OnceLock<Arc<Mutex<VecDeque<String>>>> = OnceLock::new();
+static LEVEL_RELOAD: OnceLock<reload::Handle<LevelFilter, tracing_subscriber::Registry>> = OnceLock::new();
+static CURRENT_LEVEL: OnceLock<Mutex<LogLevel>> = OnceLock::new();
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogLevel {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+impl LogLevel {
+    fn filter(self) -> LevelFilter {
+        match self {
+            Self::Error => LevelFilter::ERROR,
+            Self::Warn => LevelFilter::WARN,
+            Self::Info => LevelFilter::INFO,
+            Self::Debug => LevelFilter::DEBUG,
+            Self::Trace => LevelFilter::TRACE,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct LoggingConfig {
@@ -19,6 +43,7 @@ pub struct LoggingConfig {
     pub file_prefix: String,
     pub retention_days: usize,
     pub memory_lines: usize,
+    pub level: LogLevel,
 }
 
 impl Default for LoggingConfig {
@@ -28,6 +53,7 @@ impl Default for LoggingConfig {
             file_prefix: "wfide".into(),
             retention_days: 7,
             memory_lines: DEFAULT_MEMORY_LINES,
+            level: LogLevel::Info,
         }
     }
 }
@@ -40,6 +66,24 @@ impl LoggingGuard {
     pub fn snapshot(&self) -> Vec<String> {
         snapshot()
     }
+}
+
+pub fn level() -> LogLevel {
+    CURRENT_LEVEL
+        .get()
+        .and_then(|level| level.lock().ok().map(|level| *level))
+        .unwrap_or(LogLevel::Info)
+}
+
+pub fn set_level(level: LogLevel) -> Result<(), &'static str> {
+    let handle = LEVEL_RELOAD.get().ok_or("WFIDE logging is not initialized")?;
+    handle.reload(level.filter()).map_err(|_| "failed to reload WFIDE log level")?;
+    if let Some(current) = CURRENT_LEVEL.get() {
+        if let Ok(mut current) = current.lock() {
+            *current = level;
+        }
+    }
+    Ok(())
 }
 
 pub fn snapshot() -> Vec<String> {
@@ -78,11 +122,18 @@ pub fn init(
         },
     };
 
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::TRACE)
+    let (level_filter, level_handle) = reload::Layer::new(config.level.filter());
+    let fmt_layer = tracing_subscriber::fmt::layer()
         .with_target(true)
-        .with_writer(make_writer)
+        .with_writer(make_writer);
+
+    tracing_subscriber::registry()
+        .with(level_filter)
+        .with(fmt_layer)
         .try_init()?;
+
+    let _ = LEVEL_RELOAD.set(level_handle);
+    let _ = CURRENT_LEVEL.set(Mutex::new(config.level));
 
     Ok(LoggingGuard {
         _file_guard: file_guard,
