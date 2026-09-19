@@ -1,0 +1,16 @@
+locale = "ja-JP"
+name = "日本語"
+
+[strings]
+"logging.title" = "ログ設定"
+"logging.framework_panel" = "Framework 標準パネル"
+"logging.runtime_level" = "実行時ログレベル"
+"logging.description" = "実行中に記録する最小重要度を指定します。変更はコンソール、ファイル、メモリ出力へ即時反映されます。"
+"logging.error" = "ERROR: エラーのみ"
+"logging.warn" = "WARN: 警告とエラー"
+"logging.info" = "INFO: 通常の動作情報、警告、エラー（既定値）"
+"logging.debug" = "DEBUG: INFOに加えてデバッグ情報"
+"logging.trace" = "TRACE: DEBUGに加えて最も詳細な内部処理"
+"logging.load_warning" = "DEBUG/TRACEはログ量と処理負荷が大きくなる場合があります。"
+"language.title" = "言語設定"
+"language.description" = "表示言語を実行中に切り替えます。"

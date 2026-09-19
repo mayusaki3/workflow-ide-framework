@@ -1,0 +1,43 @@
+[package]
+name = "workflow-ide-framework"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Framework for building dockable workflow IDE applications"
+
+[dependencies]
+eframe = "0.34.2"
+egui_dock = "0.19.1"
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.9"
+
+[[example]]
+name = "step1_minimal"
+path = "examples/step1_minimal.rs"
+
+[[example]]
+name = "step2_application_config"
+path = "examples/step2_application_config.rs"
+
+[[example]]
+name = "step3_panel_declaration"
+path = "examples/step3_panel_declaration.rs"
+
+[[example]]
+name = "step3_5_logging"
+path = "examples/step3_5_logging.rs"
+
+[[example]]
+name = "step3_5_logging_probe"
+path = "examples/step3_5_logging_probe.rs"
+
+[[example]]
+name = "step4_initial_dock_layout"
+path = "examples/step4_initial_dock_layout.rs"
+
+[[example]]
+name = "step4_5_probe_panel"
+path = "examples/step4_5_probe_panel.rs"
