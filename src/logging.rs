@@ -36,6 +36,12 @@ pub struct LoggingGuard {
     _file_guard: WorkerGuard,
 }
 
+impl LoggingGuard {
+    pub fn snapshot(&self) -> Vec<String> {
+        snapshot()
+    }
+}
+
 pub fn snapshot() -> Vec<String> {
     MEMORY
         .get()
