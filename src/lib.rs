@@ -1,4 +1,6 @@
 use eframe::egui;
+pub mod logging;
+pub use tracing;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +41,7 @@ pub struct ApplicationConfig {
     pub window: WindowConfig,
     pub appearance: AppearanceConfig,
     pub panels: Vec<PanelDefinition>,
+    pub logging: logging::LoggingConfig,
 }
 
 impl ApplicationConfig {
@@ -49,6 +52,7 @@ impl ApplicationConfig {
             window: WindowConfig::default(),
             appearance: AppearanceConfig::default(),
             panels: Vec::new(),
+            logging: logging::LoggingConfig::default(),
         }
     }
 }
@@ -101,6 +105,9 @@ impl Application {
 
     pub fn run(self) -> eframe::Result<()> {
         let config = self.config;
+        let _logging_guard = logging::init(&config.id, &config.logging)
+            .map_err(|error| eframe::Error::AppCreation(Box::new(error)))?;
+        tracing::info!(target: "wfide::application", application_id = %config.id, "WFIDE application starting");
         let window_title = config
             .window
             .title
