@@ -164,6 +164,13 @@ impl Application {
         self
     }
 
+    /// Enables or disables IME coordinate diagnostics for a Text Editor panel.
+    /// Intended for Framework verification, not normal consumer UI.
+    pub fn text_editor_ime_debug(mut self, panel_id: impl Into<String>, enabled: bool) -> Self {
+        self.text_editor_options.entry(panel_id.into()).or_default().ime_debug = enabled;
+        self
+    }
+
     pub fn panel(mut self, panel: PanelDefinition) -> Self {
         self.config.panels.push(panel);
         self
