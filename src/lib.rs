@@ -289,6 +289,7 @@ struct FrameworkHost {
     config: ApplicationConfig,
     dock_state: Option<egui_dock::DockState<String>>,
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
+    text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
 }
 
 impl eframe::App for FrameworkHost {
