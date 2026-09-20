@@ -136,6 +136,7 @@ fn install_application_font(
 pub struct Application {
     config: ApplicationConfig,
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
+    text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
 }
 
 impl Application {
@@ -144,7 +145,11 @@ impl Application {
     }
 
     pub fn with_config(config: ApplicationConfig) -> Self {
-        Self { config, text_editors: std::collections::HashMap::new() }
+        Self {
+            config,
+            text_editors: std::collections::HashMap::new(),
+            text_editor_options: std::collections::HashMap::new(),
+        }
     }
 
     /// Registers a Framework Standard Text Editor implementation for a declared Standard UI Panel.
@@ -153,7 +158,9 @@ impl Application {
         panel_id: impl Into<String>,
         document: text_editor::TextDocument,
     ) -> Self {
-        self.text_editors.insert(panel_id.into(), document);
+        let panel_id = panel_id.into();
+        self.text_editors.insert(panel_id.clone(), document);
+        self.text_editor_options.entry(panel_id).or_default();
         self
     }
 
@@ -189,6 +196,7 @@ impl Application {
     pub fn run(self) -> eframe::Result<()> {
         let mut config = self.config;
         let text_editors = self.text_editors;
+        let text_editor_options = self.text_editor_options;
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
             config.panels.push(
                 PanelDefinition::new(probe::PANEL_ID, "WFIDE Probe", PanelKind::StandardUi)
@@ -266,7 +274,12 @@ impl Application {
                     }
                 }
 
-                Ok(Box::new(FrameworkHost { config, dock_state, text_editors }))
+                Ok(Box::new(FrameworkHost {
+                    config,
+                    dock_state,
+                    text_editors,
+                    text_editor_options,
+                }))
             }),
         )
     }
@@ -296,6 +309,7 @@ impl eframe::App for FrameworkHost {
                 logging_file_prefix: self.config.logging.file_prefix.clone(),
                 logging_retention: self.config.logging.retention_days,
                 text_editors: &mut self.text_editors,
+                text_editor_options: &mut self.text_editor_options,
             };
             egui_dock::DockArea::new(dock_state).show_inside(ui, &mut viewer);
         } else if !self.config.panels.is_empty() {
@@ -322,6 +336,7 @@ struct FrameworkTabViewer<'a> {
     logging_file_prefix: String,
     logging_retention: usize,
     text_editors: &'a mut std::collections::HashMap<String, text_editor::TextDocument>,
+    text_editor_options: &'a mut std::collections::HashMap<String, text_editor::TextEditorOptions>,
 }
 
 impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
@@ -407,7 +422,8 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
         }
 
         if let Some(document) = self.text_editors.get_mut(tab) {
-            let response = text_editor::show(ui, document);
+            let options = self.text_editor_options.entry(tab.clone()).or_default();
+            let response = text_editor::show_with_options(ui, document, options);
             if let Some(text_editor::TextEditorAction::SaveRequested) = response.action {
                 tracing::info!(
                     target: "wfide::text_editor",
