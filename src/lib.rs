@@ -117,11 +117,18 @@ fn install_application_font(
         "wfide_application_font".to_owned(),
         egui::FontData::from_owned(bytes).into(),
     );
-    fonts
-        .families
-        .entry(egui::FontFamily::Proportional)
-        .or_default()
-        .insert(0, "wfide_application_font".to_owned());
+    // Use the application font as the first fallback for both normal UI
+    // and code-editor text. This keeps CJK glyph coverage in monospace views.
+    for family in [
+        egui::FontFamily::Proportional,
+        egui::FontFamily::Monospace,
+    ] {
+        fonts
+            .families
+            .entry(family)
+            .or_default()
+            .insert(0, "wfide_application_font".to_owned());
+    }
     ctx.set_fonts(fonts);
     Ok(())
 }
