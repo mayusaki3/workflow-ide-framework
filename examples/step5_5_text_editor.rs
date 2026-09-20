@@ -16,6 +16,15 @@ fn main() {
             "Text Editor",
             wfide::PanelKind::StandardUi,
         ))
+        .text_editor_panel(
+            "text-editor",
+            wfide::text_editor::TextDocument::new(
+                "sample-document",
+                "sample.toml",
+                "# workflow-ide-framework Text Editor\n\n[application]\nname = \"サンプル\"\nenabled = true\n",
+            )
+            .language_hint("TOML"),
+        )
         .layout(wfide::LayoutConfig::new(["text-editor"]).selected("text-editor"))
         .run()
         .expect("failed to start Step 5.5 Text Editor sample");
