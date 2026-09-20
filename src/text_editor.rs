@@ -89,85 +89,104 @@ fn line_column(text: &str, char_index: usize) -> (usize, usize) {
 pub fn show(ui: &mut egui::Ui, document: &mut TextDocument) -> TextEditorResponse {
     let mut result = TextEditorResponse::default();
 
-    // Reserve the status bar at the bottom first so it can never escape the
-    // Dock panel. The editor then consumes only the remaining central area.
-    egui::TopBottomPanel::bottom(ui.id().with("text_editor_status"))
-        .resizable(false)
-        .show_inside(ui, |ui| {
-            ui.horizontal(|ui| {
-                let cursor = match (document.cursor_line, document.cursor_column) {
-                    (Some(line), Some(column)) => format!(
-                        "{} {}, {} {}",
-                        crate::localization::text("text_editor.line"),
-                        line,
-                        crate::localization::text("text_editor.column"),
-                        column
-                    ),
-                    _ => crate::localization::text("text_editor.no_cursor"),
-                };
-                ui.label(cursor);
+    // Split the Dock panel's available rect explicitly. Toolbar and status
+    // bar get fixed-height child UIs; the editor receives exactly the rect
+    // between them. This avoids nested panel/min-size competition.
+    let full = ui.available_rect_before_wrap();
+    let row_height = ui.spacing().interact_size.y;
+    let gap = ui.spacing().item_spacing.y;
+    let toolbar_height = row_height + gap;
+    let status_height = row_height + gap;
+
+    let toolbar_rect = egui::Rect::from_min_max(
+        full.min,
+        egui::pos2(full.max.x, (full.min.y + toolbar_height).min(full.max.y)),
+    );
+    let status_top = (full.max.y - status_height).max(toolbar_rect.max.y);
+    let status_rect = egui::Rect::from_min_max(
+        egui::pos2(full.min.x, status_top),
+        full.max,
+    );
+    let editor_rect = egui::Rect::from_min_max(
+        egui::pos2(full.min.x, toolbar_rect.max.y),
+        egui::pos2(full.max.x, status_rect.min.y),
+    );
+
+    ui.scope_builder(egui::UiBuilder::new().max_rect(toolbar_rect), |ui| {
+        ui.horizontal(|ui| {
+            ui.strong(&document.display_name);
+            if document.modified {
+                ui.label("*");
+            }
+            if let Some(language) = &document.language_hint {
                 ui.separator();
-                ui.label(document.encoding.label());
-                if let Some(language) = &document.language_hint {
-                    ui.separator();
-                    ui.label(language);
-                }
-            });
-        });
-
-    egui::TopBottomPanel::top(ui.id().with("text_editor_toolbar"))
-        .resizable(false)
-        .show_inside(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.strong(&document.display_name);
-                if document.modified {
-                    ui.label("*");
-                }
-                if let Some(language) = &document.language_hint {
-                    ui.separator();
-                    ui.label(language);
-                }
-                if document.read_only {
-                    ui.separator();
-                    ui.label(crate::localization::text("text_editor.read_only"));
-                }
-                if ui
-                    .add_enabled(
-                        !document.read_only && document.modified,
-                        egui::Button::new(crate::localization::text("text_editor.save")),
-                    )
-                    .clicked()
-                {
-                    result.action = Some(TextEditorAction::SaveRequested);
-                }
-            });
-        });
-
-    egui::CentralPanel::default()
-        .frame(egui::Frame::NONE)
-        .show_inside(ui, |ui| {
-            let available = ui.available_size();
-            let output = egui::TextEdit::multiline(&mut document.text)
-                .desired_width(available.x)
-                .desired_rows(1)
-                .min_size(available)
-                .interactive(!document.read_only)
-                .code_editor()
-                .show(ui);
-
-            if output.response.changed() {
-                document.modified = true;
-                result.changed = true;
+                ui.label(language);
             }
-
-            if let Some(range) = output.cursor_range {
-                let (line, column) = line_column(&document.text, range.primary.index);
-                document.cursor_line = Some(line);
-                document.cursor_column = Some(column);
-                result.cursor_line = Some(line);
-                result.cursor_column = Some(column);
+            if document.read_only {
+                ui.separator();
+                ui.label(crate::localization::text("text_editor.read_only"));
+            }
+            if ui
+                .add_enabled(
+                    !document.read_only && document.modified,
+                    egui::Button::new(crate::localization::text("text_editor.save")),
+                )
+                .clicked()
+            {
+                result.action = Some(TextEditorAction::SaveRequested);
             }
         });
+    });
+
+    ui.scope_builder(egui::UiBuilder::new().max_rect(editor_rect), |ui| {
+        let output = egui::TextEdit::multiline(&mut document.text)
+            .desired_width(editor_rect.width())
+            .desired_rows(1)
+            .min_size(editor_rect.size())
+            .interactive(!document.read_only)
+            .code_editor()
+            .show(ui);
+
+        if output.response.changed() {
+            document.modified = true;
+            result.changed = true;
+        }
+
+        if let Some(range) = output.cursor_range {
+            let (line, column) = line_column(&document.text, range.primary.index);
+            document.cursor_line = Some(line);
+            document.cursor_column = Some(column);
+            result.cursor_line = Some(line);
+            result.cursor_column = Some(column);
+        }
+    });
+
+    ui.scope_builder(egui::UiBuilder::new().max_rect(status_rect), |ui| {
+        ui.separator();
+        ui.horizontal(|ui| {
+            let cursor = match (document.cursor_line, document.cursor_column) {
+                (Some(line), Some(column)) => format!(
+                    "{} {}, {} {}",
+                    crate::localization::text("text_editor.line"),
+                    line,
+                    crate::localization::text("text_editor.column"),
+                    column
+                ),
+                _ => crate::localization::text("text_editor.no_cursor"),
+            };
+            ui.label(cursor);
+            ui.separator();
+            ui.label(document.encoding.label());
+            if let Some(language) = &document.language_hint {
+                ui.separator();
+                ui.label(language);
+            }
+        });
+    });
+
+    // Consume the complete parent rect exactly once so following Dock content
+    // cannot overlap this editor.
+    ui.allocate_rect(full, egui::Sense::hover());
 
     result
 }
