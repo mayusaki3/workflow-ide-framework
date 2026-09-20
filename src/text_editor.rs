@@ -182,19 +182,32 @@ pub fn show_with_options(
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     let viewport = ui.available_size();
-                    let mut editor = egui::TextEdit::multiline(&mut document.text)
+                    let word_wrap = options.word_wrap;
+                    let mut layouter =
+                        move |ui: &egui::Ui, text: &dyn egui::TextBuffer, wrap_width: f32| {
+                            let max_width = if word_wrap {
+                                wrap_width
+                            } else {
+                                f32::INFINITY
+                            };
+                            let mut job = egui::text::LayoutJob::simple(
+                                text.as_str().to_owned(),
+                                egui::TextStyle::Monospace.resolve(ui.style()),
+                                ui.visuals().text_color(),
+                                max_width,
+                            );
+                            job.wrap.max_width = max_width;
+                            ui.fonts_mut(|fonts| fonts.layout_job(job))
+                        };
+
+                    let output = egui::TextEdit::multiline(&mut document.text)
+                        .desired_width(if word_wrap { viewport.x } else { f32::INFINITY })
                         .desired_rows(1)
                         .min_size(viewport)
                         .interactive(!document.read_only)
-                        .code_editor();
-
-                    editor = if options.word_wrap {
-                        editor.desired_width(viewport.x)
-                    } else {
-                        editor.desired_width(f32::INFINITY)
-                    };
-
-                    let output = editor.show(ui);
+                        .code_editor()
+                        .layouter(&mut layouter)
+                        .show(ui);
 
                     if output.response.changed() {
                         document.modified = true;
