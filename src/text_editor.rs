@@ -85,76 +85,88 @@ fn line_column(text: &str, char_index: usize) -> (usize, usize) {
 pub fn show(ui: &mut egui::Ui, document: &mut TextDocument) -> TextEditorResponse {
     let mut result = TextEditorResponse::default();
 
-    ui.horizontal(|ui| {
-        ui.strong(&document.display_name);
-        if document.modified {
-            ui.label("*");
-        }
-        if let Some(language) = &document.language_hint {
-            ui.separator();
-            ui.label(language);
-        }
-        if document.read_only {
-            ui.separator();
-            ui.label(crate::localization::text("text_editor.read_only"));
-        }
-        if ui
-            .add_enabled(
-                !document.read_only && document.modified,
-                egui::Button::new(crate::localization::text("text_editor.save")),
-            )
-            .clicked()
-        {
-            result.action = Some(TextEditorAction::SaveRequested);
-        }
-    });
-    ui.separator();
+    // Reserve the status bar at the bottom first so it can never escape the
+    // Dock panel. The editor then consumes only the remaining central area.
+    egui::TopBottomPanel::bottom(ui.id().with("text_editor_status"))
+        .resizable(false)
+        .show_inside(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(crate::localization::text("text_editor.no_cursor"));
+                ui.separator();
+                ui.label(document.encoding.label());
+                if let Some(language) = &document.language_hint {
+                    ui.separator();
+                    ui.label(language);
+                }
+            });
+        });
 
-    let status_height = ui.spacing().interact_size.y + ui.spacing().item_spacing.y;
-    let editor_height = (ui.available_height() - status_height).max(80.0);
-    let output = egui::TextEdit::multiline(&mut document.text)
-        .desired_width(f32::INFINITY)
-        .desired_rows(1)
-        .interactive(!document.read_only)
-        .code_editor()
-        .show(ui);
+    egui::TopBottomPanel::top(ui.id().with("text_editor_toolbar"))
+        .resizable(false)
+        .show_inside(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.strong(&document.display_name);
+                if document.modified {
+                    ui.label("*");
+                }
+                if let Some(language) = &document.language_hint {
+                    ui.separator();
+                    ui.label(language);
+                }
+                if document.read_only {
+                    ui.separator();
+                    ui.label(crate::localization::text("text_editor.read_only"));
+                }
+                if ui
+                    .add_enabled(
+                        !document.read_only && document.modified,
+                        egui::Button::new(crate::localization::text("text_editor.save")),
+                    )
+                    .clicked()
+                {
+                    result.action = Some(TextEditorAction::SaveRequested);
+                }
+            });
+        });
 
-    // Fill the remaining panel height instead of using a fixed row count.
-    let current_height = output.response.rect.height();
-    if current_height < editor_height {
-        ui.allocate_space(egui::vec2(0.0, editor_height - current_height));
-    }
+    egui::CentralPanel::default()
+        .frame(egui::Frame::NONE)
+        .show_inside(ui, |ui| {
+            let available = ui.available_size();
+            let output = egui::TextEdit::multiline(&mut document.text)
+                .desired_width(available.x)
+                .desired_rows(1)
+                .min_size(available)
+                .interactive(!document.read_only)
+                .code_editor()
+                .show(ui);
 
-    if output.response.changed() {
-        document.modified = true;
-        result.changed = true;
-    }
+            if output.response.changed() {
+                document.modified = true;
+                result.changed = true;
+            }
 
-    if let Some(range) = output.cursor_range {
-        let (line, column) = line_column(&document.text, range.primary.index);
-        result.cursor_line = Some(line);
-        result.cursor_column = Some(column);
-    }
+            if let Some(range) = output.cursor_range {
+                let (line, column) = line_column(&document.text, range.primary.index);
+                result.cursor_line = Some(line);
+                result.cursor_column = Some(column);
+            }
+        });
 
-    ui.separator();
-    ui.horizontal(|ui| {
-        let cursor = match (result.cursor_line, result.cursor_column) {
-            (Some(line), Some(column)) => format!(
-                "{} {}, {} {}",
-                crate::localization::text("text_editor.line"),
-                line,
-                crate::localization::text("text_editor.column"),
-                column
-            ),
-            _ => crate::localization::text("text_editor.no_cursor"),
-        };
-        ui.label(cursor);
-        ui.separator();
-        ui.label(document.encoding.label());
-        if let Some(language) = &document.language_hint {
-            ui.separator();
-            ui.label(language);
-        }
+    // Repaint the reserved status area with current-frame cursor information.
+    // TopBottomPanel keeps the geometry inside the parent Dock panel.
+    let status_text = match (result.cursor_line, result.cursor_column) {
+        (Some(line), Some(column)) => format!(
+            "{} {}, {} {}",
+            crate::localization::text("text_editor.line"),
+            line,
+            crate::localization::text("text_editor.column"),
+            column
+        ),
+        _ => crate::localization::text("text_editor.no_cursor"),
+    };
+    ui.ctx().data_mut(|data| {
+        data.insert_temp(ui.id().with("text_editor_status_text"), status_text);
     });
 
     result
