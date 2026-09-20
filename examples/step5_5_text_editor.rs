@@ -9,6 +9,7 @@ fn main() {
     config.window.initial_size = Some([1000.0, 700.0]);
     config.window.min_size = Some([720.0, 480.0]);
     config.appearance.font_path = Some("assets/fonts/default/NotoSansCJK-Regular.ttc".into());
+    config.localization.default_locale = wfide::localization::JA_JP.to_owned();
 
     wfide::Application::with_config(config)
         .panel(wfide::PanelDefinition::new(
@@ -26,6 +27,7 @@ fn main() {
             .language_hint("TOML"),
         )
         .layout(wfide::LayoutConfig::new(["text-editor"]).selected("text-editor"))
+        .language_settings_panel()
         .run()
         .expect("failed to start Step 5.5 Text Editor sample");
 }
