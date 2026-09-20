@@ -1,0 +1,22 @@
+use workflow_ide_framework as wfide;
+
+fn main() {
+    let mut config = wfide::ApplicationConfig::new(
+        "workflow-ide-framework-step5-5-text-editor",
+        "Workflow IDE Framework Step 5.5",
+    );
+    config.window.title = Some("Workflow IDE Framework - Step 5.5 Text Editor".into());
+    config.window.initial_size = Some([1000.0, 700.0]);
+    config.window.min_size = Some([720.0, 480.0]);
+    config.appearance.font_path = Some("assets/fonts/default/NotoSansCJK-Regular.ttc".into());
+
+    wfide::Application::with_config(config)
+        .panel(wfide::PanelDefinition::new(
+            "text-editor",
+            "Text Editor",
+            wfide::PanelKind::StandardUi,
+        ))
+        .layout(wfide::LayoutConfig::new(["text-editor"]).selected("text-editor"))
+        .run()
+        .expect("failed to start Step 5.5 Text Editor sample");
+}
