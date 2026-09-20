@@ -4,6 +4,7 @@ pub mod layout;
 pub mod localization;
 pub mod probe;
 pub mod table;
+pub mod text_editor;
 pub use layout::{LayoutConfig, SplitDirection};
 pub use tracing;
 
