@@ -24,6 +24,8 @@ pub struct TextDocument {
     pub modified: bool,
     pub language_hint: Option<String>,
     pub encoding: TextEncoding,
+    pub cursor_line: Option<usize>,
+    pub cursor_column: Option<usize>,
 }
 
 impl TextDocument {
@@ -36,6 +38,8 @@ impl TextDocument {
             modified: false,
             language_hint: None,
             encoding: TextEncoding::Utf8,
+            cursor_line: None,
+            cursor_column: None,
         }
     }
 
@@ -91,7 +95,17 @@ pub fn show(ui: &mut egui::Ui, document: &mut TextDocument) -> TextEditorRespons
         .resizable(false)
         .show_inside(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(crate::localization::text("text_editor.no_cursor"));
+                let cursor = match (document.cursor_line, document.cursor_column) {
+                    (Some(line), Some(column)) => format!(
+                        "{} {}, {} {}",
+                        crate::localization::text("text_editor.line"),
+                        line,
+                        crate::localization::text("text_editor.column"),
+                        column
+                    ),
+                    _ => crate::localization::text("text_editor.no_cursor"),
+                };
+                ui.label(cursor);
                 ui.separator();
                 ui.label(document.encoding.label());
                 if let Some(language) = &document.language_hint {
@@ -148,26 +162,12 @@ pub fn show(ui: &mut egui::Ui, document: &mut TextDocument) -> TextEditorRespons
 
             if let Some(range) = output.cursor_range {
                 let (line, column) = line_column(&document.text, range.primary.index);
+                document.cursor_line = Some(line);
+                document.cursor_column = Some(column);
                 result.cursor_line = Some(line);
                 result.cursor_column = Some(column);
             }
         });
-
-    // Repaint the reserved status area with current-frame cursor information.
-    // TopBottomPanel keeps the geometry inside the parent Dock panel.
-    let status_text = match (result.cursor_line, result.cursor_column) {
-        (Some(line), Some(column)) => format!(
-            "{} {}, {} {}",
-            crate::localization::text("text_editor.line"),
-            line,
-            crate::localization::text("text_editor.column"),
-            column
-        ),
-        _ => crate::localization::text("text_editor.no_cursor"),
-    };
-    ui.ctx().data_mut(|data| {
-        data.insert_temp(ui.id().with("text_editor_status_text"), status_text);
-    });
 
     result
 }
