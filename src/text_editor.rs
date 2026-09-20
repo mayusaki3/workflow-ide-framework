@@ -117,7 +117,7 @@ pub fn show_with_options(
             .layout(egui::Layout::top_down(egui::Align::Min)),
     );
 
-    egui::TopBottomPanel::top(root.id().with("toolbar"))
+    egui::Panel::top(root.id().with("toolbar"))
         .resizable(false)
         .show_inside(&mut root, |ui| {
             ui.horizontal(|ui| {
@@ -150,7 +150,7 @@ pub fn show_with_options(
             });
         });
 
-    egui::TopBottomPanel::bottom(root.id().with("status"))
+    egui::Panel::bottom(root.id().with("status"))
         .resizable(false)
         .show_inside(&mut root, |ui| {
             ui.horizontal(|ui| {
