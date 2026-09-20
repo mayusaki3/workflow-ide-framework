@@ -209,24 +209,6 @@ pub fn show_with_options(
                         .layouter(&mut layouter)
                         .show(ui);
 
-                    // egui emits an IME target for the focused TextEdit. Keep its
-                    // candidate/composition target on the actual primary caret,
-                    // including the ScrollArea offset, instead of allowing the
-                    // platform integration to fall back to the editor/window edge.
-                    if output.response.has_focus() {
-                        if let Some(range) = output.cursor_range {
-                            let caret_rect = output
-                                .galley
-                                .pos_from_cursor(range.primary)
-                                .translate(output.galley_pos.to_vec2());
-                            ui.ctx().output_mut(|platform| {
-                                if let Some(ime) = &mut platform.ime {
-                                    ime.cursor_rect = caret_rect;
-                                }
-                            });
-                        }
-                    }
-
                     if output.response.changed() {
                         document.modified = true;
                         result.changed = true;
