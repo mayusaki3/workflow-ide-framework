@@ -26,6 +26,7 @@ fn main() {
             )
             .language_hint("TOML"),
         )
+        .text_editor_ime_debug("text-editor", true)
         .layout(wfide::LayoutConfig::new(["text-editor"]).selected("text-editor"))
         .language_settings_panel()
         .run()
