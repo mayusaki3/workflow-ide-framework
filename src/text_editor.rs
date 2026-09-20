@@ -65,6 +65,17 @@ pub enum TextEditorAction {
 }
 
 #[derive(Debug, Default)]
+pub struct TextEditorOptions {
+    pub word_wrap: bool,
+}
+
+impl Default for TextEditorOptions {
+    fn default() -> Self {
+        Self { word_wrap: false }
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct TextEditorResponse {
     pub changed: bool,
     pub action: Option<TextEditorAction>,
@@ -87,6 +98,15 @@ fn line_column(text: &str, char_index: usize) -> (usize, usize) {
 }
 
 pub fn show(ui: &mut egui::Ui, document: &mut TextDocument) -> TextEditorResponse {
+    let mut options = TextEditorOptions::default();
+    show_with_options(ui, document, &mut options)
+}
+
+pub fn show_with_options(
+    ui: &mut egui::Ui,
+    document: &mut TextDocument,
+    options: &mut TextEditorOptions,
+) -> TextEditorResponse {
     let mut result = TextEditorResponse::default();
 
     // Build one child UI that owns exactly the Dock panel's available rect.
@@ -125,6 +145,11 @@ pub fn show(ui: &mut egui::Ui, document: &mut TextDocument) -> TextEditorRespons
                 {
                     result.action = Some(TextEditorAction::SaveRequested);
                 }
+                ui.separator();
+                ui.checkbox(
+                    &mut options.word_wrap,
+                    crate::localization::text("text_editor.word_wrap"),
+                );
             });
         });
 
@@ -158,18 +183,24 @@ pub fn show(ui: &mut egui::Ui, document: &mut TextDocument) -> TextEditorRespons
             // The TextEdit may be taller than the viewport when the document
             // grows. Keep that content inside an explicit vertical viewport;
             // the surrounding toolbar/status panels remain fixed siblings.
-            egui::ScrollArea::vertical()
+            egui::ScrollArea::both()
                 .id_salt("text_editor_scroll")
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     let viewport = ui.available_size();
-                    let output = egui::TextEdit::multiline(&mut document.text)
-                        .desired_width(viewport.x)
+                    let mut editor = egui::TextEdit::multiline(&mut document.text)
                         .desired_rows(1)
                         .min_size(viewport)
                         .interactive(!document.read_only)
-                        .code_editor()
-                        .show(ui);
+                        .code_editor();
+
+                    editor = if options.word_wrap {
+                        editor.desired_width(viewport.x)
+                    } else {
+                        editor.desired_width(f32::INFINITY)
+                    };
+
+                    let output = editor.show(ui);
 
                     if output.response.changed() {
                         document.modified = true;
