@@ -67,11 +67,13 @@ pub enum TextEditorAction {
 #[derive(Debug)]
 pub struct TextEditorOptions {
     pub word_wrap: bool,
+    /// Draw IME/caret coordinate diagnostics in the editor. Verification only.
+    pub ime_debug: bool,
 }
 
 impl Default for TextEditorOptions {
     fn default() -> Self {
-        Self { word_wrap: false }
+        Self { word_wrap: false, ime_debug: false }
     }
 }
 
@@ -220,6 +222,42 @@ pub fn show_with_options(
                         document.cursor_column = Some(column);
                         result.cursor_line = Some(line);
                         result.cursor_column = Some(column);
+
+                        if options.ime_debug && output.response.has_focus() {
+                            let cursor = output.galley.pos_from_cursor(range.primary);
+                            let caret = cursor.translate(output.galley_pos.to_vec2());
+                            let ime = ui.ctx().output(|platform| platform.ime.clone());
+
+                            ui.painter().rect_stroke(
+                                caret,
+                                0.0,
+                                egui::Stroke::new(1.0, egui::Color32::YELLOW),
+                                egui::StrokeKind::Outside,
+                            );
+                            if let Some(ime) = ime {
+                                ui.painter().rect_stroke(
+                                    ime.cursor_rect,
+                                    0.0,
+                                    egui::Stroke::new(1.0, egui::Color32::LIGHT_BLUE),
+                                    egui::StrokeKind::Outside,
+                                );
+                                ui.painter().text(
+                                    output.response.rect.left_top() + egui::vec2(4.0, 4.0),
+                                    egui::Align2::LEFT_TOP,
+                                    format!(
+                                        "IME DEBUG caret=({:.1},{:.1}) ime=({:.1},{:.1}) delta=({:.1},{:.1})",
+                                        caret.left(),
+                                        caret.top(),
+                                        ime.cursor_rect.left(),
+                                        ime.cursor_rect.top(),
+                                        ime.cursor_rect.left() - caret.left(),
+                                        ime.cursor_rect.top() - caret.top(),
+                                    ),
+                                    egui::TextStyle::Monospace.resolve(ui.style()),
+                                    egui::Color32::YELLOW,
+                                );
+                            }
+                        }
                     }
                 });
         });
