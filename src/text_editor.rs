@@ -64,7 +64,7 @@ pub enum TextEditorAction {
     SaveRequested,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TextEditorOptions {
     pub word_wrap: bool,
 }
@@ -109,9 +109,6 @@ pub fn show_with_options(
 ) -> TextEditorResponse {
     let mut result = TextEditorResponse::default();
 
-    // Build one child UI that owns exactly the Dock panel's available rect.
-    // Its top/bottom panels are siblings, so the status bar is reserved before
-    // the central editor and is not part of the editor's content/scroll extent.
     let full = ui.available_rect_before_wrap();
     let mut root = ui.new_child(
         egui::UiBuilder::new()
@@ -180,9 +177,6 @@ pub fn show_with_options(
     egui::CentralPanel::default()
         .frame(egui::Frame::NONE)
         .show_inside(&mut root, |ui| {
-            // The TextEdit may be taller than the viewport when the document
-            // grows. Keep that content inside an explicit vertical viewport;
-            // the surrounding toolbar/status panels remain fixed siblings.
             egui::ScrollArea::both()
                 .id_salt("text_editor_scroll")
                 .auto_shrink([false, false])
@@ -217,7 +211,6 @@ pub fn show_with_options(
                 });
         });
 
-    // Consume only the parent Dock allocation. Child content cannot enlarge it.
     ui.allocate_rect(full, egui::Sense::hover());
 
     result
