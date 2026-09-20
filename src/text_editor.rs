@@ -155,27 +155,35 @@ pub fn show(ui: &mut egui::Ui, document: &mut TextDocument) -> TextEditorRespons
     egui::CentralPanel::default()
         .frame(egui::Frame::NONE)
         .show_inside(&mut root, |ui| {
-            let available = ui.available_size();
-            let output = egui::TextEdit::multiline(&mut document.text)
-                .desired_width(available.x)
-                .desired_rows(1)
-                .min_size(available)
-                .interactive(!document.read_only)
-                .code_editor()
-                .show(ui);
+            // The TextEdit may be taller than the viewport when the document
+            // grows. Keep that content inside an explicit vertical viewport;
+            // the surrounding toolbar/status panels remain fixed siblings.
+            egui::ScrollArea::vertical()
+                .id_salt("text_editor_scroll")
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    let viewport = ui.available_size();
+                    let output = egui::TextEdit::multiline(&mut document.text)
+                        .desired_width(viewport.x)
+                        .desired_rows(1)
+                        .min_size(viewport)
+                        .interactive(!document.read_only)
+                        .code_editor()
+                        .show(ui);
 
-            if output.response.changed() {
-                document.modified = true;
-                result.changed = true;
-            }
+                    if output.response.changed() {
+                        document.modified = true;
+                        result.changed = true;
+                    }
 
-            if let Some(range) = output.cursor_range {
-                let (line, column) = line_column(&document.text, range.primary.index);
-                document.cursor_line = Some(line);
-                document.cursor_column = Some(column);
-                result.cursor_line = Some(line);
-                result.cursor_column = Some(column);
-            }
+                    if let Some(range) = output.cursor_range {
+                        let (line, column) = line_column(&document.text, range.primary.index);
+                        document.cursor_line = Some(line);
+                        document.cursor_column = Some(column);
+                        result.cursor_line = Some(line);
+                        result.cursor_column = Some(column);
+                    }
+                });
         });
 
     // Consume only the parent Dock allocation. Child content cannot enlarge it.
