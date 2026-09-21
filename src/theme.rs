@@ -24,11 +24,13 @@ impl Theme {
     }
 
     pub fn apply(self, ctx: &egui::Context) {
+        self.apply_with_system_dark(ctx, ctx.style().visuals.dark_mode);
+    }
+
+    pub fn apply_with_system_dark(self, ctx: &egui::Context, system_dark: bool) {
         match self {
             Self::System => {
-                // Temporary v0.1.0 behavior. Native OS theme tracking is handled separately.
-                let dark = ctx.style().visuals.dark_mode;
-                ctx.set_visuals(if dark { egui::Visuals::dark() } else { egui::Visuals::light() });
+                ctx.set_visuals(if system_dark { egui::Visuals::dark() } else { egui::Visuals::light() });
             }
             Self::Dark => ctx.set_visuals(egui::Visuals::dark()),
             Self::Light => ctx.set_visuals(egui::Visuals::light()),
@@ -39,6 +41,10 @@ impl Theme {
             Self::YoruNoIzumi => ctx.set_visuals(yoru_no_izumi_dark()),
             Self::FukaiAo => ctx.set_visuals(fukai_ao_dark()),
         }
+    }
+
+    pub fn effective_dark(self, system_dark: bool) -> bool {
+        self.is_dark().unwrap_or(system_dark)
     }
 }
 
