@@ -244,15 +244,27 @@ pub fn show_with_options(
                                 ui.painter().text(
                                     output.response.rect.left_top() + egui::vec2(4.0, 4.0),
                                     egui::Align2::LEFT_TOP,
-                                    format!(
-                                        "IME DEBUG caret=({:.1},{:.1}) ime=({:.1},{:.1}) delta=({:.1},{:.1})",
-                                        caret.left(),
-                                        caret.top(),
-                                        ime.cursor_rect.left(),
-                                        ime.cursor_rect.top(),
-                                        ime.cursor_rect.left() - caret.left(),
-                                        ime.cursor_rect.top() - caret.top(),
-                                    ),
+                                    {
+                                        let ctx = ui.ctx();
+                                        let ppp = ctx.pixels_per_point();
+                                        let native_ppp = ctx.native_pixels_per_point();
+                                        let zoom = ctx.zoom_factor();
+                                        let viewport = ctx.viewport_rect();
+                                        format!(
+                                            "IME DEBUG caret=({:.1},{:.1}) ime=({:.1},{:.1}) delta=({:.1},{:.1}) ppp={:.3} native_ppp={} zoom={:.3} viewport=({:.1}x{:.1})",
+                                            caret.left(),
+                                            caret.top(),
+                                            ime.cursor_rect.left(),
+                                            ime.cursor_rect.top(),
+                                            ime.cursor_rect.left() - caret.left(),
+                                            ime.cursor_rect.top() - caret.top(),
+                                            ppp,
+                                            native_ppp.map(|v| format!("{v:.3}")).unwrap_or_else(|| "None".to_owned()),
+                                            zoom,
+                                            viewport.width(),
+                                            viewport.height(),
+                                        )
+                                    },
                                     egui::TextStyle::Monospace.resolve(ui.style()),
                                     egui::Color32::YELLOW,
                                 );
