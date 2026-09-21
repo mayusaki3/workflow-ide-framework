@@ -21,3 +21,7 @@ name = "日本語"
 "text_editor.column" = "列"
 "text_editor.no_cursor" = "カーソルなし"
 "text_editor.word_wrap" = "折り返し"
+
+"log_viewer.auto_scroll" = "自動スクロール"
+"log_viewer.level" = "実行時レベル"
+"log_viewer.empty" = "ログはありません。"
