@@ -8,7 +8,14 @@ use std::{
 
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_appender::rolling::{Builder, Rotation};
-use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, reload, util::SubscriberInitExt};
+use tracing::{Event, Subscriber};
+use tracing_subscriber::{
+    filter::LevelFilter,
+    layer::{Context, Layer, SubscriberExt},
+    reload,
+    registry::LookupSpan,
+    util::SubscriberInitExt,
+};
 
 const DEFAULT_MEMORY_LINES: usize = 2_000;
 
@@ -29,23 +36,77 @@ pub enum LogLevel {
 #[derive(Debug, Clone)]
 pub struct LogEntry {
     pub level: LogLevel,
-    pub text: String,
+    pub target: String,
+    pub message: Option<String>,
+    pub fields: Vec<(String, String)>,
 }
 
 impl LogEntry {
-    fn from_formatted_line(text: String) -> Self {
-        let level = if text.contains(" ERROR ") {
-            LogLevel::Error
-        } else if text.contains(" WARN ") {
-            LogLevel::Warn
-        } else if text.contains(" DEBUG ") {
-            LogLevel::Debug
-        } else if text.contains(" TRACE ") {
-            LogLevel::Trace
+    pub fn display_text(&self) -> String {
+        let mut text = format!("{:?} {}", self.level, self.target);
+        if let Some(message) = &self.message {
+            text.push_str(": ");
+            text.push_str(message);
+        }
+        for (name, value) in &self.fields {
+            text.push(' ');
+            text.push_str(name);
+            text.push('=');
+            text.push_str(value);
+        }
+        text
+    }
+}
+
+#[derive(Default)]
+struct EventVisitor {
+    message: Option<String>,
+    fields: Vec<(String, String)>,
+}
+
+impl tracing::field::Visit for EventVisitor {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        let value = format!("{value:?}");
+        if field.name() == "message" {
+            self.message = Some(value.trim_matches('"').to_owned());
         } else {
-            LogLevel::Info
+            self.fields.push((field.name().to_owned(), value));
+        }
+    }
+}
+
+struct MemoryLayer {
+    buffer: Arc<Mutex<VecDeque<LogEntry>>>,
+    capacity: usize,
+}
+
+impl<S> Layer<S> for MemoryLayer
+where
+    S: Subscriber + for<'lookup> LookupSpan<'lookup>,
+{
+    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+        let metadata = event.metadata();
+        let level = match *metadata.level() {
+            tracing::Level::ERROR => LogLevel::Error,
+            tracing::Level::WARN => LogLevel::Warn,
+            tracing::Level::INFO => LogLevel::Info,
+            tracing::Level::DEBUG => LogLevel::Debug,
+            tracing::Level::TRACE => LogLevel::Trace,
         };
-        Self { level, text }
+        let mut visitor = EventVisitor::default();
+        event.record(&mut visitor);
+        let entry = LogEntry {
+            level,
+            target: metadata.target().to_owned(),
+            message: visitor.message,
+            fields: visitor.fields,
+        };
+        if let Ok(mut buffer) = self.buffer.lock() {
+            while buffer.len() >= self.capacity {
+                buffer.pop_front();
+            }
+            buffer.push_back(entry);
+        }
     }
 }
 
@@ -164,12 +225,7 @@ pub fn init(
     let make_writer = move || CombinedWriter {
         console: io::stdout(),
         file: file_writer.clone(),
-        memory: MemoryWriter {
-            buffer: memory.clone(),
-            capacity: memory_lines,
-            pending: Vec::new(),
-        },
-    };
+     };
 
     let (level_filter, level_handle) = reload::Layer::new(config.level.filter());
     // Keep the shared file/memory stream free of terminal ANSI escapes.
@@ -183,9 +239,15 @@ pub fn init(
         // event formatting from producing continuation rows without metadata.
         .compact();
 
+    let memory_layer = MemoryLayer {
+        buffer: memory,
+        capacity: memory_lines,
+    };
+
     tracing_subscriber::registry()
         .with(level_filter)
         .with(fmt_layer)
+        .with(memory_layer)
         .try_init()?;
 
     let _ = LEVEL_RELOAD.set(level_handle);
@@ -199,54 +261,19 @@ pub fn init(
 struct CombinedWriter {
     console: io::Stdout,
     file: NonBlocking,
-    memory: MemoryWriter,
-}
+ }
 
 impl Write for CombinedWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.console.write_all(buf)?;
         self.file.write_all(buf)?;
-        self.memory.write_all(buf)?;
-        Ok(buf.len())
+         Ok(buf.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {
         self.console.flush()?;
         self.file.flush()?;
-        self.memory.flush()
-    }
-}
-
-struct MemoryWriter {
-    buffer: Arc<Mutex<VecDeque<LogEntry>>>,
-    capacity: usize,
-    pending: Vec<u8>,
-}
-
-impl MemoryWriter {
-    fn push_complete_lines(&mut self) {
-        while let Some(pos) = self.pending.iter().position(|byte| *byte == b'\n') {
-            let bytes: Vec<u8> = self.pending.drain(..=pos).collect();
-            let line = String::from_utf8_lossy(&bytes).trim_end().to_owned();
-            if let Ok(mut buffer) = self.buffer.lock() {
-                while buffer.len() >= self.capacity {
-                    buffer.pop_front();
-                }
-                buffer.push_back(LogEntry::from_formatted_line(line));
-            }
-        }
-    }
-}
-
-impl Write for MemoryWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.pending.extend_from_slice(buf);
-        self.push_complete_lines();
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.push_complete_lines();
         Ok(())
     }
 }
+
