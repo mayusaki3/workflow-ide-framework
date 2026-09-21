@@ -1,5 +1,6 @@
 use eframe::egui;
 pub mod logging;
+pub mod log_viewer;
 pub mod layout;
 pub mod localization;
 pub mod probe;
@@ -137,6 +138,7 @@ pub struct Application {
     config: ApplicationConfig,
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
+    log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
 }
 
 impl Application {
@@ -149,6 +151,7 @@ impl Application {
             config,
             text_editors: std::collections::HashMap::new(),
             text_editor_options: std::collections::HashMap::new(),
+            log_viewers: std::collections::HashMap::new(),
         }
     }
 
@@ -168,6 +171,12 @@ impl Application {
     /// Intended for Framework verification, not normal consumer UI.
     pub fn text_editor_ime_debug(mut self, panel_id: impl Into<String>, enabled: bool) -> Self {
         self.text_editor_options.entry(panel_id.into()).or_default().ime_debug = enabled;
+        self
+    }
+
+    /// Registers a Framework Standard Log Viewer for a declared Standard UI Panel.
+    pub fn log_viewer_panel(mut self, panel_id: impl Into<String>) -> Self {
+        self.log_viewers.entry(panel_id.into()).or_default();
         self
     }
 
@@ -204,6 +213,7 @@ impl Application {
         let mut config = self.config;
         let text_editors = self.text_editors;
         let text_editor_options = self.text_editor_options;
+        let log_viewers = self.log_viewers;
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
             config.panels.push(
                 PanelDefinition::new(probe::PANEL_ID, "WFIDE Probe", PanelKind::StandardUi)
@@ -286,6 +296,7 @@ impl Application {
                     dock_state,
                     text_editors,
                     text_editor_options,
+                    log_viewers,
                 }))
             }),
         )
@@ -297,6 +308,7 @@ struct FrameworkHost {
     dock_state: Option<egui_dock::DockState<String>>,
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
+    log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
 }
 
 impl eframe::App for FrameworkHost {
@@ -318,6 +330,7 @@ impl eframe::App for FrameworkHost {
                 logging_retention: self.config.logging.retention_days,
                 text_editors: &mut self.text_editors,
                 text_editor_options: &mut self.text_editor_options,
+                log_viewers: &mut self.log_viewers,
             };
             egui_dock::DockArea::new(dock_state).show_inside(ui, &mut viewer);
         } else if !self.config.panels.is_empty() {
@@ -345,6 +358,7 @@ struct FrameworkTabViewer<'a> {
     logging_retention: usize,
     text_editors: &'a mut std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: &'a mut std::collections::HashMap<String, text_editor::TextEditorOptions>,
+    log_viewers: &'a mut std::collections::HashMap<String, log_viewer::LogViewerOptions>,
 }
 
 impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
@@ -426,6 +440,11 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
             ui.separator();
             let model = probe::table_model(true, self.dock_active);
             table::show(ui, "wfide_probe_table", &model);
+            return;
+        }
+
+        if let Some(options) = self.log_viewers.get_mut(tab) {
+            log_viewer::show(ui, options);
             return;
         }
 
