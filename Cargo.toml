@@ -6,8 +6,8 @@ license = "MIT"
 description = "Framework for building dockable workflow IDE applications"
 
 [dependencies]
-eframe = "0.34.2"
-egui-winit = "0.34.2"
+eframe = "=0.34.3"
+egui-winit = "=0.34.3"
 egui_dock = "0.19.1"
 winit = "0.30.13"
 softbuffer = "0.4"
