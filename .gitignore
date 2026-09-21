@@ -32,3 +32,6 @@ dock_layout.json
 # Keep directory
 !assets/fonts/default/.gitkeep
 !assets/fonts/default/README.md
+
+# Generated from the local Cargo registry by the Step 5.5 IME diagnostic setup.
+patches/egui-winit-0.34.3/
