@@ -108,12 +108,27 @@ where
             seconds % 60,
             millis
         );
+        // Preserve the original target for events bridged from the log crate,
+        // while keeping bridge source metadata out of the normal viewer.
+        let mut target = metadata.target().to_owned();
+        let mut fields = Vec::new();
+        for (name, value) in visitor.fields {
+            if name == "log.target" {
+                target = value.trim_matches('"').to_owned();
+            } else if !matches!(
+                name.as_str(),
+                "log.module_path" | "log.file" | "log.line"
+            ) {
+                fields.push((name, value));
+            }
+        }
+
         let entry = LogEntry {
             time,
             level,
-            target: metadata.target().to_owned(),
+            target,
             message: visitor.message,
-            fields: visitor.fields,
+            fields,
         };
         if let Ok(mut buffer) = self.buffer.lock() {
             while buffer.len() >= self.capacity {
