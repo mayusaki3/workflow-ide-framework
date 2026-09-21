@@ -281,6 +281,16 @@ impl Application {
             viewport = viewport.with_min_inner_size([width, height]);
         }
 
+        // Explicit themes also tell the native window chrome whether it is
+        // light or dark. System leaves the choice to the OS/native integration.
+        if let Some(dark) = config.appearance.theme.is_dark() {
+            viewport = viewport.with_theme(if dark {
+                egui::Theme::Dark
+            } else {
+                egui::Theme::Light
+            });
+        }
+
         let native_options = eframe::NativeOptions {
             viewport,
             ..Default::default()
@@ -312,6 +322,7 @@ impl Application {
                 }
 
                 Ok(Box::new(FrameworkHost {
+                    last_native_theme: None,
                     config,
                     dock_state,
                     text_editors,
@@ -325,6 +336,7 @@ impl Application {
 
 struct FrameworkHost {
     config: ApplicationConfig,
+    last_native_theme: Option<egui::Theme>,
     dock_state: Option<egui_dock::DockState<String>>,
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
@@ -332,6 +344,20 @@ struct FrameworkHost {
 }
 
 impl eframe::App for FrameworkHost {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let native_theme = ctx.input(|i| i.viewport().native_theme);
+        if self.config.appearance.theme == theme::Theme::System && native_theme != self.last_native_theme {
+            if let Some(native_theme) = native_theme {
+                self.config.appearance.theme.apply_with_system_dark(ctx, native_theme == egui::Theme::Dark);
+                tracing::info!(target: "wfide::theme", ?native_theme, "system theme changed");
+            }
+            self.last_native_theme = native_theme;
+        }
+        egui::CentralPanel::default().show(ctx, |ui| self.ui(ui, _frame));
+    }
+}
+
+impl FrameworkHost {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         ui.heading(&self.config.name);
         ui.label(format!("Application ID: {}", self.config.id));
@@ -405,6 +431,12 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
         if self.theme_settings_enabled && tab == "__wfide_theme_settings" {
             if theme::show_settings(ui, self.theme) {
                 self.theme.apply(ui.ctx());
+                let command = match self.theme.is_dark() {
+                    Some(true) => egui::ViewportCommand::SetTheme(egui::Theme::Dark),
+                    Some(false) => egui::ViewportCommand::SetTheme(egui::Theme::Light),
+                    None => egui::ViewportCommand::SetTheme(egui::Theme::System),
+                };
+                ui.ctx().send_viewport_cmd(command);
                 tracing::info!(target: "wfide::theme", theme = ?self.theme, "theme changed");
             }
             return;
