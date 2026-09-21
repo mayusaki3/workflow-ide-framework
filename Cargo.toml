@@ -54,3 +54,7 @@ path = "examples/step4_5_probe_panel.rs"
 [[example]]
 name = "step5_5_text_editor"
 path = "examples/step5_5_text_editor.rs"
+
+[[example]]
+name = "step5_6_log_viewer"
+path = "examples/step5_6_log_viewer.rs"
