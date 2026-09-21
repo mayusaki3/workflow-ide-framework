@@ -5,5 +5,6 @@ fn main() -> eframe::Result<()> {
         .panel(PanelDefinition::new("logs", "Logs", PanelKind::StandardUi))
         .layout(LayoutConfig::new(["logs"]))
         .log_viewer_panel("logs")
+        .theme_settings_panel()
         .run()
 }
