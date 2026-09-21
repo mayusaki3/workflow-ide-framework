@@ -250,8 +250,12 @@ pub fn show_with_options(
                                         let native_ppp = ctx.native_pixels_per_point();
                                         let zoom = ctx.zoom_factor();
                                         let viewport = ctx.viewport_rect();
+                                        let physical_x = ime.cursor_rect.left() * ppp;
+                                        let physical_y = ime.cursor_rect.top() * ppp;
+                                        let physical_w = ime.cursor_rect.width() * ppp;
+                                        let physical_h = ime.cursor_rect.height() * ppp;
                                         format!(
-                                            "IME DEBUG caret=({:.1},{:.1}) ime=({:.1},{:.1}) delta=({:.1},{:.1}) ppp={:.3} native_ppp={} zoom={:.3} viewport=({:.1}x{:.1})",
+                                            "IME DEBUG caret=({:.1},{:.1}) ime=({:.1},{:.1}) delta=({:.1},{:.1}) ppp={:.3} native_ppp={} zoom={:.3} send=({:.1},{:.1},{:.1},{:.1}) viewport=({:.1}x{:.1})",
                                             caret.left(),
                                             caret.top(),
                                             ime.cursor_rect.left(),
@@ -261,6 +265,10 @@ pub fn show_with_options(
                                             ppp,
                                             native_ppp.map(|v| format!("{v:.3}")).unwrap_or_else(|| "None".to_owned()),
                                             zoom,
+                                            physical_x,
+                                            physical_y,
+                                            physical_w,
+                                            physical_h,
                                             viewport.width(),
                                             viewport.height(),
                                         )
