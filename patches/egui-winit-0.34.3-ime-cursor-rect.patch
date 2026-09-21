@@ -1,0 +1,8 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@
+-            let ime_rect_px = pixels_per_point * ime.rect;
++            // WFIDE temporary workaround:
++            // IME candidate windows must follow the primary text cursor, not
++            // the full TextEdit widget rectangle.
++            let ime_rect_px = pixels_per_point * ime.cursor_rect;
