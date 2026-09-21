@@ -149,8 +149,12 @@ pub fn init(
     };
 
     let (level_filter, level_handle) = reload::Layer::new(config.level.filter());
+    // Keep the shared file/memory stream free of terminal ANSI escapes.
+    // Console coloring can be added as a separate presentation layer later;
+    // Log Viewer must receive structured/plain data rather than terminal control codes.
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_target(true)
+        .with_ansi(false)
         .with_writer(make_writer);
 
     tracing_subscriber::registry()
