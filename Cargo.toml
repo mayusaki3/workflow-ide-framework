@@ -9,6 +9,7 @@ description = "Framework for building dockable workflow IDE applications"
 eframe = "0.34.2"
 egui_dock = "0.19.1"
 winit = "0.30.13"
+softbuffer = "0.4"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
