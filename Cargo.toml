@@ -17,6 +17,12 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.9"
 
+# Temporary Step 5.5 diagnostic patch. The patched egui-winit source is vendored
+# under patches/ and must stay API-compatible with 0.34.3. Remove after the IME
+# candidate-position issue is resolved or upstreamed.
+[patch.crates-io]
+egui-winit = { path = "patches/egui-winit-0.34.3" }
+
 [[example]]
 name = "step1_minimal"
 path = "examples/step1_minimal.rs"
