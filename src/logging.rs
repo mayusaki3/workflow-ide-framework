@@ -35,6 +35,7 @@ pub enum LogLevel {
 
 #[derive(Debug, Clone)]
 pub struct LogEntry {
+    pub time: String,
     pub level: LogLevel,
     pub target: String,
     pub message: Option<String>,
@@ -43,7 +44,7 @@ pub struct LogEntry {
 
 impl LogEntry {
     pub fn display_text(&self) -> String {
-        let mut text = format!("{:?} {}", self.level, self.target);
+        let mut text = format!("{} {:?} {}", self.time, self.level, self.target);
         if let Some(message) = &self.message {
             text.push_str(": ");
             text.push_str(message);
@@ -95,7 +96,20 @@ where
         };
         let mut visitor = EventVisitor::default();
         event.record(&mut visitor);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default();
+        let seconds = now.as_secs() % 86_400;
+        let millis = now.subsec_millis();
+        let time = format!(
+            "{:02}:{:02}:{:02}.{:03}",
+            seconds / 3_600,
+            (seconds % 3_600) / 60,
+            seconds % 60,
+            millis
+        );
         let entry = LogEntry {
+            time,
             level,
             target: metadata.target().to_owned(),
             message: visitor.message,
