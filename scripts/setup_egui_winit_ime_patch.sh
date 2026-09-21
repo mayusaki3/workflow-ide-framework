@@ -2,7 +2,9 @@
 set -euo pipefail
 VERSION="${1:-0.34.3}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REGISTRY_ROOT="${CARGO_HOME:-$HOME/.cargo}/registry/src"
+CARGO_HOME_DIR="${CARGO_HOME:-$HOME/.cargo}"
+REGISTRY_ROOT="$CARGO_HOME_DIR/registry/src"
+if [[ ! -d "$REGISTRY_ROOT" ]]; then cargo fetch; fi
 SOURCE="$(find "$REGISTRY_ROOT" -mindepth 2 -maxdepth 2 -type d -name "egui-winit-$VERSION" -print -quit)"
 if [[ -z "$SOURCE" ]]; then echo "egui-winit $VERSION was not found. Run cargo fetch first." >&2; exit 1; fi
 PATCH_ROOT="$REPO_ROOT/patches/egui-winit-$VERSION"
