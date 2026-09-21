@@ -360,6 +360,14 @@ impl eframe::App for FrameworkHost {
         // Refresh the root Ui style so the application header follows the same
         // theme in the same frame as Dock/Panel content.
         ui.set_style(ui.ctx().global_style());
+        // The root Ui background was already painted by eframe before App::ui.
+        // Repaint the application area with the active theme so runtime
+        // changes affect the header as well as subsequently-created panels.
+        ui.painter().rect_filled(
+            ui.max_rect(),
+            0.0,
+            ui.visuals().panel_fill,
+        );
 
         ui.heading(&self.config.name);
         ui.label(format!("Application ID: {}", self.config.id));
