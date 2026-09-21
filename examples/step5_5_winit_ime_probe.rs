@@ -52,7 +52,10 @@ impl ApplicationHandler for App {
             WindowEvent::CursorMoved { position, .. } => {
                 self.ime_pos = position;
                 window.set_ime_cursor_area(position, PhysicalSize::new(2, 24));
-                window.set_title(&format!("WFIDE IME Probe | cursor=({:.0},{:.0}) | composing: {}", position.x, position.y, self.preedit));
+                window.set_title(&format!(
+                    "WFIDE IME Probe | cursor=({:.0},{:.0}) | composing: {}",
+                    position.x, position.y, self.preedit
+                ));
             }
             WindowEvent::Ime(event) => {
                 println!("IME EVENT {event:?}");
@@ -79,7 +82,8 @@ fn main() {
     println!("Direct winit IME probe");
     println!("1. Enable Japanese IME.");
     println!("2. Move the mouse to the left or right side of this window.");
-    println!("3. Start composition. The current preedit text is shown in the window title.");\n    println!("4. Candidate UI should appear near the mouse position.");
+    println!("3. Start composition. The current preedit text is shown in the window title.");
+    println!("4. Candidate UI should appear near the mouse position.");
     let event_loop = EventLoop::new().expect("create event loop");
     event_loop.run_app(&mut App::default()).expect("run app");
 }
