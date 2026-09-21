@@ -18,6 +18,10 @@ serde = { version = "1", features = ["derive"] }
 toml = "0.9"
 
 
+# Step 5.5 diagnostic: run scripts/setup_egui_winit_ime_patch.ps1 first.
+[patch.crates-io]
+egui-winit = { path = "patches/egui-winit-0.34.3" }
+
 [[example]]
 name = "step1_minimal"
 path = "examples/step1_minimal.rs"
