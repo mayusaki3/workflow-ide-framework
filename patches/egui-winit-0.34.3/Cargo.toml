@@ -1,0 +1,30 @@
+[package]
+name = "egui-winit"
+version = "0.34.3"
+edition = "2021"
+publish = false
+
+[features]
+default = ["wayland", "x11", "clipboard", "links"]
+accesskit = []
+android-game-activity = ["winit/android-game-activity"]
+android-native-activity = ["winit/android-native-activity"]
+bytemuck = []
+clipboard = []
+document-features = []
+links = []
+serde = []
+wayland = ["winit/wayland"]
+x11 = ["winit/x11"]
+
+[dependencies]
+egui = "=0.34.3"
+log = "0.4"
+profiling = "1"
+raw-window-handle = "0.6"
+web-time = "1"
+winit = { version = "0.30.13", default-features = false }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+arboard = { version = "3", optional = true }
+webbrowser = { version = "1", optional = true }
