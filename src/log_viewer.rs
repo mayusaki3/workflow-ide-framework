@@ -32,29 +32,17 @@ pub fn show(ui: &mut egui::Ui, options: &mut LogViewerOptions) {
         ui.separator();
     }
 
-    let lines = crate::logging::snapshot();
+    let entries = crate::logging::snapshot();
     egui::ScrollArea::both()
         .stick_to_bottom(options.auto_scroll)
         .auto_shrink([false, false])
         .show(ui, |ui| {
             ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-            if lines.is_empty() {
+            if entries.is_empty() {
                 ui.label(crate::localization::text("log_viewer.empty"));
             } else {
-                for line in lines {
-                    let level = if line.contains(" ERROR ") {
-                        crate::logging::LogLevel::Error
-                    } else if line.contains(" WARN ") {
-                        crate::logging::LogLevel::Warn
-                    } else if line.contains(" DEBUG ") {
-                        crate::logging::LogLevel::Debug
-                    } else if line.contains(" TRACE ") {
-                        crate::logging::LogLevel::Trace
-                    } else {
-                        crate::logging::LogLevel::Info
-                    };
-
-                    let color = match level {
+                for entry in entries {
+                    let color = match entry.level {
                         crate::logging::LogLevel::Error => ui.visuals().error_fg_color,
                         crate::logging::LogLevel::Warn => ui.visuals().warn_fg_color,
                         crate::logging::LogLevel::Info => ui.visuals().text_color(),
@@ -62,7 +50,7 @@ pub fn show(ui: &mut egui::Ui, options: &mut LogViewerOptions) {
                         crate::logging::LogLevel::Trace => ui.visuals().weak_text_color(),
                     };
 
-                    ui.label(egui::RichText::new(line).monospace().color(color));
+                    ui.label(egui::RichText::new(entry.text).monospace().color(color));
                 }
             }
         });
