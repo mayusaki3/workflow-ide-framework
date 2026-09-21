@@ -6,6 +6,7 @@ pub mod localization;
 pub mod probe;
 pub mod table;
 pub mod text_editor;
+pub mod theme;
 pub use layout::{LayoutConfig, SplitDirection};
 pub use tracing;
 
@@ -53,6 +54,7 @@ pub struct ApplicationConfig {
     pub probe_panel: bool,
     pub logging_settings_panel: bool,
     pub language_settings_panel: bool,
+    pub theme_settings_panel: bool,
     pub localization: localization::LocalizationConfig,
 }
 
@@ -69,6 +71,7 @@ impl ApplicationConfig {
             probe_panel: false,
             logging_settings_panel: false,
             language_settings_panel: false,
+            theme_settings_panel: false,
             localization: localization::LocalizationConfig::default(),
         }
     }
@@ -97,6 +100,7 @@ pub struct AppearanceConfig {
     /// Optional application font file. When set, WFIDE loads it into egui
     /// before the first frame and gives it priority for proportional text.
     pub font_path: Option<std::path::PathBuf>,
+    pub theme: theme::Theme,
 }
 
 impl Default for AppearanceConfig {
@@ -104,6 +108,7 @@ impl Default for AppearanceConfig {
         Self {
             ui_scale: None,
             font_path: None,
+            theme: theme::Theme::System,
         }
     }
 }
@@ -209,6 +214,12 @@ impl Application {
         self
     }
 
+    /// Enables the Framework standard Theme Settings Panel.
+    pub fn theme_settings_panel(mut self) -> Self {
+        self.config.theme_settings_panel = true;
+        self
+    }
+
     pub fn run(self) -> eframe::Result<()> {
         let mut config = self.config;
         let text_editors = self.text_editors;
@@ -236,6 +247,14 @@ impl Application {
             );
             if let Some(layout) = &mut config.layout {
                 layout.root_panel_ids.push("__wfide_language_settings".to_owned());
+            }
+        }
+        if config.theme_settings_panel && !config.panels.iter().any(|panel| panel.id == "__wfide_theme_settings") {
+            config.panels.push(
+                PanelDefinition::new("__wfide_theme_settings", "Theme Settings", PanelKind::StandardUi)
+            );
+            if let Some(layout) = &mut config.layout {
+                layout.root_panel_ids.push("__wfide_theme_settings".to_owned());
             }
         }
         localization::init(&config.localization);
@@ -271,6 +290,7 @@ impl Application {
             &window_title,
             native_options,
             Box::new(move |cc| {
+                config.appearance.theme.apply(&cc.egui_ctx);
                 if let Some(scale) = config.appearance.ui_scale {
                     cc.egui_ctx.set_zoom_factor(scale);
                 }
@@ -324,6 +344,8 @@ impl eframe::App for FrameworkHost {
                 probe_enabled: self.config.probe_panel,
                 logging_settings_enabled: self.config.logging_settings_panel,
                 language_settings_enabled: self.config.language_settings_panel,
+                theme_settings_enabled: self.config.theme_settings_panel,
+                theme: &mut self.config.appearance.theme,
                 dock_active: true,
                 logging_directory: self.config.logging.directory.clone(),
                 logging_file_prefix: self.config.logging.file_prefix.clone(),
@@ -352,6 +374,8 @@ struct FrameworkTabViewer<'a> {
     probe_enabled: bool,
     logging_settings_enabled: bool,
     language_settings_enabled: bool,
+    theme_settings_enabled: bool,
+    theme: &'a mut theme::Theme,
     dock_active: bool,
     logging_directory: std::path::PathBuf,
     logging_file_prefix: String,
@@ -378,6 +402,14 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        if self.theme_settings_enabled && tab == "__wfide_theme_settings" {
+            if theme::show_settings(ui, self.theme) {
+                self.theme.apply(ui.ctx());
+                tracing::info!(target: "wfide::theme", theme = ?self.theme, "theme changed");
+            }
+            return;
+        }
+
         if self.language_settings_enabled && tab == "__wfide_language_settings" {
             ui.heading(localization::text("language.title"));
             ui.label(localization::text("language.description"));
