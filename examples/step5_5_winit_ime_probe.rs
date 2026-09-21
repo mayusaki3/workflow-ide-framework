@@ -5,6 +5,7 @@
 //! eframe, Dock and TextEditor.
 
 use std::sync::Arc;
+use winit::window::WindowLevel;
 use winit::{
     application::ApplicationHandler,
     dpi::{PhysicalPosition, PhysicalSize},
@@ -28,7 +29,9 @@ impl ApplicationHandler for App {
                     .create_window(
                         WindowAttributes::default()
                             .with_title("WFIDE - Direct winit IME Cursor Area Probe")
-                            .with_inner_size(PhysicalSize::new(1000, 700)),
+                            .with_inner_size(PhysicalSize::new(1000, 700))
+                            .with_visible(true)
+                            .with_window_level(WindowLevel::Normal),
                     )
                     .expect("create window"),
             );
@@ -36,6 +39,7 @@ impl ApplicationHandler for App {
             self.ime_pos = PhysicalPosition::new(100.0, 200.0);
             window.set_ime_cursor_area(self.ime_pos, PhysicalSize::new(2, 24));
             println!("IME AREA x={:.1} y={:.1}", self.ime_pos.x, self.ime_pos.y);
+            window.request_redraw();
             self.window = Some(window);
         }
     }
@@ -49,6 +53,10 @@ impl ApplicationHandler for App {
         let Some(window) = self.window.as_ref() else { return };
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::RedrawRequested => {
+                // No renderer is intentionally attached. Requesting redraw after the
+                // initial Wayland configure keeps the probe window lifecycle active.
+            }
             WindowEvent::CursorMoved { position, .. } => {
                 self.ime_pos = position;
                 window.set_ime_cursor_area(position, PhysicalSize::new(2, 24));
