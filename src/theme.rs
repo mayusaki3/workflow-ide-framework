@@ -9,6 +9,9 @@ pub enum Theme {
     Sakura,
     Izumi,
     Ao,
+    Yozakura,
+    YoruNoIzumi,
+    FukaiAo,
 }
 
 impl Theme {
@@ -24,6 +27,9 @@ impl Theme {
             Self::Sakura => ctx.set_visuals(sakura_light()),
             Self::Izumi => ctx.set_visuals(izumi_light()),
             Self::Ao => ctx.set_visuals(ao_light()),
+            Self::Yozakura => ctx.set_visuals(yozakura_dark()),
+            Self::YoruNoIzumi => ctx.set_visuals(yoru_no_izumi_dark()),
+            Self::FukaiAo => ctx.set_visuals(fukai_ao_dark()),
         }
     }
 }
@@ -72,6 +78,49 @@ fn ao_light() -> egui::Visuals {
     visuals
 }
 
+
+fn dark_palette(background: egui::Color32, panel: egui::Color32, accent: egui::Color32) -> egui::Visuals {
+    let mut visuals = egui::Visuals::dark();
+    visuals.panel_fill = panel;
+    visuals.window_fill = panel;
+    visuals.extreme_bg_color = background;
+    visuals.faint_bg_color = panel;
+    visuals.selection.bg_fill = accent;
+    visuals.hyperlink_color = accent;
+    visuals.widgets.noninteractive.bg_fill = panel;
+    visuals.widgets.inactive.bg_fill = background;
+    visuals.widgets.hovered.bg_fill = accent.gamma_multiply(0.55);
+    visuals.widgets.active.bg_fill = accent.gamma_multiply(0.75);
+    visuals
+}
+
+/// 夜桜: deep night background with subdued sakura-pink accents.
+fn yozakura_dark() -> egui::Visuals {
+    dark_palette(
+        egui::Color32::from_rgb(28, 22, 30),
+        egui::Color32::from_rgb(39, 29, 40),
+        egui::Color32::from_rgb(214, 105, 145),
+    )
+}
+
+/// 夜の泉: dark water blue with restrained young-grass accents.
+fn yoru_no_izumi_dark() -> egui::Visuals {
+    dark_palette(
+        egui::Color32::from_rgb(17, 32, 38),
+        egui::Color32::from_rgb(22, 43, 47),
+        egui::Color32::from_rgb(104, 166, 119),
+    )
+}
+
+/// 深い蒼: deep indigo/navy palette.
+fn fukai_ao_dark() -> egui::Visuals {
+    dark_palette(
+        egui::Color32::from_rgb(12, 25, 43),
+        egui::Color32::from_rgb(17, 35, 58),
+        egui::Color32::from_rgb(72, 124, 174),
+    )
+}
+
 pub fn show_settings(ui: &mut egui::Ui, current: &mut Theme) -> bool {
     ui.heading(crate::localization::text("theme.title"));
     ui.label(crate::localization::text("theme.description"));
@@ -85,6 +134,9 @@ pub fn show_settings(ui: &mut egui::Ui, current: &mut Theme) -> bool {
         (Theme::Sakura, "theme.sakura"),
         (Theme::Izumi, "theme.izumi"),
         (Theme::Ao, "theme.ao"),
+        (Theme::Yozakura, "theme.yozakura"),
+        (Theme::YoruNoIzumi, "theme.yoru_no_izumi"),
+        (Theme::FukaiAo, "theme.fukai_ao"),
     ] {
         let selected = *current == theme;
         if ui.radio(selected, crate::localization::text(key)).clicked() && !selected {
