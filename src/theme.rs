@@ -135,7 +135,46 @@ fn fukai_ao_dark() -> egui::Visuals {
     )
 }
 
-pub fn show_settings(ui: &mut egui::Ui, current: &mut Theme) -> bool {
+#[derive(Debug, Clone, Copy)]
+pub struct ThemeEditor {
+    pub panel_fill: egui::Color32,
+    pub input_fill: egui::Color32,
+    pub accent: egui::Color32,
+    pub text: egui::Color32,
+}
+
+impl ThemeEditor {
+    pub fn from_context(ctx: &egui::Context) -> Self {
+        let visuals = &ctx.global_style().visuals;
+        Self {
+            panel_fill: visuals.panel_fill,
+            input_fill: visuals.extreme_bg_color,
+            accent: visuals.selection.bg_fill,
+            text: visuals.text_color(),
+        }
+    }
+
+    pub fn apply(self, ctx: &egui::Context) {
+        ctx.global_style_mut(|style| {
+            let visuals = &mut style.visuals;
+            visuals.panel_fill = self.panel_fill;
+            visuals.window_fill = self.panel_fill;
+            visuals.extreme_bg_color = self.input_fill;
+            visuals.selection.bg_fill = self.accent;
+            visuals.hyperlink_color = self.accent;
+            visuals.widgets.noninteractive.fg_stroke.color = self.text;
+            visuals.widgets.inactive.fg_stroke.color = self.text;
+            visuals.widgets.hovered.fg_stroke.color = self.text;
+            visuals.widgets.active.fg_stroke.color = self.text;
+        });
+    }
+}
+
+pub fn show_settings(
+    ui: &mut egui::Ui,
+    current: &mut Theme,
+    editor: &mut Option<ThemeEditor>,
+) -> bool {
     ui.heading(crate::localization::text("theme.title"));
     ui.label(crate::localization::text("theme.description"));
     ui.separator();
@@ -181,5 +220,40 @@ pub fn show_settings(ui: &mut egui::Ui, current: &mut Theme) -> bool {
             changed = true;
         }
     }
+
+    ui.add_space(10.0);
+    ui.separator();
+    egui::CollapsingHeader::new(crate::localization::text("theme.editor"))
+        .default_open(false)
+        .show(ui, |ui| {
+            if editor.is_none() {
+                *editor = Some(ThemeEditor::from_context(ui.ctx()));
+            }
+            let edit = editor.as_mut().expect("theme editor initialized");
+            let mut edited = false;
+            ui.horizontal(|ui| {
+                ui.label(crate::localization::text("theme.editor_panel"));
+                edited |= ui.color_edit_button_srgba(&mut edit.panel_fill).changed();
+            });
+            ui.horizontal(|ui| {
+                ui.label(crate::localization::text("theme.editor_input"));
+                edited |= ui.color_edit_button_srgba(&mut edit.input_fill).changed();
+            });
+            ui.horizontal(|ui| {
+                ui.label(crate::localization::text("theme.editor_accent"));
+                edited |= ui.color_edit_button_srgba(&mut edit.accent).changed();
+            });
+            ui.horizontal(|ui| {
+                ui.label(crate::localization::text("theme.editor_text"));
+                edited |= ui.color_edit_button_srgba(&mut edit.text).changed();
+            });
+            if edited {
+                edit.apply(ui.ctx());
+            }
+            if ui.button(crate::localization::text("theme.editor_reset")).clicked() {
+                current.apply(ui.ctx());
+                *edit = ThemeEditor::from_context(ui.ctx());
+            }
+        });
     changed
 }
