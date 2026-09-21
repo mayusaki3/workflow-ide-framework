@@ -155,7 +155,10 @@ pub fn init(
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_target(true)
         .with_ansi(false)
-        .with_writer(make_writer);
+        .with_writer(make_writer)
+        // The in-memory Log Viewer is line-oriented. Prevent pretty/multiline
+        // event formatting from producing continuation rows without metadata.
+        .compact();
 
     tracing_subscriber::registry()
         .with(level_filter)
