@@ -142,6 +142,7 @@ pub struct Application {
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
+    theme_editor: Option<theme::ThemeEditor>,
 }
 
 impl Application {
@@ -306,6 +307,7 @@ impl Application {
                     text_editors,
                     text_editor_options,
                     log_viewers,
+                    theme_editor: None,
                 }))
             }),
         )
@@ -382,6 +384,7 @@ impl eframe::App for FrameworkHost {
                 language_settings_enabled: self.config.language_settings_panel,
                 theme_settings_enabled: self.config.theme_settings_panel,
                 theme: &mut self.config.appearance.theme,
+                theme_editor: &mut self.theme_editor,
                 dock_active: true,
                 logging_directory: self.config.logging.directory.clone(),
                 logging_file_prefix: self.config.logging.file_prefix.clone(),
@@ -411,6 +414,7 @@ struct FrameworkTabViewer<'a> {
     language_settings_enabled: bool,
     theme_settings_enabled: bool,
     theme: &'a mut theme::Theme,
+    theme_editor: &'a mut Option<theme::ThemeEditor>,
     dock_active: bool,
     logging_directory: std::path::PathBuf,
     logging_file_prefix: String,
@@ -438,7 +442,7 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         if self.theme_settings_enabled && tab == "__wfide_theme_settings" {
-            if theme::show_settings(ui, self.theme) {
+            if theme::show_settings(ui, self.theme, self.theme_editor) {
                 apply_theme_mode(ui.ctx(), *self.theme);
                 let system_theme = match self.theme.is_dark() {
                     Some(true) => egui::SystemTheme::Dark,
@@ -447,6 +451,7 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                 };
                 ui.ctx()
                     .send_viewport_cmd(egui::ViewportCommand::SetTheme(system_theme));
+                *self.theme_editor = None;
                 tracing::info!(target: "wfide::theme", theme = ?self.theme, "theme changed");
             }
             return;
