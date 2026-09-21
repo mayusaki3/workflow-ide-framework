@@ -12,7 +12,7 @@ use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, reload, util
 
 const DEFAULT_MEMORY_LINES: usize = 2_000;
 
-static MEMORY: OnceLock<Arc<Mutex<VecDeque<String>>>> = OnceLock::new();
+static MEMORY: OnceLock<Arc<Mutex<VecDeque<LogEntry>>>> = OnceLock::new();
 static LEVEL_RELOAD: OnceLock<reload::Handle<LevelFilter, tracing_subscriber::Registry>> = OnceLock::new();
 static CURRENT_LEVEL: OnceLock<Mutex<LogLevel>> = OnceLock::new();
 static LEVEL_CHANGE_LOCK: Mutex<()> = Mutex::new(());
@@ -24,6 +24,29 @@ pub enum LogLevel {
     Info,
     Debug,
     Trace,
+}
+
+#[derive(Debug, Clone)]
+pub struct LogEntry {
+    pub level: LogLevel,
+    pub text: String,
+}
+
+impl LogEntry {
+    fn from_formatted_line(text: String) -> Self {
+        let level = if text.contains(" ERROR ") {
+            LogLevel::Error
+        } else if text.contains(" WARN ") {
+            LogLevel::Warn
+        } else if text.contains(" DEBUG ") {
+            LogLevel::Debug
+        } else if text.contains(" TRACE ") {
+            LogLevel::Trace
+        } else {
+            LogLevel::Info
+        };
+        Self { level, text }
+    }
 }
 
 impl LogLevel {
@@ -64,7 +87,7 @@ pub struct LoggingGuard {
 }
 
 impl LoggingGuard {
-    pub fn snapshot(&self) -> Vec<String> {
+    pub fn snapshot(&self) -> Vec<LogEntry> {
         snapshot()
     }
 }
@@ -112,7 +135,7 @@ pub fn set_level(level: LogLevel) -> Result<(), &'static str> {
     Ok(())
 }
 
-pub fn snapshot() -> Vec<String> {
+pub fn snapshot() -> Vec<LogEntry> {
     MEMORY
         .get()
         .and_then(|memory| memory.lock().ok().map(|lines| lines.iter().cloned().collect()))
@@ -195,7 +218,7 @@ impl Write for CombinedWriter {
 }
 
 struct MemoryWriter {
-    buffer: Arc<Mutex<VecDeque<String>>>,
+    buffer: Arc<Mutex<VecDeque<LogEntry>>>,
     capacity: usize,
     pending: Vec<u8>,
 }
@@ -209,7 +232,7 @@ impl MemoryWriter {
                 while buffer.len() >= self.capacity {
                     buffer.pop_front();
                 }
-                buffer.push_back(line);
+                buffer.push_back(LogEntry::from_formatted_line(line));
             }
         }
     }
