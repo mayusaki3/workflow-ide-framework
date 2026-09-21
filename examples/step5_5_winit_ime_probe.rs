@@ -5,7 +5,7 @@
 //! eframe, Dock and TextEditor.
 
 use std::sync::Arc;
-use eframe::winit::{
+use winit::{
     application::ApplicationHandler,
     dpi::{PhysicalPosition, PhysicalSize},
     event::{Ime, WindowEvent},
