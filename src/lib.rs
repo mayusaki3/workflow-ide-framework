@@ -354,6 +354,13 @@ impl eframe::App for FrameworkHost {
                 .apply_with_system_dark(ui.ctx(), system_dark);
         }
 
+        // eframe supplies the root Ui before App::ui is called. A runtime
+        // theme change therefore updates Context styles immediately, but this
+        // already-created Ui can still hold the previous frame's style.
+        // Refresh the root Ui style so the application header follows the same
+        // theme in the same frame as Dock/Panel content.
+        ui.set_style(ui.ctx().global_style());
+
         ui.heading(&self.config.name);
         ui.label(format!("Application ID: {}", self.config.id));
         ui.label("workflow-ide-framework v0.1.0 Sample");
