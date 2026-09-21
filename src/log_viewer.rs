@@ -50,7 +50,7 @@ pub fn show(ui: &mut egui::Ui, options: &mut LogViewerOptions) {
                         crate::logging::LogLevel::Trace => ui.visuals().weak_text_color(),
                     };
 
-                    ui.label(egui::RichText::new(entry.text).monospace().color(color));
+                    ui.label(egui::RichText::new(entry.display_text()).monospace().color(color));
                 }
             }
         });
