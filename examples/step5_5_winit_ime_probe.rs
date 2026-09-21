@@ -4,7 +4,8 @@
 //! cursor position while composing text. This intentionally bypasses egui,
 //! eframe, Dock and TextEditor.
 
-use std::sync::Arc;
+use std::{num::NonZeroU32, sync::Arc};
+use softbuffer::{Context, Surface};
 use winit::window::WindowLevel;
 use winit::{
     application::ApplicationHandler,
@@ -19,6 +20,7 @@ struct App {
     window: Option<Arc<Window>>,
     ime_pos: PhysicalPosition<f64>,
     preedit: String,
+    surface: Option<Surface<Arc<Window>, Arc<Window>>>,
 }
 
 impl ApplicationHandler for App {
@@ -39,6 +41,9 @@ impl ApplicationHandler for App {
             self.ime_pos = PhysicalPosition::new(100.0, 200.0);
             window.set_ime_cursor_area(self.ime_pos, PhysicalSize::new(2, 24));
             println!("IME AREA x={:.1} y={:.1}", self.ime_pos.x, self.ime_pos.y);
+            let context = Context::new(window.clone()).expect("create softbuffer context");
+            let surface = Surface::new(&context, window.clone()).expect("create softbuffer surface");
+            self.surface = Some(surface);
             window.request_redraw();
             self.window = Some(window);
         }
@@ -54,8 +59,17 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
-                // No renderer is intentionally attached. Requesting redraw after the
-                // initial Wayland configure keeps the probe window lifecycle active.
+                if let Some(surface) = self.surface.as_mut() {
+                    let size = window.inner_size();
+                    if let (Some(width), Some(height)) =
+                        (NonZeroU32::new(size.width), NonZeroU32::new(size.height))
+                    {
+                        surface.resize(width, height).expect("resize surface");
+                        let mut buffer = surface.buffer_mut().expect("surface buffer");
+                        buffer.fill(0x00202020);
+                        buffer.present().expect("present surface");
+                    }
+                }
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.ime_pos = position;
