@@ -21,3 +21,7 @@ name = "English"
 "text_editor.column" = "Col"
 "text_editor.no_cursor" = "No cursor"
 "text_editor.word_wrap" = "Wrap"
+
+"log_viewer.auto_scroll" = "Auto scroll"
+"log_viewer.level" = "Runtime level"
+"log_viewer.empty" = "No log entries."
