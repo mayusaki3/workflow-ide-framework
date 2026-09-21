@@ -15,6 +15,14 @@ pub enum Theme {
 }
 
 impl Theme {
+    pub const fn is_dark(self) -> Option<bool> {
+        match self {
+            Self::System => None,
+            Self::Dark | Self::Yozakura | Self::YoruNoIzumi | Self::FukaiAo => Some(true),
+            Self::Light | Self::Sakura | Self::Izumi | Self::Ao => Some(false),
+        }
+    }
+
     pub fn apply(self, ctx: &egui::Context) {
         match self {
             Self::System => {
@@ -126,14 +134,37 @@ pub fn show_settings(ui: &mut egui::Ui, current: &mut Theme) -> bool {
     ui.label(crate::localization::text("theme.description"));
     ui.separator();
 
+    ui.label(crate::localization::text("theme.standard_group"));
     let mut changed = false;
     for (theme, key) in [
         (Theme::System, "theme.system"),
         (Theme::Dark, "theme.dark"),
         (Theme::Light, "theme.light"),
+    ] {
+        let selected = *current == theme;
+        if ui.radio(selected, crate::localization::text(key)).clicked() && !selected {
+            *current = theme;
+            changed = true;
+        }
+    }
+
+    ui.add_space(6.0);
+    ui.label(crate::localization::text("theme.japanese_light_group"));
+    for (theme, key) in [
         (Theme::Sakura, "theme.sakura"),
         (Theme::Izumi, "theme.izumi"),
         (Theme::Ao, "theme.ao"),
+    ] {
+        let selected = *current == theme;
+        if ui.radio(selected, crate::localization::text(key)).clicked() && !selected {
+            *current = theme;
+            changed = true;
+        }
+    }
+
+    ui.add_space(6.0);
+    ui.label(crate::localization::text("theme.japanese_dark_group"));
+    for (theme, key) in [
         (Theme::Yozakura, "theme.yozakura"),
         (Theme::YoruNoIzumi, "theme.yoru_no_izumi"),
         (Theme::FukaiAo, "theme.fukai_ao"),
