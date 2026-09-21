@@ -42,7 +42,27 @@ pub fn show(ui: &mut egui::Ui, options: &mut LogViewerOptions) {
                 ui.label(crate::localization::text("log_viewer.empty"));
             } else {
                 for line in lines {
-                    ui.monospace(line);
+                    let level = if line.contains(" ERROR ") {
+                        crate::logging::LogLevel::Error
+                    } else if line.contains(" WARN ") {
+                        crate::logging::LogLevel::Warn
+                    } else if line.contains(" DEBUG ") {
+                        crate::logging::LogLevel::Debug
+                    } else if line.contains(" TRACE ") {
+                        crate::logging::LogLevel::Trace
+                    } else {
+                        crate::logging::LogLevel::Info
+                    };
+
+                    let color = match level {
+                        crate::logging::LogLevel::Error => ui.visuals().error_fg_color,
+                        crate::logging::LogLevel::Warn => ui.visuals().warn_fg_color,
+                        crate::logging::LogLevel::Info => ui.visuals().text_color(),
+                        crate::logging::LogLevel::Debug => ui.visuals().weak_text_color(),
+                        crate::logging::LogLevel::Trace => ui.visuals().weak_text_color(),
+                    };
+
+                    ui.label(egui::RichText::new(line).monospace().color(color));
                 }
             }
         });
