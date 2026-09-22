@@ -370,6 +370,7 @@ struct FrameworkHost {
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
+    flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     theme_editor: Option<theme::ThemeEditor>,
 }
 
