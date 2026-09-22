@@ -156,6 +156,7 @@ impl Application {
             text_editors: std::collections::HashMap::new(),
             text_editor_options: std::collections::HashMap::new(),
             log_viewers: std::collections::HashMap::new(),
+            theme_editor: None,
         }
     }
 
@@ -340,6 +341,7 @@ struct FrameworkHost {
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
+    theme_editor: Option<theme::ThemeEditor>,
 }
 
 impl eframe::App for FrameworkHost {
