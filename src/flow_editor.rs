@@ -64,13 +64,29 @@ pub struct FlowModel {
 pub enum FlowAction {
     NodeSelected { node_id: String },
     NodeMoved { node_id: String, position: [f32; 2] },
-    ConnectRequested { from: PortRef, to: PortRef },
-    EdgeDeleteRequested { edge_id: String },
+    ConnectionCreated { edge_id: String, from: PortRef, to: PortRef },
+    ConnectionRejected { from: PortRef, to: PortRef, reason: String },
+    EdgeDeleted { edge_id: String },
 }
 #[derive(Debug, Default)]
 pub struct FlowResponse { pub actions: Vec<FlowAction> }
 
 pub type ConnectionValidator = dyn Fn(&FlowModel, &PortRef, &PortRef) -> Result<(), String>;
+
+fn next_edge_id(model: &FlowModel) -> String {
+    let mut index = model.edges.len() + 1;
+    loop {
+        let id = format!("edge-{index}");
+        if !model.edges.iter().any(|edge| edge.id == id) { return id; }
+        index += 1;
+    }
+}
+
+fn port_direction(model: &FlowModel, port: &PortRef) -> Option<PortDirection> {
+    model.nodes.iter().find(|node| node.id == port.node_id)
+        .and_then(|node| node.ports.iter().find(|candidate| candidate.id == port.port_id))
+        .map(|port| port.direction)
+}
 
 fn port_position(rect: egui::Rect, node: &FlowNode, port_id: &str, node_size: egui::Vec2) -> Option<egui::Pos2> {
     let node_rect = egui::Rect::from_min_size(rect.min + node.position.to_vec2(), node_size);
@@ -96,6 +112,7 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
     let painter = ui.painter_at(rect);
     let node_size = egui::vec2(170.0, 84.0);
 
+    let mut delete_edge: Option<String> = None;
     for edge in &model.edges {
         let from = model.nodes.iter().find(|n| n.id == edge.from_node)
             .and_then(|n| port_position(rect, n, &edge.from_port, node_size));
@@ -106,9 +123,14 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
             let mid = a + (b-a)*0.5;
             let delete_rect = egui::Rect::from_center_size(mid, egui::vec2(14.0,14.0));
             if ui.interact(delete_rect, ui.make_persistent_id(("wfide_edge", &edge.id)), egui::Sense::click()).double_clicked() {
-                response.actions.push(FlowAction::EdgeDeleteRequested { edge_id: edge.id.clone() });
+                delete_edge = Some(edge.id.clone());
             }
         }
+    }
+
+    if let Some(edge_id) = delete_edge {
+        model.edges.retain(|edge| edge.id != edge_id);
+        response.actions.push(FlowAction::EdgeDeleted { edge_id });
     }
 
     if let (Some(start), Some(pointer)) = (&model.pending_connection, ui.input(|i| i.pointer.hover_pos())) {
@@ -155,8 +177,23 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
     if let Some(clicked)=clicked_port {
         if let Some(start)=model.pending_connection.take() {
             if start != clicked {
-                let valid=validator.map(|v|v(model,&start,&clicked)).unwrap_or(Ok(()));
-                if valid.is_ok() { response.actions.push(FlowAction::ConnectRequested{from:start,to:clicked}); }
+                let built_in = match (port_direction(model, &start), port_direction(model, &clicked)) {
+                    (Some(PortDirection::Output), Some(PortDirection::Input)) => Ok(()),
+                    _ => Err("connection must be Output -> Input".to_owned()),
+                };
+                let valid = built_in.and_then(|_| validator.map(|v|v(model,&start,&clicked)).unwrap_or(Ok(())));
+                match valid {
+                    Ok(()) => {
+                        let edge_id = next_edge_id(model);
+                        model.edges.push(FlowEdge::new(
+                            edge_id.clone(),
+                            start.node_id.clone(), start.port_id.clone(),
+                            clicked.node_id.clone(), clicked.port_id.clone(),
+                        ));
+                        response.actions.push(FlowAction::ConnectionCreated { edge_id, from: start, to: clicked });
+                    }
+                    Err(reason) => response.actions.push(FlowAction::ConnectionRejected { from: start, to: clicked, reason }),
+                }
             }
         } else { model.pending_connection=Some(clicked); }
     }
