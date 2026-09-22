@@ -63,6 +63,7 @@ pub struct FlowModel {
 #[derive(Debug, Clone, PartialEq)]
 pub enum FlowAction {
     NodeSelected { node_id: String },
+    EdgeSelected { edge_id: String },
     NodeMoved { node_id: String, position: [f32; 2] },
     ConnectionCreated { edge_id: String, from: PortRef, to: PortRef },
     ConnectionRejected { from: PortRef, to: PortRef, reason: String },
@@ -138,7 +139,9 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
                 .map(|pointer| distance_to_segment(pointer, a, b) <= 8.0)
                 .unwrap_or(false);
             if near_edge {
-                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                if edge_hit.clicked() {
+                    response.actions.push(FlowAction::EdgeSelected { edge_id: edge.id.clone() });
+                }
                 if edge_hit.double_clicked() {
                     delete_edge = Some(edge.id.clone());
                 }
