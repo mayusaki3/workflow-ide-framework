@@ -128,9 +128,6 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
             .and_then(|n| port_position(rect, n, &edge.to_port, node_size));
         if let (Some(a), Some(b)) = (from, to) {
             painter.line_segment([a,b], ui.visuals().widgets.inactive.fg_stroke);
-            // Make the whole visible edge interactive instead of only a tiny
-            // rectangle at its midpoint. The bounding rect scales with edge
-            // length; the distance check keeps the effective hit width narrow.
             let edge_rect = egui::Rect::from_two_pos(a, b).expand(8.0);
             let edge_hit = ui.interact(
                 edge_rect,
@@ -199,8 +196,8 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
         if let Some(start)=model.pending_connection.take() {
             if start != clicked {
                 let normalized = match (port_direction(model, &start), port_direction(model, &clicked)) {
-                    (Some(PortDirection::Output), Some(PortDirection::Input)) => Ok((start, clicked)),
-                    (Some(PortDirection::Input), Some(PortDirection::Output)) => Ok((clicked, start)),
+                    (Some(PortDirection::Output), Some(PortDirection::Input)) => Ok((start.clone(), clicked.clone())),
+                    (Some(PortDirection::Input), Some(PortDirection::Output)) => Ok((clicked.clone(), start.clone())),
                     _ => Err("connection requires one Output and one Input".to_owned()),
                 };
                 match normalized {
