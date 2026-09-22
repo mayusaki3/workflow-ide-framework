@@ -10,10 +10,13 @@ fn main() -> eframe::Result<()> {
         .port(FlowPort::new("parent", "parent", PortDirection::Input).data_type("link"))
         .port(FlowPort::new("child", "child", PortDirection::Output).data_type("link"));
     let arm = FlowNode::new("arm", "arm_link", [580.0, 120.0])
+        .port(FlowPort::new("parent", "parent", PortDirection::Input).data_type("link"))
+        .port(FlowPort::new("child", "child", PortDirection::Output).data_type("link"));
+    let tool = FlowNode::new("tool", "tool_link", [580.0, 300.0])
         .port(FlowPort::new("parent", "parent", PortDirection::Input).data_type("link"));
 
     let model = FlowModel {
-        nodes: vec![base, joint, arm],
+        nodes: vec![base, joint, arm, tool],
         edges: vec![
             FlowEdge::new("e1", "base", "child", "joint", "parent"),
             FlowEdge::new("e2", "joint", "child", "arm", "parent"),
