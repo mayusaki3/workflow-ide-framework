@@ -19,6 +19,7 @@ fn main() -> eframe::Result<()> {
             FlowEdge::new("e2", "joint", "child", "arm", "parent"),
         ],
         selected_node_id: None,
+        pending_connection: None,
     };
 
     Application::new("step5-8-flow-editor", "Step 5.8 Flow Editor")
