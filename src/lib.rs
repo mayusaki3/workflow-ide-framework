@@ -6,6 +6,7 @@ pub mod localization;
 pub mod probe;
 pub mod table;
 pub mod text_editor;
+pub mod tree_viewer;
 pub mod theme;
 pub use layout::{LayoutConfig, SplitDirection};
 pub use tracing;
