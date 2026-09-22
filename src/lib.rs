@@ -550,13 +550,17 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
 
         if let Some(model) = self.tree_viewers.get_mut(tab) {
             let response = tree_viewer::show(ui, model);
-            if let Some(tree_viewer::TreeAction::Selected { node_id }) = response.action {
-                tracing::info!(
-                    target: "wfide::tree_viewer",
-                    panel_id = %tab,
-                    %node_id,
-                    "tree node selected"
-                );
+            for action in response.actions {
+                match action {
+                    tree_viewer::TreeAction::Selected { node_id } => {
+                        tracing::info!(
+                            target: "wfide::tree_viewer",
+                            panel_id = %tab,
+                            %node_id,
+                            "tree node selected"
+                        );
+                    }
+                }
             }
             return;
         }
