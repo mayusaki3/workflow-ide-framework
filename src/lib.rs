@@ -143,6 +143,7 @@ pub struct Application {
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
+    tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
     theme_editor: Option<theme::ThemeEditor>,
 }
 
@@ -157,6 +158,7 @@ impl Application {
             text_editors: std::collections::HashMap::new(),
             text_editor_options: std::collections::HashMap::new(),
             log_viewers: std::collections::HashMap::new(),
+            tree_viewers: std::collections::HashMap::new(),
             theme_editor: None,
         }
     }
@@ -179,6 +181,15 @@ impl Application {
 
     pub fn log_viewer_panel(mut self, panel_id: impl Into<String>) -> Self {
         self.log_viewers.entry(panel_id.into()).or_default();
+        self
+    }
+
+    pub fn tree_viewer_panel(
+        mut self,
+        panel_id: impl Into<String>,
+        model: tree_viewer::TreeModel,
+    ) -> Self {
+        self.tree_viewers.insert(panel_id.into(), model);
         self
     }
 
@@ -217,6 +228,7 @@ impl Application {
         let text_editors = self.text_editors;
         let text_editor_options = self.text_editor_options;
         let log_viewers = self.log_viewers;
+        let tree_viewers = self.tree_viewers;
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
             config.panels.push(
                 PanelDefinition::new(probe::PANEL_ID, "WFIDE Probe", PanelKind::StandardUi)
@@ -309,6 +321,7 @@ impl Application {
                     text_editors,
                     text_editor_options,
                     log_viewers,
+                    tree_viewers,
                     theme_editor: None,
                 }))
             }),
@@ -402,6 +415,7 @@ impl eframe::App for FrameworkHost {
                 text_editors: &mut self.text_editors,
                 text_editor_options: &mut self.text_editor_options,
                 log_viewers: &mut self.log_viewers,
+                tree_viewers: &mut self.tree_viewers,
             };
             egui_dock::DockArea::new(dock_state).show_inside(ui, &mut viewer);
         } else if !self.config.panels.is_empty() {
@@ -432,6 +446,7 @@ struct FrameworkTabViewer<'a> {
     text_editors: &'a mut std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: &'a mut std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: &'a mut std::collections::HashMap<String, log_viewer::LogViewerOptions>,
+    tree_viewers: &'a mut std::collections::HashMap<String, tree_viewer::TreeModel>,
 }
 
 impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
@@ -529,6 +544,19 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
             ui.separator();
             let model = probe::table_model(true, self.dock_active);
             table::show(ui, "wfide_probe_table", &model);
+            return;
+        }
+
+        if let Some(model) = self.tree_viewers.get_mut(tab) {
+            let response = tree_viewer::show(ui, model);
+            if let Some(tree_viewer::TreeAction::Selected { node_id }) = response.action {
+                tracing::info!(
+                    target: "wfide::tree_viewer",
+                    panel_id = %tab,
+                    %node_id,
+                    "tree node selected"
+                );
+            }
             return;
         }
 
