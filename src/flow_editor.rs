@@ -116,7 +116,12 @@ pub fn show(ui: &mut egui::Ui, model: &mut FlowModel) -> FlowResponse {
             response.actions.push(FlowAction::NodeSelected { node_id: node.id.clone() });
         }
         if hit.dragged() {
-            node.position += hit.drag_delta();
+            // drag_delta() is the total displacement since drag start.
+            // Applying it every frame accumulates the same displacement and can
+            // move a node explosively far outside the canvas. Use the per-frame
+            // pointer delta instead.
+            let delta = ui.input(|input| input.pointer.delta());
+            node.position += delta;
             response.actions.push(FlowAction::NodeMoved {
                 node_id: node.id.clone(),
                 position: [node.position.x, node.position.y],
