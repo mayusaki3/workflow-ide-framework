@@ -5,6 +5,7 @@ pub mod log_viewer;
 pub mod layout;
 pub mod localization;
 pub mod probe;
+pub mod property_panel;
 pub mod table;
 pub mod text_editor;
 pub mod tree_viewer;
@@ -146,6 +147,7 @@ pub struct Application {
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
+    property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
 }
 
 impl Application {
@@ -161,6 +163,7 @@ impl Application {
             log_viewers: std::collections::HashMap::new(),
             tree_viewers: std::collections::HashMap::new(),
             flow_editors: std::collections::HashMap::new(),
+            property_panels: std::collections::HashMap::new(),
         }
     }
 
@@ -203,6 +206,15 @@ impl Application {
         self
     }
 
+    pub fn property_panel(
+        mut self,
+        panel_id: impl Into<String>,
+        model: property_panel::PropertyModel,
+    ) -> Self {
+        self.property_panels.insert(panel_id.into(), model);
+        self
+    }
+
     pub fn panel(mut self, panel: PanelDefinition) -> Self {
         self.config.panels.push(panel);
         self
@@ -240,6 +252,7 @@ impl Application {
         let log_viewers = self.log_viewers;
         let tree_viewers = self.tree_viewers;
         let flow_editors = self.flow_editors;
+        let property_panels = self.property_panels;
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
             config.panels.push(
                 PanelDefinition::new(probe::PANEL_ID, "WFIDE Probe", PanelKind::StandardUi)
@@ -334,6 +347,7 @@ impl Application {
                     log_viewers,
                     tree_viewers,
                     flow_editors,
+                    property_panels,
                     theme_editor: None,
                 }))
             }),
@@ -369,6 +383,7 @@ struct FrameworkHost {
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
+    property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
     theme_editor: Option<theme::ThemeEditor>,
 }
 
@@ -431,6 +446,7 @@ impl eframe::App for FrameworkHost {
                 log_viewers: &mut self.log_viewers,
                 tree_viewers: &mut self.tree_viewers,
                 flow_editors: &mut self.flow_editors,
+                property_panels: &mut self.property_panels,
             };
             egui_dock::DockArea::new(dock_state).show_inside(ui, &mut viewer);
         } else if !self.config.panels.is_empty() {
@@ -463,6 +479,7 @@ struct FrameworkTabViewer<'a> {
     log_viewers: &'a mut std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: &'a mut std::collections::HashMap<String, tree_viewer::TreeModel>,
     flow_editors: &'a mut std::collections::HashMap<String, flow_editor::FlowModel>,
+    property_panels: &'a mut std::collections::HashMap<String, property_panel::PropertyModel>,
 }
 
 impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
@@ -560,6 +577,19 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
             ui.separator();
             let model = probe::table_model(true, self.dock_active);
             table::show(ui, "wfide_probe_table", &model);
+            return;
+        }
+
+        if let Some(model) = self.property_panels.get_mut(tab) {
+            let response = property_panel::show(ui, model);
+            for action in response.actions {
+                tracing::info!(
+                    target: "wfide::property_panel",
+                    panel_id = %tab,
+                    action = ?action,
+                    "property changed"
+                );
+            }
             return;
         }
 
