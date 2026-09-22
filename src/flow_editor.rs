@@ -102,6 +102,14 @@ fn port_position(rect: egui::Rect, node: &FlowNode, port_id: &str, node_size: eg
     None
 }
 
+fn distance_to_segment(point: egui::Pos2, a: egui::Pos2, b: egui::Pos2) -> f32 {
+    let ab = b - a;
+    let length_sq = ab.length_sq();
+    if length_sq <= f32::EPSILON { return point.distance(a); }
+    let t = ((point - a).dot(ab) / length_sq).clamp(0.0, 1.0);
+    point.distance(a + ab * t)
+}
+
 pub fn show(ui: &mut egui::Ui, model: &mut FlowModel) -> FlowResponse {
     show_with_validator(ui, model, None)
 }
@@ -120,10 +128,23 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
             .and_then(|n| port_position(rect, n, &edge.to_port, node_size));
         if let (Some(a), Some(b)) = (from, to) {
             painter.line_segment([a,b], ui.visuals().widgets.inactive.fg_stroke);
-            let mid = a + (b-a)*0.5;
-            let delete_rect = egui::Rect::from_center_size(mid, egui::vec2(14.0,14.0));
-            if ui.interact(delete_rect, ui.make_persistent_id(("wfide_edge", &edge.id)), egui::Sense::click()).double_clicked() {
-                delete_edge = Some(edge.id.clone());
+            // Make the whole visible edge interactive instead of only a tiny
+            // rectangle at its midpoint. The bounding rect scales with edge
+            // length; the distance check keeps the effective hit width narrow.
+            let edge_rect = egui::Rect::from_two_pos(a, b).expand(8.0);
+            let edge_hit = ui.interact(
+                edge_rect,
+                ui.make_persistent_id(("wfide_edge", &edge.id)),
+                egui::Sense::click(),
+            );
+            let near_edge = edge_hit.hover_pos()
+                .map(|pointer| distance_to_segment(pointer, a, b) <= 8.0)
+                .unwrap_or(false);
+            if near_edge {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                if edge_hit.double_clicked() {
+                    delete_edge = Some(edge.id.clone());
+                }
             }
         }
     }
@@ -177,20 +198,25 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
     if let Some(clicked)=clicked_port {
         if let Some(start)=model.pending_connection.take() {
             if start != clicked {
-                let built_in = match (port_direction(model, &start), port_direction(model, &clicked)) {
-                    (Some(PortDirection::Output), Some(PortDirection::Input)) => Ok(()),
-                    _ => Err("connection must be Output -> Input".to_owned()),
+                let normalized = match (port_direction(model, &start), port_direction(model, &clicked)) {
+                    (Some(PortDirection::Output), Some(PortDirection::Input)) => Ok((start, clicked)),
+                    (Some(PortDirection::Input), Some(PortDirection::Output)) => Ok((clicked, start)),
+                    _ => Err("connection requires one Output and one Input".to_owned()),
                 };
-                let valid = built_in.and_then(|_| validator.map(|v|v(model,&start,&clicked)).unwrap_or(Ok(())));
-                match valid {
-                    Ok(()) => {
-                        let edge_id = next_edge_id(model);
-                        model.edges.push(FlowEdge::new(
-                            edge_id.clone(),
-                            start.node_id.clone(), start.port_id.clone(),
-                            clicked.node_id.clone(), clicked.port_id.clone(),
-                        ));
-                        response.actions.push(FlowAction::ConnectionCreated { edge_id, from: start, to: clicked });
+                match normalized {
+                    Ok((from, to)) => {
+                        match validator.map(|v|v(model,&from,&to)).unwrap_or(Ok(())) {
+                            Ok(()) => {
+                                let edge_id = next_edge_id(model);
+                                model.edges.push(FlowEdge::new(
+                                    edge_id.clone(),
+                                    from.node_id.clone(), from.port_id.clone(),
+                                    to.node_id.clone(), to.port_id.clone(),
+                                ));
+                                response.actions.push(FlowAction::ConnectionCreated { edge_id, from, to });
+                            }
+                            Err(reason) => response.actions.push(FlowAction::ConnectionRejected { from, to, reason }),
+                        }
                     }
                     Err(reason) => response.actions.push(FlowAction::ConnectionRejected { from: start, to: clicked, reason }),
                 }
