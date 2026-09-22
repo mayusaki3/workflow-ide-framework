@@ -66,3 +66,7 @@ path = "examples/step5_7_tree_viewer.rs"
 [[example]]
 name = "step5_8_flow_editor"
 path = "examples/step5_8_flow_editor.rs"
+
+[[example]]
+name = "step5_9_property_panel"
+path = "examples/step5_9_property_panel.rs"
