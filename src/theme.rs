@@ -24,7 +24,7 @@ impl Theme {
     }
 
     pub fn apply(self, ctx: &egui::Context) {
-        self.apply_with_system_dark(ctx, ctx.style().visuals.dark_mode);
+        self.apply_with_system_dark(ctx, ctx.global_style().visuals.dark_mode);
     }
 
     pub fn apply_with_system_dark(self, ctx: &egui::Context, system_dark: bool) {
