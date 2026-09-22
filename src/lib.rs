@@ -358,6 +358,13 @@ impl eframe::App for FrameworkHost {
                 .apply_with_system_dark(ui.ctx(), system_dark);
         }
 
+        // Theme Editor is an override layer on top of the selected base theme.
+        // In System mode the base palette is refreshed every frame to follow
+        // the OS, so re-apply the editor override afterwards.
+        if let Some(editor) = self.theme_editor {
+            editor.apply(ui.ctx());
+        }
+
         // eframe supplies the root Ui before App::ui is called. A runtime
         // theme change therefore updates Context styles immediately, but this
         // already-created Ui can still hold the previous frame's style.
