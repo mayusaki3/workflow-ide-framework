@@ -146,7 +146,6 @@ pub struct Application {
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
-    theme_editor: Option<theme::ThemeEditor>,
 }
 
 impl Application {
@@ -162,7 +161,6 @@ impl Application {
             log_viewers: std::collections::HashMap::new(),
             tree_viewers: std::collections::HashMap::new(),
             flow_editors: std::collections::HashMap::new(),
-            theme_editor: None,
         }
     }
 
