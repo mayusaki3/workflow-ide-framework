@@ -37,7 +37,15 @@ pub enum TreeAction {
 
 #[derive(Debug, Default)]
 pub struct TreeResponse {
-    pub action: Option<TreeAction>,
+    pub actions: Vec<TreeAction>,
+}
+
+impl TreeResponse {
+    fn selected(&mut self, node_id: &str) {
+        self.actions.push(TreeAction::Selected {
+            node_id: node_id.to_owned(),
+        });
+    }
 }
 
 pub fn show(ui: &mut egui::Ui, model: &mut TreeModel) -> TreeResponse {
@@ -54,7 +62,7 @@ fn show_node(ui: &mut egui::Ui, node: &TreeNode, model: &mut TreeModel, response
         let selected = model.selected_id.as_deref() == Some(node.id.as_str());
         if ui.selectable_label(selected, &node.label).clicked() {
             model.selected_id = Some(node.id.clone());
-            response.action = Some(TreeAction::Selected { node_id: node.id.clone() });
+            response.selected(&node.id);
         }
         return;
     }
@@ -69,6 +77,6 @@ fn show_node(ui: &mut egui::Ui, node: &TreeNode, model: &mut TreeModel, response
 
     if header.header_response.clicked() {
         model.selected_id = Some(node.id.clone());
-        response.action = Some(TreeAction::Selected { node_id: node.id.clone() });
+        response.selected(&node.id);
     }
 }
