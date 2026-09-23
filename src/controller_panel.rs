@@ -30,11 +30,12 @@ pub struct ControllerModel {
     pub mode: ControllerMode,
     /// Logical design size. Rendering is automatically fitted into the panel.
     pub canvas_size: [f32; 2],
+    pub background: [u8; 4],
     pub elements: Vec<ControllerElement>,
     pub selected_id: Option<String>,
 }
 impl Default for ControllerModel {
-    fn default() -> Self { Self { mode: ControllerMode::Operate, canvas_size: [800.0, 520.0], elements: Vec::new(), selected_id: None } }
+    fn default() -> Self { Self { mode: ControllerMode::Operate, canvas_size: [800.0, 520.0], background: [30, 30, 30, 255], elements: Vec::new(), selected_id: None } }
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +78,8 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
     let scale = (available.x / logical.x).min(available.y / logical.y).min(1.0).max(0.05);
     let display = logical * scale;
     let (canvas, canvas_response) = ui.allocate_exact_size(display, egui::Sense::click());
+    let canvas_bg = egui::Color32::from_rgba_unmultiplied(model.background[0], model.background[1], model.background[2], model.background[3]);
+    ui.painter().rect_filled(canvas, 0.0, canvas_bg);
     ui.painter().rect_stroke(canvas, 0.0, ui.visuals().widgets.noninteractive.bg_stroke, egui::StrokeKind::Inside);
     if model.mode == ControllerMode::Edit && canvas_response.clicked() {
         model.selected_id = None;
@@ -93,7 +96,7 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
         let bg = egui::Color32::from_rgba_unmultiplied(element.background[0], element.background[1], element.background[2], element.background[3]);
 
         if model.mode == ControllerMode::Edit {
-            if response.clicked() {
+            if response.clicked() || response.drag_started() {
                 model.selected_id = Some(element.id.clone());
                 out.actions.push(ControllerAction::ElementSelected { element_id: element.id.clone() });
             }
@@ -128,8 +131,9 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
                 if model.mode == ControllerMode::Operate {
                     ui.put(rect, egui::Slider::new(value, *min..=*max).text(&element.label));
                 } else {
-                    ui.painter().rect_stroke(rect, 2.0, ui.visuals().widgets.noninteractive.bg_stroke, egui::StrokeKind::Inside);
-                    ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, format!("{} {:.2}", element.label, value), egui::TextStyle::Body.resolve(ui.style()), fg);
+                    ui.add_enabled_ui(false, |ui| {
+                        ui.put(rect, egui::Slider::new(value, *min..=*max).text(&element.label));
+                    });
                 }
                 if model.mode == ControllerMode::Operate && *value != before {
                     out.actions.push(ControllerAction::SliderChanged { element_id: element.id.clone(), value: *value });
@@ -199,8 +203,8 @@ pub fn property_model_for_element(element: &ControllerElement) -> crate::propert
         PropertyItem::new("position.y", "Y", PropertyValue::Float(element.position[1] as f64)),
         PropertyItem::new("size.w", "幅", PropertyValue::Float(element.size[0] as f64)),
         PropertyItem::new("size.h", "高さ", PropertyValue::Float(element.size[1] as f64)),
-        PropertyItem::new("foreground", "前景色 RGBA", PropertyValue::Text(rgba_text(element.foreground))),
-        PropertyItem::new("background", "背景色 RGBA", PropertyValue::Text(rgba_text(element.background))),
+        PropertyItem::new("foreground", "前景色", PropertyValue::Color(element.foreground)),
+        PropertyItem::new("background", "背景色", PropertyValue::Color(element.background)),
     ];
     match &element.kind {
         ControllerElementKind::Button { text, image_source } => {
@@ -241,8 +245,8 @@ pub fn apply_property_action(element: &mut ControllerElement, action: &crate::pr
         ("position.y", PropertyValue::Float(v)) => element.position[1] = *v as f32,
         ("size.w", PropertyValue::Float(v)) => element.size[0] = (*v as f32).max(12.0),
         ("size.h", PropertyValue::Float(v)) => element.size[1] = (*v as f32).max(12.0),
-        ("foreground", PropertyValue::Text(v)) => if let Some(c) = parse_rgba(v) { element.foreground = c; },
-        ("background", PropertyValue::Text(v)) => if let Some(c) = parse_rgba(v) { element.background = c; },
+        ("foreground", PropertyValue::Color(v)) => element.foreground = *v,
+        ("background", PropertyValue::Color(v)) => element.background = *v,
         ("button.text", PropertyValue::Text(v)) => if let ControllerElementKind::Button { text, .. } = &mut element.kind { *text = v.clone(); },
         ("button.image", PropertyValue::Text(v)) => if let ControllerElementKind::Button { image_source, .. } = &mut element.kind { *image_source = if v.is_empty() { None } else { Some(v.clone()) }; },
         ("joystick.return_to_center", PropertyValue::Bool(v)) => if let ControllerElementKind::Joystick { return_to_center, .. } = &mut element.kind { *return_to_center = *v; },
@@ -268,6 +272,7 @@ pub fn property_model_for_canvas(model: &ControllerModel) -> crate::property_pan
             items: vec![
                 PropertyItem::new("canvas.w", "論理幅", PropertyValue::Float(model.canvas_size[0] as f64)),
                 PropertyItem::new("canvas.h", "論理高さ", PropertyValue::Float(model.canvas_size[1] as f64)),
+                PropertyItem::new("canvas.background", "背景色", PropertyValue::Color(model.background)),
             ],
         }],
     }
@@ -279,14 +284,7 @@ pub fn apply_canvas_property_action(model: &mut ControllerModel, action: &crate:
     match (property_id.as_str(), value) {
         ("canvas.w", PropertyValue::Float(v)) => model.canvas_size[0] = (*v as f32).max(100.0),
         ("canvas.h", PropertyValue::Float(v)) => model.canvas_size[1] = (*v as f32).max(100.0),
+        ("canvas.background", PropertyValue::Color(v)) => model.background = *v,
         _ => {}
     }
-}
-
-fn rgba_text(c: [u8; 4]) -> String { format!("#{:02X}{:02X}{:02X}{:02X}", c[0], c[1], c[2], c[3]) }
-fn parse_rgba(value: &str) -> Option<[u8; 4]> {
-    let v = value.trim().trim_start_matches('#');
-    if v.len() != 6 && v.len() != 8 { return None; }
-    let byte = |i| u8::from_str_radix(&v[i..i + 2], 16).ok();
-    Some([byte(0)?, byte(2)?, byte(4)?, if v.len() == 8 { byte(6)? } else { 255 }])
 }
