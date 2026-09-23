@@ -139,11 +139,9 @@ pub fn show(ui: &mut egui::Ui, model: &mut FlowModel) -> FlowResponse {
 }
 
 pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&ConnectionValidator>) -> FlowResponse {
-    egui::ScrollArea::both()
-        .id_salt("wfide_flow_canvas_scroll")
-        .auto_shrink([false, false])
-        .show(ui, |ui| show_canvas(ui, model, validator))
-        .inner
+    // Flow canvas owns navigation. Keeping an egui ScrollArea around the same
+    // region creates competing drag/wheel state after scrollbar interaction.
+    show_canvas(ui, model, validator)
 }
 
 fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&ConnectionValidator>) -> FlowResponse {
@@ -151,26 +149,9 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
     let viewport = ui.available_rect_before_wrap();
     let node_size = egui::vec2(170.0, 84.0);
     model.zoom = model.zoom.clamp(0.25, 4.0);
-    let margin = 80.0;
-    let mut min = egui::vec2(0.0, 0.0);
-    let mut max = egui::vec2(viewport.width(), viewport.height());
-    for node in &model.nodes {
-        let node_min = model.pan + node.position.to_vec2() * model.zoom;
-        let node_max = node_min + node_size * model.zoom;
-        min.x = min.x.min(node_min.x - margin);
-        min.y = min.y.min(node_min.y - margin);
-        max.x = max.x.max(node_max.x + margin);
-        max.y = max.y.max(node_max.y + margin);
-    }
-    // Shift negative content into the ScrollArea coordinate space while keeping
-    // the same screen-space graph position.
-    let origin_shift = egui::vec2((-min.x).max(0.0), (-min.y).max(0.0));
-    let canvas_size = egui::vec2(
-        (max.x + origin_shift.x).max(viewport.width()),
-        (max.y + origin_shift.y).max(viewport.height()),
-    );
+    let canvas_size = viewport.size();
     let (rect, canvas_hit) = ui.allocate_exact_size(canvas_size, egui::Sense::click_and_drag());
-    let graph_rect = rect.translate(origin_shift);
+    let graph_rect = rect;
 
     // Background drag pans the graph without limiting placement.
     if canvas_hit.dragged() {
@@ -184,14 +165,7 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
         input.pointer.hover_pos().is_some_and(|pointer| rect.contains(pointer))
     });
     let zoom_delta = if pointer_over_canvas {
-        ui.input_mut(|input| {
-            // egui 0.34 ScrollArea consumes this field by setting it to zero.
-            // Flow canvas takes ownership while hovered and clears it after
-            // reading so an outer/remembered ScrollArea cannot also scroll.
-            let delta = input.smooth_scroll_delta.y;
-            input.smooth_scroll_delta.y = 0.0;
-            delta
-        })
+        ui.input(|input| input.smooth_scroll_delta.y)
     } else {
         0.0
     };
