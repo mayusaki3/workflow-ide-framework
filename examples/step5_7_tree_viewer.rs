@@ -4,7 +4,7 @@ use workflow_ide_framework::{
 };
 
 fn main() -> eframe::Result<()> {
-    let project = TreeNode::new("project", "Sample Project")
+    let project = TreeNode::new("project", "サンプルプロジェクト")
         .node_type("project")
         .child(
             TreeNode::new("src", "src")
@@ -20,10 +20,11 @@ fn main() -> eframe::Result<()> {
         )
         .child(TreeNode::new("cargo", "Cargo.toml").node_type("file"));
 
-    Application::new("step5-7-tree-viewer", "Step 5.7 Tree Viewer")
+    Application::new("step5-7-tree-viewer", "Step 5.7 Tree Viewer / ツリー表示")
+        .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
         .panel(PanelDefinition::new(
             "project",
-            "Project",
+            "プロジェクト / Project",
             PanelKind::StandardUi,
         ))
         .layout(LayoutConfig::new(["project"]))
