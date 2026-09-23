@@ -139,9 +139,15 @@ pub fn show(ui: &mut egui::Ui, model: &mut FlowModel) -> FlowResponse {
 }
 
 pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&ConnectionValidator>) -> FlowResponse {
-    // Flow canvas owns navigation. Keeping an egui ScrollArea around the same
-    // region creates competing drag/wheel state after scrollbar interaction.
-    show_canvas(ui, model, validator)
+    // Keep scroll bars as an alternate navigation path, but do not let the
+    // ScrollArea own canvas drag or mouse-wheel input. This prevents a prior
+    // scrollbar interaction from stealing later pan/zoom input from the canvas.
+    egui::ScrollArea::both()
+        .id_salt("wfide_flow_canvas_scroll")
+        .auto_shrink([false, false])
+        .scroll_source(egui::scroll_area::ScrollSource::SCROLL_BAR)
+        .show(ui, |ui| show_canvas(ui, model, validator))
+        .inner
 }
 
 fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&ConnectionValidator>) -> FlowResponse {
@@ -149,18 +155,34 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
     let viewport = ui.available_rect_before_wrap();
     let node_size = egui::vec2(170.0, 84.0);
     model.zoom = model.zoom.clamp(0.25, 4.0);
-    let canvas_size = viewport.size();
+    // The scrollable extent follows the transformed graph, while graph
+    // coordinates themselves remain unrestricted.
+    let margin = 80.0;
+    let mut min = egui::vec2(0.0, 0.0);
+    let mut max = viewport.size();
+    for node in &model.nodes {
+        let node_min = model.pan + node.position.to_vec2() * model.zoom;
+        let node_max = node_min + node_size * model.zoom;
+        min.x = min.x.min(node_min.x - margin);
+        min.y = min.y.min(node_min.y - margin);
+        max.x = max.x.max(node_max.x + margin);
+        max.y = max.y.max(node_max.y + margin);
+    }
+    let origin_shift = egui::vec2((-min.x).max(0.0), (-min.y).max(0.0));
+    let canvas_size = egui::vec2(
+        (max.x + origin_shift.x).max(viewport.width()),
+        (max.y + origin_shift.y).max(viewport.height()),
+    );
     let (rect, canvas_hit) = ui.allocate_exact_size(canvas_size, egui::Sense::click_and_drag());
-    let graph_rect = rect;
+    let graph_rect = rect.translate(origin_shift);
 
     // Background drag pans the graph without limiting placement.
     if canvas_hit.dragged() {
         model.pan += ui.input(|input| input.pointer.delta());
     }
 
-    // Wheel over the canvas always belongs to canvas zoom, regardless of
-    // which ScrollArea widget was focused previously. Consume it here so the
-    // surrounding ScrollArea does not keep scrolling after scrollbar use.
+    // Mouse-wheel input is disabled as a ScrollArea source, so wheel input
+    // over the canvas always belongs to zoom even after scrollbar interaction.
     let pointer_over_canvas = ui.input(|input| {
         input.pointer.hover_pos().is_some_and(|pointer| rect.contains(pointer))
     });
