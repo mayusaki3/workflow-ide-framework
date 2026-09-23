@@ -11,7 +11,7 @@ fn main() -> eframe::Result<()> {
             PropertyGroup {
                 label: "General".into(),
                 items: vec![
-                    PropertyItem::new("name", "Name", PropertyValue::Text("arm_link".into())),
+                    PropertyItem::new("name", "Name", PropertyValue::Text("アームリンク".into())),
                     PropertyItem::new("enabled", "Enabled", PropertyValue::Bool(true)),
                     PropertyItem::new("index", "Index", PropertyValue::Integer(2)).read_only(true),
                 ],
@@ -30,6 +30,7 @@ fn main() -> eframe::Result<()> {
     };
 
     Application::new("step5-9-property-panel", "Step 5.9 Property Panel")
+        .font_path("resources/fonts/NotoSansJP-Regular.ttf")
         .panel(PanelDefinition::new("viewport", "Selection Source", PanelKind::StandardUi))
         .panel(PanelDefinition::new("properties", "Properties", PanelKind::StandardUi))
         .layout(LayoutConfig {
