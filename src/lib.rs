@@ -10,7 +10,7 @@ pub mod table;
 pub mod text_editor;
 pub mod tree_viewer;
 pub mod theme;
-pub use layout::{LayoutConfig, SplitDirection};
+pub use layout::{LayoutConfig, LayoutSplit, SplitDirection};
 pub use tracing;
 
 
@@ -401,22 +401,11 @@ impl eframe::App for FrameworkHost {
                 .apply_with_system_dark(ui.ctx(), system_dark);
         }
 
-        // Theme Editor is an override layer on top of the selected base theme.
-        // In System mode the base palette is refreshed every frame to follow
-        // the OS, so re-apply the editor override afterwards.
         if let Some(editor) = self.theme_editor {
             editor.apply(ui.ctx());
         }
 
-        // eframe supplies the root Ui before App::ui is called. A runtime
-        // theme change therefore updates Context styles immediately, but this
-        // already-created Ui can still hold the previous frame's style.
-        // Refresh the root Ui style so the application header follows the same
-        // theme in the same frame as Dock/Panel content.
         ui.set_style(ui.ctx().global_style());
-        // The root Ui background was already painted by eframe before App::ui.
-        // Repaint the application area with the active theme so runtime
-        // changes affect the header as well as subsequently-created panels.
         ui.painter().rect_filled(
             ui.max_rect(),
             0.0,
