@@ -144,7 +144,8 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
                 painter.rect_stroke(rect, 4.0, ui.visuals().widgets.noninteractive.bg_stroke, egui::StrokeKind::Inside);
                 let center = rect.center();
                 let radius = rect.width().min(rect.height()) * 0.35;
-                painter.circle_stroke(center, radius, ui.visuals().widgets.noninteractive.fg_stroke);
+                painter.circle_filled(center, radius, bg);
+                painter.circle_stroke(center, radius, egui::Stroke::new(1.0, fg));
                 painter.circle_filled(center + egui::vec2(value[0], -value[1]) * radius, 7.0 * scale.max(0.5), fg);
                 if model.mode == ControllerMode::Operate && response.dragged() {
                     let p = response.interact_pointer_pos().unwrap_or(center);
