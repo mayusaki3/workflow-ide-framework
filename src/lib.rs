@@ -655,14 +655,26 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
         if let Some(model) = self.controller_panels.get_mut(tab) {
             let response = controller_panel::show(ui, model);
             for action in response.actions {
-                if let controller_panel::ControllerAction::ElementSelected { element_id } = &action {
-                    for link in self.controller_property_links.iter().filter(|link| link.controller_panel_id == *tab) {
-                        if let Some(element) = model.elements.iter().find(|element| element.id == *element_id) {
+                for link in self.controller_property_links.iter().filter(|link| link.controller_panel_id == *tab) {
+                    match &action {
+                        controller_panel::ControllerAction::ElementSelected { element_id }
+                        | controller_panel::ControllerAction::ElementMoved { element_id, .. }
+                        | controller_panel::ControllerAction::ElementResized { element_id, .. } => {
+                            if let Some(element) = model.elements.iter().find(|element| element.id == *element_id) {
+                                self.property_panels.insert(
+                                    link.property_panel_id.clone(),
+                                    controller_panel::property_model_for_element(element),
+                                );
+                            }
+                        }
+                        controller_panel::ControllerAction::CanvasSelected
+                        | controller_panel::ControllerAction::CanvasResized { .. } => {
                             self.property_panels.insert(
                                 link.property_panel_id.clone(),
-                                controller_panel::property_model_for_element(element),
+                                controller_panel::property_model_for_canvas(model),
                             );
                         }
+                        _ => {}
                     }
                 }
                 tracing::info!(target: "wfide::controller_panel", panel_id = %tab, action = ?action, "controller action");
@@ -685,7 +697,9 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                 for link in self.controller_property_links.iter().filter(|link| link.property_panel_id == *tab) {
                     if let Some(controller) = self.controller_panels.get_mut(&link.controller_panel_id) {
                         if let Some(object_id) = model.object_id.as_deref() {
-                            if let Some(element) = controller.elements.iter_mut().find(|element| element.id == object_id) {
+                            if object_id == "__controller_canvas__" {
+                                controller_panel::apply_canvas_property_action(controller, &action);
+                            } else if let Some(element) = controller.elements.iter_mut().find(|element| element.id == object_id) {
                                 controller_panel::apply_property_action(element, &action);
                             }
                         }
