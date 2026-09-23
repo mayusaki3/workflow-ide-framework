@@ -57,7 +57,7 @@ pub fn show(ui: &mut egui::Ui, model: &mut PropertyModel) -> PropertyResponse {
     if model.display_name.is_some() || model.object_id.is_some() { ui.separator(); }
 
     for group in &mut model.groups {
-        let body = |ui: &mut egui::Ui| {
+        let mut body = |ui: &mut egui::Ui| {
             egui::Grid::new(("wfide_property_grid", &group.label))
                 .num_columns(2)
                 .spacing([12.0, 6.0])
