@@ -114,3 +114,48 @@ fn show_value(ui: &mut egui::Ui, id: &str, value: &mut PropertyValue, read_only:
         }
     }
 }
+
+
+/// Build a generic property view for a Flow Editor node.
+/// Domain-specific properties remain the Consumer's responsibility.
+pub fn from_flow_node(node: &crate::flow_editor::FlowNode) -> PropertyModel {
+    PropertyModel {
+        object_id: Some(node.id.clone()),
+        display_name: Some(format!("{} Properties", node.label)),
+        groups: vec![PropertyGroup {
+            label: "Node".into(),
+            items: vec![
+                PropertyItem::new("label", "Label", PropertyValue::Text(node.label.clone())),
+                PropertyItem::new("position.x", "X", PropertyValue::Float(node.position.x as f64)),
+                PropertyItem::new("position.y", "Y", PropertyValue::Float(node.position.y as f64)),
+            ],
+        }],
+    }
+}
+
+/// Build a generic property view for a Flow Editor edge.
+pub fn from_flow_edge(edge: &crate::flow_editor::FlowEdge) -> PropertyModel {
+    PropertyModel {
+        object_id: Some(edge.id.clone()),
+        display_name: Some(format!("{} Properties", edge.id)),
+        groups: vec![PropertyGroup {
+            label: "Edge".into(),
+            items: vec![
+                PropertyItem::new("from", "From", PropertyValue::Text(format!("{}.{}", edge.from_node, edge.from_port))).read_only(true),
+                PropertyItem::new("to", "To", PropertyValue::Text(format!("{}.{}", edge.to_node, edge.to_port))).read_only(true),
+            ],
+        }],
+    }
+}
+
+/// Apply the generic editable node properties back to a Flow Editor node.
+pub fn apply_to_flow_node(node: &mut crate::flow_editor::FlowNode, action: &PropertyAction) {
+    if let PropertyAction::ValueChanged { property_id, value } = action {
+        match (property_id.as_str(), value) {
+            ("label", PropertyValue::Text(value)) => node.label = value.clone(),
+            ("position.x", PropertyValue::Float(value)) => node.position.x = *value as f32,
+            ("position.y", PropertyValue::Float(value)) => node.position.y = *value as f32,
+            _ => {}
+        }
+    }
+}
