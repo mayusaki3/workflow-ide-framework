@@ -74,3 +74,8 @@ path = "examples/step5_9_property_panel.rs"
 [[example]]
 name = "step5_9_flow_properties"
 path = "examples/step5_9_flow_properties.rs"
+
+
+[[example]]
+name = "step5_10_controller_panel"
+path = "examples/step5_10_controller_panel.rs"
