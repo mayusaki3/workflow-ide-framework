@@ -257,6 +257,12 @@ impl Application {
         self
     }
 
+    /// Set the initial Framework/Consumer tracing level before logging is initialized.
+    pub fn log_level(mut self, level: logging::LogLevel) -> Self {
+        self.config.logging.level = level;
+        self
+    }
+
     pub fn language_settings_panel(mut self) -> Self {
         self.config.language_settings_panel = true;
         self
