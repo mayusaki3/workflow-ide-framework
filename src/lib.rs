@@ -1,4 +1,5 @@
 use eframe::egui;
+pub mod controller_panel;
 pub mod flow_editor;
 pub mod logging;
 pub mod log_viewer;
@@ -155,6 +156,7 @@ pub struct Application {
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: Vec<FlowPropertyLink>,
+    controller_panels: std::collections::HashMap<String, controller_panel::ControllerModel>,
 }
 
 impl Application {
@@ -172,6 +174,7 @@ impl Application {
             flow_editors: std::collections::HashMap::new(),
             property_panels: std::collections::HashMap::new(),
             flow_property_links: Vec::new(),
+            controller_panels: std::collections::HashMap::new(),
         }
     }
 
@@ -220,6 +223,15 @@ impl Application {
         model: property_panel::PropertyModel,
     ) -> Self {
         self.property_panels.insert(panel_id.into(), model);
+        self
+    }
+
+    pub fn controller_panel(
+        mut self,
+        panel_id: impl Into<String>,
+        model: controller_panel::ControllerModel,
+    ) -> Self {
+        self.controller_panels.insert(panel_id.into(), model);
         self
     }
 
@@ -289,6 +301,7 @@ impl Application {
         let flow_editors = self.flow_editors;
         let property_panels = self.property_panels;
         let flow_property_links = self.flow_property_links;
+        let controller_panels = self.controller_panels;
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
             config.panels.push(
                 PanelDefinition::new(probe::PANEL_ID, "WFIDE Probe", PanelKind::StandardUi)
@@ -385,6 +398,7 @@ impl Application {
                     flow_editors,
                     property_panels,
                     flow_property_links,
+                    controller_panels,
                     theme_editor: None,
                 }))
             }),
@@ -422,6 +436,7 @@ struct FrameworkHost {
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: Vec<FlowPropertyLink>,
+    controller_panels: std::collections::HashMap<String, controller_panel::ControllerModel>,
     theme_editor: Option<theme::ThemeEditor>,
 }
 
@@ -475,6 +490,7 @@ impl eframe::App for FrameworkHost {
                 flow_editors: &mut self.flow_editors,
                 property_panels: &mut self.property_panels,
                 flow_property_links: &self.flow_property_links,
+                controller_panels: &mut self.controller_panels,
             };
             egui_dock::DockArea::new(dock_state).show_inside(ui, &mut viewer);
         } else if !self.config.panels.is_empty() {
@@ -509,6 +525,7 @@ struct FrameworkTabViewer<'a> {
     flow_editors: &'a mut std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: &'a mut std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: &'a [FlowPropertyLink],
+    controller_panels: &'a mut std::collections::HashMap<String, controller_panel::ControllerModel>,
 }
 
 impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
@@ -606,6 +623,14 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
             ui.separator();
             let model = probe::table_model(true, self.dock_active);
             table::show(ui, "wfide_probe_table", &model);
+            return;
+        }
+
+        if let Some(model) = self.controller_panels.get_mut(tab) {
+            let response = controller_panel::show(ui, model);
+            for action in response.actions {
+                tracing::info!(target: "wfide::controller_panel", panel_id = %tab, action = ?action, "controller action");
+            }
             return;
         }
 
