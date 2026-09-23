@@ -150,12 +150,11 @@ pub fn from_flow_edge(edge: &crate::flow_editor::FlowEdge) -> PropertyModel {
 
 /// Apply the generic editable node properties back to a Flow Editor node.
 pub fn apply_to_flow_node(node: &mut crate::flow_editor::FlowNode, action: &PropertyAction) {
-    if let PropertyAction::ValueChanged { property_id, value } = action {
-        match (property_id.as_str(), value) {
-            ("label", PropertyValue::Text(value)) => node.label = value.clone(),
-            ("position.x", PropertyValue::Float(value)) => node.position.x = *value as f32,
-            ("position.y", PropertyValue::Float(value)) => node.position.y = *value as f32,
-            _ => {}
-        }
+    let PropertyAction::ValueChanged { property_id, value } = action;
+    match (property_id.as_str(), value) {
+        ("label", PropertyValue::Text(value)) => node.label = value.clone(),
+        ("position.x", PropertyValue::Float(value)) => node.position.x = *value as f32,
+        ("position.y", PropertyValue::Float(value)) => node.position.y = *value as f32,
+        _ => {}
     }
 }
