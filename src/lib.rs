@@ -659,7 +659,8 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                     match &action {
                         controller_panel::ControllerAction::ElementSelected { element_id }
                         | controller_panel::ControllerAction::ElementMoved { element_id, .. }
-                        | controller_panel::ControllerAction::ElementResized { element_id, .. } => {
+                        | controller_panel::ControllerAction::ElementResized { element_id, .. }
+                        | controller_panel::ControllerAction::LineChanged { element_id } => {
                             if let Some(element) = model.elements.iter().find(|element| element.id == *element_id) {
                                 self.property_panels.insert(
                                     link.property_panel_id.clone(),
@@ -676,6 +677,25 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                         }
                         _ => {}
                     }
+                }
+                match &action {
+                    controller_panel::ControllerAction::SliderChanged { element_id, .. }
+                    | controller_panel::ControllerAction::JoystickChanged { element_id, .. } => {
+                        for link in self.controller_property_links.iter().filter(|link| link.controller_panel_id == *tab) {
+                            let should_refresh = self.property_panels.get(&link.property_panel_id)
+                                .and_then(|property| property.object_id.as_deref())
+                                == Some(element_id.as_str());
+                            if should_refresh {
+                                if let Some(element) = model.elements.iter().find(|element| element.id == *element_id) {
+                                    self.property_panels.insert(
+                                        link.property_panel_id.clone(),
+                                        controller_panel::property_model_for_element(element),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
                 }
                 tracing::info!(target: "wfide::controller_panel", panel_id = %tab, action = ?action, "controller action");
             }
