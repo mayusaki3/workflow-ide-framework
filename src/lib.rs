@@ -629,7 +629,9 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                             model.edges.iter().find(|edge| edge.id == *edge_id).map(property_panel::from_flow_edge),
                         _ => None,
                     };
-                    if let Some(next) = next {
+                    if matches!(&action, flow_editor::FlowAction::SelectionCleared) {
+                        self.property_panels.insert(link.property_panel_id.clone(), property_panel::PropertyModel::default());
+                    } else if let Some(next) = next {
                         self.property_panels.insert(link.property_panel_id.clone(), next);
                     }
                 }
