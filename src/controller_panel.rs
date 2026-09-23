@@ -98,7 +98,14 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
 
         match &mut element.kind {
             ControllerElementKind::Button { text, image_source } => {
-                let clicked = ui.put(rect, egui::Button::new(text.as_str())).clicked();
+                let clicked = if model.mode == ControllerMode::Operate {
+                    ui.put(rect, egui::Button::new(text.as_str())).clicked()
+                } else {
+                    ui.painter().rect_filled(rect, 2.0, ui.visuals().widgets.inactive.bg_fill);
+                    ui.painter().rect_stroke(rect, 2.0, ui.visuals().widgets.inactive.bg_stroke, egui::StrokeKind::Inside);
+                    ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, text.as_str(), egui::TextStyle::Button.resolve(ui.style()), ui.visuals().text_color());
+                    false
+                };
                 if let Some(source) = image_source {
                     ui.painter().text(rect.center_top() + egui::vec2(0.0, 3.0 * scale), egui::Align2::CENTER_TOP,
                         format!("画像: {source}"), egui::TextStyle::Small.resolve(ui.style()), ui.visuals().weak_text_color());
@@ -128,8 +135,13 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
                 painter.circle_filled(center + egui::vec2(value[0], -value[1]) * radius, 7.0 * scale.max(0.5), ui.visuals().selection.bg_fill);
                 if model.mode == ControllerMode::Operate && response.dragged() {
                     let p = response.interact_pointer_pos().unwrap_or(center);
-                    value[0] = ((p.x - center.x) / radius).clamp(-1.0, 1.0);
-                    value[1] = (-(p.y - center.y) / radius).clamp(-1.0, 1.0);
+                    let mut next = egui::vec2((p.x - center.x) / radius, -(p.y - center.y) / radius);
+                    let length = next.length();
+                    if length > 1.0 {
+                        next /= length;
+                    }
+                    value[0] = next.x;
+                    value[1] = next.y;
                     out.actions.push(ControllerAction::JoystickChanged { element_id: element.id.clone(), value: *value });
                 }
             }
@@ -138,7 +150,10 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
             }
             ControllerElementKind::Image { source } => {
                 ui.painter().rect_stroke(rect, 2.0, ui.visuals().widgets.noninteractive.bg_stroke, egui::StrokeKind::Inside);
-                ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, format!("画像\n{source}"), egui::TextStyle::Small.resolve(ui.style()), ui.visuals().weak_text_color());
+                let clipped = ui.painter().with_clip_rect(rect.shrink(2.0));
+                if rect.width() >= 48.0 && rect.height() >= 28.0 {
+                    clipped.text(rect.center(), egui::Align2::CENTER_CENTER, format!("画像\n{source}"), egui::TextStyle::Small.resolve(ui.style()), ui.visuals().weak_text_color());
+                }
             }
             ControllerElementKind::Line { to, width } => {
                 let end = canvas.min + egui::vec2(to[0], to[1]) * scale;
