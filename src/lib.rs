@@ -627,6 +627,7 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                             model.nodes.iter().find(|node| node.id == *node_id).map(property_panel::from_flow_node),
                         flow_editor::FlowAction::EdgeSelected { edge_id } =>
                             model.edges.iter().find(|edge| edge.id == *edge_id).map(property_panel::from_flow_edge),
+                        flow_editor::FlowAction::SelectionCleared => Some(property_panel::PropertyModel::default()),
                         _ => None,
                     };
                     if matches!(&action, flow_editor::FlowAction::SelectionCleared) {
