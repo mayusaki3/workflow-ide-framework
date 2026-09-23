@@ -6,6 +6,7 @@ pub enum PropertyValue {
     Bool(bool),
     Integer(i64),
     Float(f64),
+    Color([u8; 4]),
     Enum { value: String, options: Vec<String> },
 }
 
@@ -91,6 +92,7 @@ fn show_value(ui: &mut egui::Ui, id: &str, value: &mut PropertyValue, read_only:
             PropertyValue::Bool(v) => { ui.label(if *v { "true" } else { "false" }); }
             PropertyValue::Integer(v) => { ui.label(v.to_string()); }
             PropertyValue::Float(v) => { ui.label(v.to_string()); }
+            PropertyValue::Color(v) => { ui.label(format!("#{:02X}{:02X}{:02X}{:02X}", v[0], v[1], v[2], v[3])); }
             PropertyValue::Enum { value, .. } => { ui.label(value.as_str()); }
         }
         return false;
@@ -101,6 +103,12 @@ fn show_value(ui: &mut egui::Ui, id: &str, value: &mut PropertyValue, read_only:
         PropertyValue::Bool(v) => ui.checkbox(v, "").changed(),
         PropertyValue::Integer(v) => ui.add(egui::DragValue::new(v)).changed(),
         PropertyValue::Float(v) => ui.add(egui::DragValue::new(v)).changed(),
+        PropertyValue::Color(v) => {
+            let mut color = egui::Color32::from_rgba_unmultiplied(v[0], v[1], v[2], v[3]);
+            let changed = ui.color_edit_button_srgba(&mut color).changed();
+            if changed { *v = color.to_array(); }
+            changed
+        }
         PropertyValue::Enum { value, options } => {
             let before = value.clone();
             egui::ComboBox::from_id_salt(("wfide_property_enum", id))
