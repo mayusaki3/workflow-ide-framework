@@ -4,15 +4,15 @@ use workflow_ide_framework::{
 };
 
 fn main() -> eframe::Result<()> {
-    let base = FlowNode::new("base", "base_link", [80.0, 120.0])
+    let base = FlowNode::new("base", "ベース / base_link", [80.0, 120.0])
         .port(FlowPort::new("child", "child", PortDirection::Output).data_type("link"));
-    let joint = FlowNode::new("joint", "shoulder_joint", [330.0, 120.0])
+    let joint = FlowNode::new("joint", "肩関節 / shoulder_joint", [330.0, 120.0])
         .port(FlowPort::new("parent", "parent", PortDirection::Input).data_type("link"))
         .port(FlowPort::new("child", "child", PortDirection::Output).data_type("link"));
-    let arm = FlowNode::new("arm", "arm_link", [580.0, 120.0])
+    let arm = FlowNode::new("arm", "アーム / arm_link", [580.0, 120.0])
         .port(FlowPort::new("parent", "parent", PortDirection::Input).data_type("link"))
         .port(FlowPort::new("child", "child", PortDirection::Output).data_type("link"));
-    let tool = FlowNode::new("tool", "tool_link", [580.0, 300.0])
+    let tool = FlowNode::new("tool", "ツール / tool_link", [580.0, 300.0])
         .port(FlowPort::new("parent", "parent", PortDirection::Input).data_type("link"));
 
     let model = FlowModel {
@@ -28,8 +28,9 @@ fn main() -> eframe::Result<()> {
         zoom: 1.0,
     };
 
-    Application::new("step5-8-flow-editor", "Step 5.8 Flow Editor")
-        .panel(PanelDefinition::new("flow", "Robot Connections", PanelKind::StandardUi))
+    Application::new("step5-8-flow-editor", "Step 5.8 Flow Editor / フロー編集")
+        .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
+        .panel(PanelDefinition::new("flow", "ロボット接続 / Robot Connections", PanelKind::StandardUi))
         .layout(LayoutConfig::new(["flow"]))
         .flow_editor_panel("flow", model)
         .run()
