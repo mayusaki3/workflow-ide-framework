@@ -30,7 +30,7 @@ fn main() -> eframe::Result<()> {
     };
 
     Application::new("step5-9-property-panel", "Step 5.9 Property Panel")
-        .font_path("resources/fonts/NotoSansJP-Regular.ttf")
+        .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
         .panel(PanelDefinition::new("viewport", "Selection Source", PanelKind::StandardUi))
         .panel(PanelDefinition::new("properties", "Properties", PanelKind::StandardUi))
         .layout(LayoutConfig {
