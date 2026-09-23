@@ -20,7 +20,10 @@ fn main() -> eframe::Result<()> {
             FlowEdge::new("edge-joint-arm", "joint", "child", "arm", "parent"),
         ],
         selected_node_id: None,
+        selected_edge_id: None,
         pending_connection: None,
+        pan: eframe::egui::Vec2::ZERO,
+        zoom: 1.0,
     };
 
     Application::new("step5-9-flow-properties", "Step 5.9 Flow + Properties")
