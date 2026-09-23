@@ -57,6 +57,7 @@ pub struct FlowModel {
     pub nodes: Vec<FlowNode>,
     pub edges: Vec<FlowEdge>,
     pub selected_node_id: Option<String>,
+    pub selected_edge_id: Option<String>,
     pub pending_connection: Option<PortRef>,
 }
 
@@ -117,9 +118,14 @@ pub fn show(ui: &mut egui::Ui, model: &mut FlowModel) -> FlowResponse {
 
 pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&ConnectionValidator>) -> FlowResponse {
     let mut response = FlowResponse::default();
-    let rect = ui.available_rect_before_wrap();
-    let painter = ui.painter_at(rect);
+    let viewport = ui.available_rect_before_wrap();
     let node_size = egui::vec2(170.0, 84.0);
+    let content_max = model.nodes.iter().fold(egui::vec2(viewport.width(), viewport.height()), |max, node| {
+        egui::vec2(max.x.max(node.position.x + node_size.x + 40.0), max.y.max(node.position.y + node_size.y + 40.0))
+    });
+    let canvas_size = egui::vec2(content_max.x.max(viewport.width()), content_max.y.max(viewport.height()));
+    let (rect, _) = ui.allocate_exact_size(canvas_size, egui::Sense::hover());
+    let painter = ui.painter_at(rect);
 
     let mut delete_edge: Option<String> = None;
     for edge in &model.edges {
@@ -128,7 +134,9 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
         let to = model.nodes.iter().find(|n| n.id == edge.to_node)
             .and_then(|n| port_position(rect, n, &edge.to_port, node_size));
         if let (Some(a), Some(b)) = (from, to) {
-            painter.line_segment([a,b], ui.visuals().widgets.inactive.fg_stroke);
+            let selected = model.selected_edge_id.as_deref() == Some(edge.id.as_str());
+            let stroke = if selected { ui.visuals().widgets.active.fg_stroke } else { ui.visuals().widgets.inactive.fg_stroke };
+            painter.line_segment([a,b], stroke);
             let edge_rect = egui::Rect::from_two_pos(a, b).expand(8.0);
             let edge_hit = ui.interact(
                 edge_rect,
@@ -140,6 +148,8 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
                 .unwrap_or(false);
             if near_edge {
                 if edge_hit.clicked() {
+                    model.selected_node_id = None;
+                    model.selected_edge_id = Some(edge.id.clone());
                     response.actions.push(FlowAction::EdgeSelected { edge_id: edge.id.clone() });
                 }
                 if edge_hit.double_clicked() {
@@ -166,7 +176,11 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
     for node in &mut model.nodes {
         let node_rect=egui::Rect::from_min_size(rect.min+node.position.to_vec2(),node_size);
         let hit=ui.interact(node_rect,ui.make_persistent_id(("wfide_flow_node",&node.id)),egui::Sense::click_and_drag());
-        if hit.clicked() { model.selected_node_id=Some(node.id.clone()); response.actions.push(FlowAction::NodeSelected{node_id:node.id.clone()}); }
+        if hit.clicked() {
+            model.selected_node_id=Some(node.id.clone());
+            model.selected_edge_id=None;
+            response.actions.push(FlowAction::NodeSelected{node_id:node.id.clone()});
+        }
         if hit.dragged() {
             node.position += ui.input(|i| i.pointer.delta());
             response.actions.push(FlowAction::NodeMoved{node_id:node.id.clone(),position:[node.position.x,node.position.y]});
@@ -224,6 +238,5 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
         } else { model.pending_connection=Some(clicked); }
     }
 
-    ui.allocate_rect(rect,egui::Sense::hover());
     response
 }
