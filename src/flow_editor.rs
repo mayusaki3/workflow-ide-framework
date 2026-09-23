@@ -194,7 +194,9 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
             delta_y = delta.y,
             "canvas scroll drag"
         );
-        ui.scroll_with_delta(-delta);
+        // Dragging the canvas behaves like grabbing the graph: content follows
+        // the pointer, so the ScrollArea offset moves in the same delta direction.
+        ui.scroll_with_delta(delta);
     }
 
     // Mouse-wheel input is disabled as a ScrollArea source, so wheel input
