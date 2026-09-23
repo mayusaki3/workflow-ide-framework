@@ -1,6 +1,7 @@
 use workflow_ide_framework::{
     Application, LayoutConfig, LayoutSplit, PanelDefinition, PanelKind, SplitDirection,
     flow_editor::{FlowEdge, FlowModel, FlowNode, FlowPort, PortDirection},
+    logging::LogLevel,
     property_panel::PropertyModel,
 };
 
@@ -27,6 +28,7 @@ fn main() -> eframe::Result<()> {
     };
 
     Application::new("step5-9-flow-properties", "Step 5.9 Flow + Properties")
+        .log_level(LogLevel::Debug)
         .panel(PanelDefinition::new("flow", "Robot Connections", PanelKind::StandardUi))
         .panel(PanelDefinition::new("properties", "Properties", PanelKind::StandardUi))
         .layout(LayoutConfig {
