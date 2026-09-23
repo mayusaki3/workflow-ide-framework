@@ -7,6 +7,7 @@ pub enum PropertyValue {
     Integer(i64),
     Float(f64),
     Color([u8; 4]),
+    FilePath(String),
     Enum { value: String, options: Vec<String> },
 }
 
@@ -93,6 +94,7 @@ fn show_value(ui: &mut egui::Ui, id: &str, value: &mut PropertyValue, read_only:
             PropertyValue::Integer(v) => { ui.label(v.to_string()); }
             PropertyValue::Float(v) => { ui.label(v.to_string()); }
             PropertyValue::Color(v) => { ui.label(format!("#{:02X}{:02X}{:02X}{:02X}", v[0], v[1], v[2], v[3])); }
+            PropertyValue::FilePath(v) => { ui.label(v.as_str()); }
             PropertyValue::Enum { value, .. } => { ui.label(value.as_str()); }
         }
         return false;
@@ -103,6 +105,19 @@ fn show_value(ui: &mut egui::Ui, id: &str, value: &mut PropertyValue, read_only:
         PropertyValue::Bool(v) => ui.checkbox(v, "").changed(),
         PropertyValue::Integer(v) => ui.add(egui::DragValue::new(v)).changed(),
         PropertyValue::Float(v) => ui.add(egui::DragValue::new(v)).changed(),
+        PropertyValue::FilePath(v) => {
+            let mut changed = ui.text_edit_singleline(v).changed();
+            if ui.button("…").on_hover_text("ファイルを選択").clicked() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("画像", &["png", "jpg", "jpeg", "webp", "bmp", "gif"])
+                    .pick_file()
+                {
+                    *v = path.to_string_lossy().into_owned();
+                    changed = true;
+                }
+            }
+            changed
+        }
         PropertyValue::Color(v) => {
             let mut color = egui::Color32::from_rgba_unmultiplied(v[0], v[1], v[2], v[3]);
             let changed = ui.color_edit_button_srgba(&mut color).changed();
