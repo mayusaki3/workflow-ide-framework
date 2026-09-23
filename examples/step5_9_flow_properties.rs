@@ -5,13 +5,6 @@ use workflow_ide_framework::{
 };
 
 fn main() -> eframe::Result<()> {
-    // Temporary Step 5.8 input probe: show DEBUG input-routing events in the
-    // console without changing the framework-wide default log level.
-    let _ = tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
-        .with_target(true)
-        .try_init();
-
     let base = FlowNode::new("base", "base_link", [70.0, 100.0])
         .port(FlowPort::new("child", "child", PortDirection::Output));
     let joint = FlowNode::new("joint", "shoulder_joint", [330.0, 100.0])
