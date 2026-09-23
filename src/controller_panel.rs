@@ -210,7 +210,7 @@ pub fn property_model_for_element(element: &ControllerElement) -> crate::propert
     match &element.kind {
         ControllerElementKind::Button { text, image_source } => {
             items.push(PropertyItem::new("button.text", "文字", PropertyValue::Text(text.clone())));
-            items.push(PropertyItem::new("button.image", "画像", PropertyValue::Text(image_source.clone().unwrap_or_default())));
+            items.push(PropertyItem::new("button.image", "画像", PropertyValue::FilePath(image_source.clone().unwrap_or_default())));
         }
         ControllerElementKind::Joystick { value, return_to_center } => {
             items.push(PropertyItem::new("joystick.x", "値 X", PropertyValue::Float(value[0] as f64)).read_only(true));
@@ -223,7 +223,7 @@ pub fn property_model_for_element(element: &ControllerElement) -> crate::propert
             items.push(PropertyItem::new("slider.max", "最大", PropertyValue::Float(*max as f64)));
         }
         ControllerElementKind::Label { text } => items.push(PropertyItem::new("label.text", "文字", PropertyValue::Text(text.clone()))),
-        ControllerElementKind::Image { source } => items.push(PropertyItem::new("image.source", "画像", PropertyValue::Text(source.clone()))),
+        ControllerElementKind::Image { source } => items.push(PropertyItem::new("image.source", "画像", PropertyValue::FilePath(source.clone()))),
         ControllerElementKind::Line { to, width } => {
             items.push(PropertyItem::new("line.to.x", "終点 X", PropertyValue::Float(to[0] as f64)));
             items.push(PropertyItem::new("line.to.y", "終点 Y", PropertyValue::Float(to[1] as f64)));
@@ -249,13 +249,13 @@ pub fn apply_property_action(element: &mut ControllerElement, action: &crate::pr
         ("foreground", PropertyValue::Color(v)) => element.foreground = *v,
         ("background", PropertyValue::Color(v)) => element.background = *v,
         ("button.text", PropertyValue::Text(v)) => if let ControllerElementKind::Button { text, .. } = &mut element.kind { *text = v.clone(); },
-        ("button.image", PropertyValue::Text(v)) => if let ControllerElementKind::Button { image_source, .. } = &mut element.kind { *image_source = if v.is_empty() { None } else { Some(v.clone()) }; },
+        ("button.image", PropertyValue::FilePath(v)) => if let ControllerElementKind::Button { image_source, .. } = &mut element.kind { *image_source = if v.is_empty() { None } else { Some(v.clone()) }; },
         ("joystick.return_to_center", PropertyValue::Bool(v)) => if let ControllerElementKind::Joystick { return_to_center, .. } = &mut element.kind { *return_to_center = *v; },
         ("slider.value", PropertyValue::Float(v)) => if let ControllerElementKind::Slider { value, .. } = &mut element.kind { *value = *v as f32; },
         ("slider.min", PropertyValue::Float(v)) => if let ControllerElementKind::Slider { min, .. } = &mut element.kind { *min = *v as f32; },
         ("slider.max", PropertyValue::Float(v)) => if let ControllerElementKind::Slider { max, .. } = &mut element.kind { *max = *v as f32; },
         ("label.text", PropertyValue::Text(v)) => if let ControllerElementKind::Label { text } = &mut element.kind { *text = v.clone(); },
-        ("image.source", PropertyValue::Text(v)) => if let ControllerElementKind::Image { source } = &mut element.kind { *source = v.clone(); },
+        ("image.source", PropertyValue::FilePath(v)) => if let ControllerElementKind::Image { source } = &mut element.kind { *source = v.clone(); },
         ("line.to.x", PropertyValue::Float(v)) => if let ControllerElementKind::Line { to, .. } = &mut element.kind { to[0] = *v as f32; },
         ("line.to.y", PropertyValue::Float(v)) => if let ControllerElementKind::Line { to, .. } = &mut element.kind { to[1] = *v as f32; },
         ("line.width", PropertyValue::Float(v)) => if let ControllerElementKind::Line { width, .. } = &mut element.kind { *width = (*v as f32).max(0.1); },
