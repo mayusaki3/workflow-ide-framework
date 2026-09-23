@@ -176,27 +176,25 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
     let (rect, canvas_hit) = ui.allocate_exact_size(canvas_size, egui::Sense::click_and_drag());
     let graph_rect = rect.translate(origin_shift);
 
-    // Background drag pans the graph without limiting placement.
+    // Background drag navigates the *same* ScrollArea state used by the
+    // scrollbars. Do not maintain a second pan offset for this gesture:
+    // doing so makes scrollbar offset and graph pan diverge.
     if canvas_hit.drag_started() {
         tracing::debug!(
             target: "wfide::flow::input",
-            pan_x = model.pan.x,
-            pan_y = model.pan.y,
             zoom = model.zoom,
-            "canvas pan drag started"
+            "canvas scroll drag started"
         );
     }
     if canvas_hit.dragged() {
         let delta = ui.input(|input| input.pointer.delta());
-        tracing::trace!(
+        tracing::debug!(
             target: "wfide::flow::input",
             delta_x = delta.x,
             delta_y = delta.y,
-            pan_x = model.pan.x,
-            pan_y = model.pan.y,
-            "canvas pan drag"
+            "canvas scroll drag"
         );
-        model.pan += delta;
+        ui.scroll_with_delta(-delta);
     }
 
     // Mouse-wheel input is disabled as a ScrollArea source, so wheel input
