@@ -7,6 +7,7 @@ fn main() -> eframe::Result<()> {
     let model = ControllerModel {
         mode: ControllerMode::Operate,
         canvas_size: [820.0, 520.0],
+        background: [30, 30, 30, 255],
         selected_id: None,
         elements: vec![
             ControllerElement::new("title", "タイトル", [30.0, 25.0], [260.0, 32.0],
