@@ -177,8 +177,26 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
     let graph_rect = rect.translate(origin_shift);
 
     // Background drag pans the graph without limiting placement.
+    if canvas_hit.drag_started() {
+        tracing::debug!(
+            target: "wfide::flow::input",
+            pan_x = model.pan.x,
+            pan_y = model.pan.y,
+            zoom = model.zoom,
+            "canvas pan drag started"
+        );
+    }
     if canvas_hit.dragged() {
-        model.pan += ui.input(|input| input.pointer.delta());
+        let delta = ui.input(|input| input.pointer.delta());
+        tracing::trace!(
+            target: "wfide::flow::input",
+            delta_x = delta.x,
+            delta_y = delta.y,
+            pan_x = model.pan.x,
+            pan_y = model.pan.y,
+            "canvas pan drag"
+        );
+        model.pan += delta;
     }
 
     // Mouse-wheel input is disabled as a ScrollArea source, so wheel input
@@ -192,6 +210,12 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
         0.0
     };
     if zoom_delta != 0.0 {
+        tracing::debug!(
+            target: "wfide::flow::input",
+            wheel_y = zoom_delta,
+            zoom = model.zoom,
+            "canvas wheel zoom"
+        );
         let old_zoom = model.zoom;
         let factor = (zoom_delta * 0.002).exp();
         model.zoom = (model.zoom * factor).clamp(0.25, 4.0);
@@ -264,8 +288,23 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
             model.selected_edge_id=None;
             response.actions.push(FlowAction::NodeSelected{node_id:node.id.clone()});
         }
+        if hit.drag_started() {
+            tracing::debug!(
+                target: "wfide::flow::input",
+                node_id = %node.id,
+                "node drag started"
+            );
+        }
         if hit.dragged() {
-            node.position += ui.input(|i| i.pointer.delta()) / model.zoom;
+            let delta = ui.input(|i| i.pointer.delta());
+            tracing::trace!(
+                target: "wfide::flow::input",
+                node_id = %node.id,
+                delta_x = delta.x,
+                delta_y = delta.y,
+                "node drag"
+            );
+            node.position += delta / model.zoom;
             response.actions.push(FlowAction::NodeMoved{node_id:node.id.clone(),position:[node.position.x,node.position.y]});
         }
         let selected=model.selected_node_id.as_deref()==Some(node.id.as_str());
