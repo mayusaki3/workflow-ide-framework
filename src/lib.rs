@@ -147,6 +147,12 @@ struct FlowPropertyLink {
     property_panel_id: String,
 }
 
+#[derive(Debug, Clone)]
+struct ControllerPropertyLink {
+    controller_panel_id: String,
+    property_panel_id: String,
+}
+
 pub struct Application {
     config: ApplicationConfig,
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
@@ -157,6 +163,7 @@ pub struct Application {
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: Vec<FlowPropertyLink>,
     controller_panels: std::collections::HashMap<String, controller_panel::ControllerModel>,
+    controller_property_links: Vec<ControllerPropertyLink>,
 }
 
 impl Application {
@@ -175,6 +182,7 @@ impl Application {
             property_panels: std::collections::HashMap::new(),
             flow_property_links: Vec::new(),
             controller_panels: std::collections::HashMap::new(),
+            controller_property_links: Vec::new(),
         }
     }
 
@@ -232,6 +240,19 @@ impl Application {
         model: controller_panel::ControllerModel,
     ) -> Self {
         self.controller_panels.insert(panel_id.into(), model);
+        self
+    }
+
+    /// Reference adapter linking Controller layout selection/editing to a Property Panel.
+    pub fn link_controller_properties(
+        mut self,
+        controller_panel_id: impl Into<String>,
+        property_panel_id: impl Into<String>,
+    ) -> Self {
+        self.controller_property_links.push(ControllerPropertyLink {
+            controller_panel_id: controller_panel_id.into(),
+            property_panel_id: property_panel_id.into(),
+        });
         self
     }
 
@@ -302,6 +323,7 @@ impl Application {
         let property_panels = self.property_panels;
         let flow_property_links = self.flow_property_links;
         let controller_panels = self.controller_panels;
+        let controller_property_links = self.controller_property_links;
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
             config.panels.push(
                 PanelDefinition::new(probe::PANEL_ID, "WFIDE Probe", PanelKind::StandardUi)
@@ -399,6 +421,7 @@ impl Application {
                     property_panels,
                     flow_property_links,
                     controller_panels,
+                    controller_property_links,
                     theme_editor: None,
                 }))
             }),
@@ -437,6 +460,7 @@ struct FrameworkHost {
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: Vec<FlowPropertyLink>,
     controller_panels: std::collections::HashMap<String, controller_panel::ControllerModel>,
+    controller_property_links: Vec<ControllerPropertyLink>,
     theme_editor: Option<theme::ThemeEditor>,
 }
 
@@ -491,6 +515,7 @@ impl eframe::App for FrameworkHost {
                 property_panels: &mut self.property_panels,
                 flow_property_links: &self.flow_property_links,
                 controller_panels: &mut self.controller_panels,
+                controller_property_links: &self.controller_property_links,
             };
             egui_dock::DockArea::new(dock_state).show_inside(ui, &mut viewer);
         } else if !self.config.panels.is_empty() {
@@ -526,6 +551,7 @@ struct FrameworkTabViewer<'a> {
     property_panels: &'a mut std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: &'a [FlowPropertyLink],
     controller_panels: &'a mut std::collections::HashMap<String, controller_panel::ControllerModel>,
+    controller_property_links: &'a [ControllerPropertyLink],
 }
 
 impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
@@ -629,6 +655,16 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
         if let Some(model) = self.controller_panels.get_mut(tab) {
             let response = controller_panel::show(ui, model);
             for action in response.actions {
+                if let controller_panel::ControllerAction::ElementSelected { element_id } = &action {
+                    for link in self.controller_property_links.iter().filter(|link| link.controller_panel_id == *tab) {
+                        if let Some(element) = model.elements.iter().find(|element| element.id == *element_id) {
+                            self.property_panels.insert(
+                                link.property_panel_id.clone(),
+                                controller_panel::property_model_for_element(element),
+                            );
+                        }
+                    }
+                }
                 tracing::info!(target: "wfide::controller_panel", panel_id = %tab, action = ?action, "controller action");
             }
             return;
@@ -642,6 +678,15 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                         if let Some(object_id) = model.object_id.as_deref() {
                             if let Some(node) = flow.nodes.iter_mut().find(|node| node.id == object_id) {
                                 property_panel::apply_to_flow_node(node, &action);
+                            }
+                        }
+                    }
+                }
+                for link in self.controller_property_links.iter().filter(|link| link.property_panel_id == *tab) {
+                    if let Some(controller) = self.controller_panels.get_mut(&link.controller_panel_id) {
+                        if let Some(object_id) = model.object_id.as_deref() {
+                            if let Some(element) = controller.elements.iter_mut().find(|element| element.id == object_id) {
+                                controller_panel::apply_property_action(element, &action);
                             }
                         }
                     }
