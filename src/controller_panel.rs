@@ -81,8 +81,7 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
         let size = egui::vec2(element.size[0], element.size[1]) * scale;
         let rect = egui::Rect::from_min_size(pos, size);
         let id = ui.make_persistent_id(("wfide_controller", &element.id));
-        let sense = egui::Sense::click_and_drag();
-        let response = ui.interact(rect, id, sense);
+        let response = ui.interact(rect, id, egui::Sense::click_and_drag());
 
         if model.mode == ControllerMode::Edit {
             if response.clicked() {
@@ -134,8 +133,9 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
                     out.actions.push(ControllerAction::JoystickChanged { element_id: element.id.clone(), value: *value });
                 }
             }
-            ControllerElementKind::Label { text } =>
-                ui.painter().text(rect.left_center(), egui::Align2::LEFT_CENTER, text, egui::TextStyle::Body.resolve(ui.style()), ui.visuals().text_color()),
+            ControllerElementKind::Label { text } => {
+                ui.painter().text(rect.left_center(), egui::Align2::LEFT_CENTER, text, egui::TextStyle::Body.resolve(ui.style()), ui.visuals().text_color());
+            }
             ControllerElementKind::Image { source } => {
                 ui.painter().rect_stroke(rect, 2.0, ui.visuals().widgets.noninteractive.bg_stroke, egui::StrokeKind::Inside);
                 ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, format!("画像\n{source}"), egui::TextStyle::Small.resolve(ui.style()), ui.visuals().weak_text_color());
@@ -144,7 +144,7 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
                 let end = canvas.min + egui::vec2(to[0], to[1]) * scale;
                 ui.painter().line_segment([pos, end], egui::Stroke::new(*width * scale, ui.visuals().text_color()));
             }
-        };
+        }
 
         if model.mode == ControllerMode::Edit && model.selected_id.as_deref() == Some(element.id.as_str()) {
             ui.painter().rect_stroke(rect, 2.0, ui.visuals().selection.stroke, egui::StrokeKind::Outside);
@@ -161,4 +161,65 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
         }
     }
     out
+}
+
+pub fn property_model_for_element(element: &ControllerElement) -> crate::property_panel::PropertyModel {
+    use crate::property_panel::{PropertyGroup, PropertyItem, PropertyModel, PropertyValue};
+    let mut items = vec![
+        PropertyItem::new("label", "ラベル", PropertyValue::Text(element.label.clone())),
+        PropertyItem::new("position.x", "X", PropertyValue::Float(element.position[0] as f64)),
+        PropertyItem::new("position.y", "Y", PropertyValue::Float(element.position[1] as f64)),
+        PropertyItem::new("size.w", "幅", PropertyValue::Float(element.size[0] as f64)),
+        PropertyItem::new("size.h", "高さ", PropertyValue::Float(element.size[1] as f64)),
+    ];
+    match &element.kind {
+        ControllerElementKind::Button { text, image_source } => {
+            items.push(PropertyItem::new("button.text", "文字", PropertyValue::Text(text.clone())));
+            items.push(PropertyItem::new("button.image", "画像", PropertyValue::Text(image_source.clone().unwrap_or_default())));
+        }
+        ControllerElementKind::Joystick { value } => {
+            items.push(PropertyItem::new("joystick.x", "値 X", PropertyValue::Float(value[0] as f64)).read_only(true));
+            items.push(PropertyItem::new("joystick.y", "値 Y", PropertyValue::Float(value[1] as f64)).read_only(true));
+        }
+        ControllerElementKind::Slider { value, min, max } => {
+            items.push(PropertyItem::new("slider.value", "値", PropertyValue::Float(*value as f64)));
+            items.push(PropertyItem::new("slider.min", "最小", PropertyValue::Float(*min as f64)));
+            items.push(PropertyItem::new("slider.max", "最大", PropertyValue::Float(*max as f64)));
+        }
+        ControllerElementKind::Label { text } => items.push(PropertyItem::new("label.text", "文字", PropertyValue::Text(text.clone()))),
+        ControllerElementKind::Image { source } => items.push(PropertyItem::new("image.source", "画像", PropertyValue::Text(source.clone()))),
+        ControllerElementKind::Line { to, width } => {
+            items.push(PropertyItem::new("line.to.x", "終点 X", PropertyValue::Float(to[0] as f64)));
+            items.push(PropertyItem::new("line.to.y", "終点 Y", PropertyValue::Float(to[1] as f64)));
+            items.push(PropertyItem::new("line.width", "線幅", PropertyValue::Float(*width as f64)));
+        }
+    }
+    PropertyModel {
+        object_id: Some(element.id.clone()),
+        display_name: Some(format!("{} プロパティ", element.label)),
+        groups: vec![PropertyGroup { label: "Controller Element".into(), items }],
+    }
+}
+
+pub fn apply_property_action(element: &mut ControllerElement, action: &crate::property_panel::PropertyAction) {
+    use crate::property_panel::{PropertyAction, PropertyValue};
+    let PropertyAction::ValueChanged { property_id, value } = action;
+    match (property_id.as_str(), value) {
+        ("label", PropertyValue::Text(v)) => element.label = v.clone(),
+        ("position.x", PropertyValue::Float(v)) => element.position[0] = *v as f32,
+        ("position.y", PropertyValue::Float(v)) => element.position[1] = *v as f32,
+        ("size.w", PropertyValue::Float(v)) => element.size[0] = (*v as f32).max(12.0),
+        ("size.h", PropertyValue::Float(v)) => element.size[1] = (*v as f32).max(12.0),
+        ("button.text", PropertyValue::Text(v)) => if let ControllerElementKind::Button { text, .. } = &mut element.kind { *text = v.clone(); },
+        ("button.image", PropertyValue::Text(v)) => if let ControllerElementKind::Button { image_source, .. } = &mut element.kind { *image_source = if v.is_empty() { None } else { Some(v.clone()) }; },
+        ("slider.value", PropertyValue::Float(v)) => if let ControllerElementKind::Slider { value, .. } = &mut element.kind { *value = *v as f32; },
+        ("slider.min", PropertyValue::Float(v)) => if let ControllerElementKind::Slider { min, .. } = &mut element.kind { *min = *v as f32; },
+        ("slider.max", PropertyValue::Float(v)) => if let ControllerElementKind::Slider { max, .. } = &mut element.kind { *max = *v as f32; },
+        ("label.text", PropertyValue::Text(v)) => if let ControllerElementKind::Label { text } = &mut element.kind { *text = v.clone(); },
+        ("image.source", PropertyValue::Text(v)) => if let ControllerElementKind::Image { source } = &mut element.kind { *source = v.clone(); },
+        ("line.to.x", PropertyValue::Float(v)) => if let ControllerElementKind::Line { to, .. } = &mut element.kind { to[0] = *v as f32; },
+        ("line.to.y", PropertyValue::Float(v)) => if let ControllerElementKind::Line { to, .. } = &mut element.kind { to[1] = *v as f32; },
+        ("line.width", PropertyValue::Float(v)) => if let ControllerElementKind::Line { width, .. } = &mut element.kind { *width = (*v as f32).max(0.1); },
+        _ => {}
+    }
 }
