@@ -1,5 +1,5 @@
 use workflow_ide_framework::{
-    Application, LayoutConfig, LayoutSplit, PanelDefinition, PanelKind, SplitDirection,
+    Application, LayoutConfig, PanelDefinition, PanelKind,
     controller_panel::{ControllerElement, ControllerElementKind, ControllerModel, ControllerMode},
 };
 
@@ -30,7 +30,7 @@ fn main() -> eframe::Result<()> {
         .panel(PanelDefinition::new("properties", "プロパティ / Properties", PanelKind::StandardUi))
         .layout(
             LayoutConfig::new(["controller"])
-                .split(LayoutSplit::new("controller", SplitDirection::Right, 0.28, ["properties"]))
+                .split_right("controller", 0.28, ["properties"])
                 .selected("controller"),
         )
         .controller_panel("controller", model)
