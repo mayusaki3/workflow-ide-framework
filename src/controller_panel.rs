@@ -6,7 +6,7 @@ pub enum ControllerMode { Operate, Edit }
 #[derive(Debug, Clone)]
 pub enum ControllerElementKind {
     Button { text: String, image_source: Option<String> },
-    Joystick { value: [f32; 2] },
+    Joystick { value: [f32; 2], return_to_center: bool },
     Slider { value: f32, min: f32, max: f32 },
     Label { text: String },
     Image { source: String },
@@ -126,7 +126,7 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
                     out.actions.push(ControllerAction::SliderChanged { element_id: element.id.clone(), value: *value });
                 }
             }
-            ControllerElementKind::Joystick { value } => {
+            ControllerElementKind::Joystick { value, return_to_center } => {
                 let painter = ui.painter();
                 painter.rect_stroke(rect, 4.0, ui.visuals().widgets.noninteractive.bg_stroke, egui::StrokeKind::Inside);
                 let center = rect.center();
@@ -142,6 +142,10 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
                     }
                     value[0] = next.x;
                     value[1] = next.y;
+                    out.actions.push(ControllerAction::JoystickChanged { element_id: element.id.clone(), value: *value });
+                }
+                if model.mode == ControllerMode::Operate && *return_to_center && response.drag_stopped() {
+                    *value = [0.0, 0.0];
                     out.actions.push(ControllerAction::JoystickChanged { element_id: element.id.clone(), value: *value });
                 }
             }
@@ -192,9 +196,10 @@ pub fn property_model_for_element(element: &ControllerElement) -> crate::propert
             items.push(PropertyItem::new("button.text", "文字", PropertyValue::Text(text.clone())));
             items.push(PropertyItem::new("button.image", "画像", PropertyValue::Text(image_source.clone().unwrap_or_default())));
         }
-        ControllerElementKind::Joystick { value } => {
+        ControllerElementKind::Joystick { value, return_to_center } => {
             items.push(PropertyItem::new("joystick.x", "値 X", PropertyValue::Float(value[0] as f64)).read_only(true));
             items.push(PropertyItem::new("joystick.y", "値 Y", PropertyValue::Float(value[1] as f64)).read_only(true));
+            items.push(PropertyItem::new("joystick.return_to_center", "離したら中央へ戻る", PropertyValue::Bool(*return_to_center)));
         }
         ControllerElementKind::Slider { value, min, max } => {
             items.push(PropertyItem::new("slider.value", "値", PropertyValue::Float(*value as f64)));
@@ -227,6 +232,7 @@ pub fn apply_property_action(element: &mut ControllerElement, action: &crate::pr
         ("size.h", PropertyValue::Float(v)) => element.size[1] = (*v as f32).max(12.0),
         ("button.text", PropertyValue::Text(v)) => if let ControllerElementKind::Button { text, .. } = &mut element.kind { *text = v.clone(); },
         ("button.image", PropertyValue::Text(v)) => if let ControllerElementKind::Button { image_source, .. } = &mut element.kind { *image_source = if v.is_empty() { None } else { Some(v.clone()) }; },
+        ("joystick.return_to_center", PropertyValue::Bool(v)) => if let ControllerElementKind::Joystick { return_to_center, .. } = &mut element.kind { *return_to_center = *v; },
         ("slider.value", PropertyValue::Float(v)) => if let ControllerElementKind::Slider { value, .. } = &mut element.kind { *value = *v as f32; },
         ("slider.min", PropertyValue::Float(v)) => if let ControllerElementKind::Slider { min, .. } = &mut element.kind { *min = *v as f32; },
         ("slider.max", PropertyValue::Float(v)) => if let ControllerElementKind::Slider { max, .. } = &mut element.kind { *max = *v as f32; },
