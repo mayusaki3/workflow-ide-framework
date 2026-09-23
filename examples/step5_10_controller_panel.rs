@@ -18,7 +18,7 @@ fn main() -> eframe::Result<()> {
             ControllerElement::new("speed", "速度", [40.0, 170.0], [240.0, 36.0],
                 ControllerElementKind::Slider { value: 0.5, min: 0.0, max: 1.0 }),
             ControllerElement::new("stick", "移動", [330.0, 105.0], [150.0, 150.0],
-                ControllerElementKind::Joystick { value: [0.0, 0.0] }),
+                ControllerElementKind::Joystick { value: [0.0, 0.0], return_to_center: true }),
             ControllerElement::new("robot-image", "ロボット画像", [550.0, 100.0], [180.0, 150.0],
                 ControllerElementKind::Image { source: "sample://ロボット画像".into() }),
         ],
