@@ -14,7 +14,7 @@ fn main() -> eframe::Result<()> {
             ControllerElement::new("separator", "区切り線", [30.0, 70.0], [500.0, 2.0],
                 ControllerElementKind::Line { to: [530.0, 70.0], width: 2.0 }),
             ControllerElement::new("forward", "前進", [40.0, 105.0], [110.0, 40.0],
-                ControllerElementKind::Button { text: "前進".into() }),
+                ControllerElementKind::Button { text: "前進".into(), image_source: Some("sample://前進アイコン".into()) }),
             ControllerElement::new("speed", "速度", [40.0, 170.0], [240.0, 36.0],
                 ControllerElementKind::Slider { value: 0.5, min: 0.0, max: 1.0 }),
             ControllerElement::new("stick", "移動", [330.0, 105.0], [150.0, 150.0],
