@@ -1,6 +1,6 @@
 use workflow_ide_framework::{
     Application, LayoutConfig, PanelDefinition, PanelKind,
-    controller_panel::{ControllerElement, ControllerElementKind, ControllerModel, ControllerMode},
+    controller_panel::{ControllerElement, ControllerElementKind, ControllerModel, ControllerMode, LineShape},
 };
 
 fn main() -> eframe::Result<()> {
@@ -13,7 +13,7 @@ fn main() -> eframe::Result<()> {
             ControllerElement::new("title", "タイトル", [30.0, 25.0], [260.0, 32.0],
                 ControllerElementKind::Label { text: "ロボット操作パネル".into() }),
             ControllerElement::new("separator", "区切り線", [30.0, 70.0], [500.0, 2.0],
-                ControllerElementKind::Line { to: [530.0, 70.0], width: 2.0 }),
+                ControllerElementKind::Line { to: [530.0, 70.0], width: 2.0, shape: LineShape::Line }),
             ControllerElement::new("forward", "前進", [40.0, 105.0], [110.0, 40.0],
                 ControllerElementKind::Button { text: "前進".into(), image_source: Some("sample://前進アイコン".into()) }),
             ControllerElement::new("speed", "速度", [40.0, 170.0], [240.0, 36.0],
