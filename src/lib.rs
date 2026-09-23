@@ -273,6 +273,13 @@ impl Application {
         self
     }
 
+    /// Load an application font before the first frame.
+    /// The font is installed for both proportional and monospace egui text.
+    pub fn font_path(mut self, path: impl Into<std::path::PathBuf>) -> Self {
+        self.config.appearance.font_path = Some(path.into());
+        self
+    }
+
     pub fn run(self) -> eframe::Result<()> {
         let mut config = self.config;
         let text_editors = self.text_editors;
