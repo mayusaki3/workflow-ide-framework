@@ -1,5 +1,5 @@
 use workflow_ide_framework::{
-    Application, LayoutConfig, PanelDefinition, PanelKind,
+    Application, LayoutConfig, LayoutSplit, PanelDefinition, PanelKind, SplitDirection,
     controller_panel::{ControllerElement, ControllerElementKind, ControllerModel, ControllerMode},
 };
 
@@ -27,7 +27,14 @@ fn main() -> eframe::Result<()> {
     Application::new("step5-10-controller-panel", "Step 5.10 Controller Panel / コントローラーパネル")
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
         .panel(PanelDefinition::new("controller", "コントローラー / Controller", PanelKind::StandardUi))
-        .layout(LayoutConfig::new(["controller"]))
+        .panel(PanelDefinition::new("properties", "プロパティ / Properties", PanelKind::StandardUi))
+        .layout(
+            LayoutConfig::new(["controller"])
+                .split(LayoutSplit::new("controller", SplitDirection::Right, 0.28, ["properties"]))
+                .selected("controller"),
+        )
         .controller_panel("controller", model)
+        .property_panel("properties", Default::default())
+        .link_controller_properties("controller", "properties")
         .run()
 }
