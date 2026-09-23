@@ -47,6 +47,7 @@ pub enum ControllerAction {
     CanvasSelected,
     ElementMoved { element_id: String, position: [f32; 2] },
     ElementResized { element_id: String, size: [f32; 2] },
+    LineChanged { element_id: String },
     CanvasResized { size: [f32; 2] },
 }
 #[derive(Debug, Default)]
@@ -58,18 +59,6 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
         ui.label("モード:");
         ui.selectable_value(&mut model.mode, ControllerMode::Operate, "操作");
         ui.selectable_value(&mut model.mode, ControllerMode::Edit, "レイアウト編集");
-        if model.mode == ControllerMode::Edit {
-            ui.separator();
-            ui.label("キャンバス");
-            let mut w = model.canvas_size[0];
-            let mut h = model.canvas_size[1];
-            let wc = ui.add(egui::DragValue::new(&mut w).range(100.0..=10000.0).prefix("W ")).changed();
-            let hc = ui.add(egui::DragValue::new(&mut h).range(100.0..=10000.0).prefix("H ")).changed();
-            if wc || hc {
-                model.canvas_size = [w, h];
-                out.actions.push(ControllerAction::CanvasResized { size: model.canvas_size });
-            }
-        }
     });
     ui.separator();
 
@@ -100,7 +89,7 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
                 model.selected_id = Some(element.id.clone());
                 out.actions.push(ControllerAction::ElementSelected { element_id: element.id.clone() });
             }
-            if response.dragged() {
+            if response.dragged() && !matches!(element.kind, ControllerElementKind::Line { .. }) {
                 let d = ui.input(|i| i.pointer.delta()) / scale;
                 element.position[0] += d.x;
                 element.position[1] += d.y;
@@ -128,10 +117,15 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
             }
             ControllerElementKind::Slider { value, min, max } => {
                 let before = *value;
+                let mut slider_ui = ui.new_child(egui::UiBuilder::new().max_rect(rect));
+                slider_ui.visuals_mut().widgets.inactive.fg_stroke.color = fg;
+                slider_ui.visuals_mut().widgets.hovered.fg_stroke.color = fg;
+                slider_ui.visuals_mut().widgets.active.fg_stroke.color = fg;
+                slider_ui.visuals_mut().selection.bg_fill = fg;
                 if model.mode == ControllerMode::Operate {
-                    ui.put(rect, egui::Slider::new(value, *min..=*max).text(&element.label));
+                    slider_ui.put(rect, egui::Slider::new(value, *min..=*max).text(&element.label));
                 } else {
-                    ui.add_enabled_ui(false, |ui| {
+                    slider_ui.add_enabled_ui(false, |ui| {
                         ui.put(rect, egui::Slider::new(value, *min..=*max).text(&element.label));
                     });
                 }
@@ -176,10 +170,43 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
             ControllerElementKind::Line { to, width } => {
                 let end = canvas.min + egui::vec2(to[0], to[1]) * scale;
                 ui.painter().line_segment([pos, end], egui::Stroke::new(*width * scale, fg));
+                if model.mode == ControllerMode::Edit {
+                    let hit_rect = egui::Rect::from_two_pos(pos, end).expand(8.0);
+                    let line_hit = ui.interact(hit_rect, id.with("line"), egui::Sense::click_and_drag());
+                    if line_hit.clicked() || line_hit.drag_started() {
+                        model.selected_id = Some(element.id.clone());
+                        out.actions.push(ControllerAction::ElementSelected { element_id: element.id.clone() });
+                    }
+                    if line_hit.dragged() {
+                        let d = ui.input(|i| i.pointer.delta()) / scale;
+                        element.position[0] += d.x; element.position[1] += d.y;
+                        to[0] += d.x; to[1] += d.y;
+                        out.actions.push(ControllerAction::LineChanged { element_id: element.id.clone() });
+                    }
+                    if model.selected_id.as_deref() == Some(element.id.as_str()) {
+                        let hs = 12.0;
+                        let start_handle = egui::Rect::from_center_size(pos, egui::vec2(hs, hs));
+                        let end_handle = egui::Rect::from_center_size(end, egui::vec2(hs, hs));
+                        ui.painter().circle_filled(pos, 5.0, fg);
+                        ui.painter().circle_filled(end, 5.0, fg);
+                        let start_drag = ui.interact(start_handle, id.with("line_start"), egui::Sense::drag());
+                        let end_drag = ui.interact(end_handle, id.with("line_end"), egui::Sense::drag());
+                        if start_drag.dragged() {
+                            let d = ui.input(|i| i.pointer.delta()) / scale;
+                            element.position[0] += d.x; element.position[1] += d.y;
+                            out.actions.push(ControllerAction::LineChanged { element_id: element.id.clone() });
+                        }
+                        if end_drag.dragged() {
+                            let d = ui.input(|i| i.pointer.delta()) / scale;
+                            to[0] += d.x; to[1] += d.y;
+                            out.actions.push(ControllerAction::LineChanged { element_id: element.id.clone() });
+                        }
+                    }
+                }
             }
         }
 
-        if model.mode == ControllerMode::Edit && model.selected_id.as_deref() == Some(element.id.as_str()) {
+        if model.mode == ControllerMode::Edit && model.selected_id.as_deref() == Some(element.id.as_str()) && !matches!(element.kind, ControllerElementKind::Line { .. }) {
             ui.painter().rect_stroke(rect, 2.0, ui.visuals().selection.stroke, egui::StrokeKind::Outside);
             let hs = 10.0;
             let handle = egui::Rect::from_center_size(rect.right_bottom(), egui::vec2(hs, hs));
