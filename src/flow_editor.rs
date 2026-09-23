@@ -177,9 +177,17 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
         model.pan += ui.input(|input| input.pointer.delta());
     }
 
-    // Wheel zooms around the pointer. Canvas navigation is spatial, so no
-    // modifier key is required.
-    let zoom_delta = ui.input(|input| input.smooth_scroll_delta.y);
+    // Wheel over the canvas always belongs to canvas zoom, regardless of
+    // which ScrollArea widget was focused previously. Consume it here so the
+    // surrounding ScrollArea does not keep scrolling after scrollbar use.
+    let pointer_over_canvas = ui.input(|input| {
+        input.pointer.hover_pos().is_some_and(|pointer| rect.contains(pointer))
+    });
+    let zoom_delta = if pointer_over_canvas {
+        ui.input_mut(|input| input.consume_scroll_delta(egui::Vec2::Y).y)
+    } else {
+        0.0
+    };
     if zoom_delta != 0.0 {
         let old_zoom = model.zoom;
         let factor = (zoom_delta * 0.002).exp();
