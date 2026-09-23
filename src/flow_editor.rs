@@ -150,14 +150,29 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
     let mut response = FlowResponse::default();
     let viewport = ui.available_rect_before_wrap();
     let node_size = egui::vec2(170.0, 84.0);
-    let content_max = model.nodes.iter().fold(egui::vec2(viewport.width(), viewport.height()), |max, node| {
-        egui::vec2(max.x.max(node.position.x + node_size.x + 40.0), max.y.max(node.position.y + node_size.y + 40.0))
-    });
-    let canvas_size = egui::vec2(content_max.x.max(viewport.width()), content_max.y.max(viewport.height()));
-    let (rect, canvas_hit) = ui.allocate_exact_size(canvas_size, egui::Sense::click_and_drag());
     model.zoom = model.zoom.clamp(0.25, 4.0);
+    let margin = 80.0;
+    let mut min = egui::vec2(0.0, 0.0);
+    let mut max = egui::vec2(viewport.width(), viewport.height());
+    for node in &model.nodes {
+        let node_min = model.pan + node.position.to_vec2() * model.zoom;
+        let node_max = node_min + node_size * model.zoom;
+        min.x = min.x.min(node_min.x - margin);
+        min.y = min.y.min(node_min.y - margin);
+        max.x = max.x.max(node_max.x + margin);
+        max.y = max.y.max(node_max.y + margin);
+    }
+    // Shift negative content into the ScrollArea coordinate space while keeping
+    // the same screen-space graph position.
+    let origin_shift = egui::vec2((-min.x).max(0.0), (-min.y).max(0.0));
+    let canvas_size = egui::vec2(
+        (max.x + origin_shift.x).max(viewport.width()),
+        (max.y + origin_shift.y).max(viewport.height()),
+    );
+    let (rect, canvas_hit) = ui.allocate_exact_size(canvas_size, egui::Sense::click_and_drag());
+    let graph_rect = rect.translate(origin_shift);
 
-    // Background drag pans the graph. Node/port interactions take precedence.
+    // Background drag pans the graph without limiting placement.
     if canvas_hit.dragged() {
         model.pan += ui.input(|input| input.pointer.delta());
     }
@@ -170,7 +185,7 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
         let factor = (zoom_delta * 0.002).exp();
         model.zoom = (model.zoom * factor).clamp(0.25, 4.0);
         if let Some(pointer) = ui.input(|input| input.pointer.hover_pos()) {
-            let local = pointer - rect.min;
+            let local = pointer - graph_rect.min;
             let world = (local - model.pan) / old_zoom;
             model.pan = local - world * model.zoom;
         }
@@ -180,9 +195,9 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
     let mut delete_edge: Option<String> = None;
     for edge in &model.edges {
         let from = model.nodes.iter().find(|n| n.id == edge.from_node)
-            .and_then(|n| port_position(rect, n, &edge.from_port, node_size, model.pan, model.zoom));
+            .and_then(|n| port_position(graph_rect, n, &edge.from_port, node_size, model.pan, model.zoom));
         let to = model.nodes.iter().find(|n| n.id == edge.to_node)
-            .and_then(|n| port_position(rect, n, &edge.to_port, node_size, model.pan, model.zoom));
+            .and_then(|n| port_position(graph_rect, n, &edge.to_port, node_size, model.pan, model.zoom));
         if let (Some(a), Some(b)) = (from, to) {
             let selected = model.selected_edge_id.as_deref() == Some(edge.id.as_str());
             let stroke = if selected {
@@ -220,7 +235,7 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
 
     if let (Some(start), Some(pointer)) = (&model.pending_connection, ui.input(|i| i.pointer.hover_pos())) {
         if let Some(node) = model.nodes.iter().find(|n| n.id == start.node_id) {
-            if let Some(a) = port_position(rect, node, &start.port_id, node_size, model.pan, model.zoom) {
+            if let Some(a) = port_position(graph_rect, node, &start.port_id, node_size, model.pan, model.zoom) {
                 painter.line_segment([a,pointer], ui.visuals().widgets.hovered.fg_stroke);
             }
         }
@@ -229,7 +244,7 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
     let mut clicked_port: Option<PortRef> = None;
     for node in &mut model.nodes {
         let node_rect=egui::Rect::from_min_size(
-            rect.min + model.pan + node.position.to_vec2() * model.zoom,
+            graph_rect.min + model.pan + node.position.to_vec2() * model.zoom,
             node_size * model.zoom,
         );
         let hit=ui.interact(node_rect,ui.make_persistent_id(("wfide_flow_node",&node.id)),egui::Sense::click_and_drag());
@@ -245,8 +260,13 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
         let selected=model.selected_node_id.as_deref()==Some(node.id.as_str());
         let visuals=if selected {&ui.visuals().widgets.active}else{&ui.visuals().widgets.inactive};
         painter.rect(node_rect,6.0,visuals.bg_fill,visuals.bg_stroke,egui::StrokeKind::Inside);
-        painter.text(node_rect.left_top()+egui::vec2(8.0,8.0),egui::Align2::LEFT_TOP,&node.label,
-            egui::TextStyle::Button.resolve(ui.style()),visuals.fg_stroke.color);
+        painter.text(
+            node_rect.left_top()+egui::vec2(8.0,8.0) * model.zoom,
+            egui::Align2::LEFT_TOP,
+            &node.label,
+            egui::FontId::proportional(egui::TextStyle::Button.resolve(ui.style()).size * model.zoom),
+            visuals.fg_stroke.color,
+        );
 
         let mut iy=node_rect.top()+34.0 * model.zoom; let mut oy=node_rect.top()+34.0 * model.zoom;
         for port in &node.ports {
@@ -254,14 +274,20 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
                 PortDirection::Input=>{let p=egui::pos2(node_rect.left(),iy);iy+=18.0 * model.zoom;p}
                 PortDirection::Output=>{let p=egui::pos2(node_rect.right(),oy);oy+=18.0 * model.zoom;p}
             };
-            let port_hit=ui.interact(egui::Rect::from_center_size(p,egui::vec2(16.0,16.0)),
+            let port_hit=ui.interact(egui::Rect::from_center_size(p,egui::vec2(16.0,16.0) * model.zoom.max(0.5)),
                 ui.make_persistent_id(("wfide_port",&node.id,&port.id)),egui::Sense::click());
-            painter.circle_filled(p,if port_hit.hovered(){6.0}else{4.0},visuals.fg_stroke.color);
+            painter.circle_filled(p,(if port_hit.hovered(){6.0}else{4.0}) * model.zoom,visuals.fg_stroke.color);
             let (offset,align)=match port.direction {
-                PortDirection::Input=>(egui::vec2(8.0,-7.0),egui::Align2::LEFT_TOP),
-                PortDirection::Output=>(egui::vec2(-8.0,-7.0),egui::Align2::RIGHT_TOP),
+                PortDirection::Input=>(egui::vec2(8.0,-7.0) * model.zoom,egui::Align2::LEFT_TOP),
+                PortDirection::Output=>(egui::vec2(-8.0,-7.0) * model.zoom,egui::Align2::RIGHT_TOP),
             };
-            painter.text(p+offset,align,&port.label,egui::TextStyle::Small.resolve(ui.style()),visuals.fg_stroke.color);
+            painter.text(
+                p+offset,
+                align,
+                &port.label,
+                egui::FontId::proportional(egui::TextStyle::Small.resolve(ui.style()).size * model.zoom),
+                visuals.fg_stroke.color,
+            );
             if port_hit.clicked() { clicked_port=Some(PortRef{node_id:node.id.clone(),port_id:port.id.clone()}); }
         }
     }
