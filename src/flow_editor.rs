@@ -162,11 +162,9 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
         model.pan += ui.input(|input| input.pointer.delta());
     }
 
-    // Ctrl+wheel zooms around the pointer. Plain wheel remains available to
-    // the surrounding ScrollArea.
-    let zoom_delta = ui.input(|input| {
-        if input.modifiers.ctrl { input.raw_scroll_delta.y } else { 0.0 }
-    });
+    // Wheel zooms around the pointer. Canvas navigation is spatial, so no
+    // modifier key is required.
+    let zoom_delta = ui.input(|input| input.raw_scroll_delta.y);
     if zoom_delta != 0.0 {
         let old_zoom = model.zoom;
         let factor = (zoom_delta * 0.002).exp();
