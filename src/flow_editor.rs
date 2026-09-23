@@ -184,7 +184,14 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
         input.pointer.hover_pos().is_some_and(|pointer| rect.contains(pointer))
     });
     let zoom_delta = if pointer_over_canvas {
-        ui.input_mut(|input| input.consume_scroll_delta(egui::Vec2::Y).y)
+        ui.input_mut(|input| {
+            // egui 0.34 ScrollArea consumes this field by setting it to zero.
+            // Flow canvas takes ownership while hovered and clears it after
+            // reading so an outer/remembered ScrollArea cannot also scroll.
+            let delta = input.smooth_scroll_delta.y;
+            input.smooth_scroll_delta.y = 0.0;
+            delta
+        })
     } else {
         0.0
     };
