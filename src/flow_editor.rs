@@ -65,6 +65,7 @@ pub struct FlowModel {
 pub enum FlowAction {
     NodeSelected { node_id: String },
     EdgeSelected { edge_id: String },
+    SelectionCleared,
     NodeMoved { node_id: String, position: [f32; 2] },
     ConnectionCreated { edge_id: String, from: PortRef, to: PortRef },
     ConnectionRejected { from: PortRef, to: PortRef, reason: String },
@@ -117,6 +118,14 @@ pub fn show(ui: &mut egui::Ui, model: &mut FlowModel) -> FlowResponse {
 }
 
 pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&ConnectionValidator>) -> FlowResponse {
+    egui::ScrollArea::both()
+        .id_salt("wfide_flow_canvas_scroll")
+        .auto_shrink([false, false])
+        .show(ui, |ui| show_canvas(ui, model, validator))
+        .inner
+}
+
+fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&ConnectionValidator>) -> FlowResponse {
     let mut response = FlowResponse::default();
     let viewport = ui.available_rect_before_wrap();
     let node_size = egui::vec2(170.0, 84.0);
@@ -124,7 +133,7 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
         egui::vec2(max.x.max(node.position.x + node_size.x + 40.0), max.y.max(node.position.y + node_size.y + 40.0))
     });
     let canvas_size = egui::vec2(content_max.x.max(viewport.width()), content_max.y.max(viewport.height()));
-    let (rect, _) = ui.allocate_exact_size(canvas_size, egui::Sense::hover());
+    let (rect, canvas_hit) = ui.allocate_exact_size(canvas_size, egui::Sense::click());
     let painter = ui.painter_at(rect);
 
     let mut delete_edge: Option<String> = None;
@@ -207,6 +216,16 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
             painter.text(p+offset,align,&port.label,egui::TextStyle::Small.resolve(ui.style()),visuals.fg_stroke.color);
             if port_hit.clicked() { clicked_port=Some(PortRef{node_id:node.id.clone(),port_id:port.id.clone()}); }
         }
+    }
+
+    let selection_changed = response.actions.iter().any(|action| matches!(
+        action,
+        FlowAction::NodeSelected { .. } | FlowAction::EdgeSelected { .. }
+    ));
+    if canvas_hit.clicked() && !selection_changed && clicked_port.is_none() {
+        model.selected_node_id = None;
+        model.selected_edge_id = None;
+        response.actions.push(FlowAction::SelectionCleared);
     }
 
     if let Some(clicked)=clicked_port {
