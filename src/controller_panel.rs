@@ -120,11 +120,14 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
             }
             ControllerElementKind::Slider { value, min, max } => {
                 let before = *value;
-                let label_w = (rect.width() * 0.28).clamp(36.0 * scale, 100.0 * scale);
-                let value_w = (rect.width() * 0.18).clamp(32.0 * scale, 72.0 * scale);
+                let font = egui::FontId::proportional((rect.height() * 0.45).clamp(8.0, 18.0));
+                let label_w = text_width(ui, &element.label, &font) + 8.0 * scale;
+                let value_text = format!("{:.2}", value);
+                let value_w = text_width(ui, &value_text, &font) + 8.0 * scale;
+                let reserved = (label_w + value_w).min(rect.width() * 0.72);
                 let track_rect = egui::Rect::from_min_max(
                     rect.min,
-                    egui::pos2((rect.max.x - label_w - value_w - 8.0 * scale).max(rect.min.x + 8.0), rect.max.y),
+                    egui::pos2((rect.max.x - reserved - 8.0 * scale).max(rect.min.x + 8.0), rect.max.y),
                 );
                 if model.mode == ControllerMode::Operate && response.dragged() {
                     if let Some(p) = response.interact_pointer_pos() {
@@ -147,10 +150,10 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
                 let label_rect = egui::Rect::from_min_max(
                     egui::pos2(rect.right() - label_w, rect.top()), rect.max,
                 );
-                ui.painter().text(value_rect.center(), egui::Align2::CENTER_CENTER, format!("{:.2}", value),
-                    egui::FontId::proportional((rect.height() * 0.45).clamp(8.0, 18.0)), fg);
+                ui.painter().text(value_rect.center(), egui::Align2::CENTER_CENTER, value_text,
+                    font.clone(), fg);
                 ui.painter().text(label_rect.left_center(), egui::Align2::LEFT_CENTER, &element.label,
-                    egui::FontId::proportional((rect.height() * 0.45).clamp(8.0, 18.0)), fg);
+                    font, fg);
                 if model.mode == ControllerMode::Operate && *value != before {
                     out.actions.push(ControllerAction::SliderChanged { element_id: element.id.clone(), value: *value });
                 }
@@ -180,8 +183,8 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
                 }
             }
             ControllerElementKind::Label { text } => {
-                let chars = text.chars().count().max(1) as f32;
-                let font_size = (rect.height() * 0.72).min(rect.width() / (chars * 0.62)).clamp(4.0, 96.0);
+                ui.painter().rect_filled(rect, 0.0, bg);
+                let font_size = fit_text_size(ui, text, rect.size() * 0.92, 4.0, 96.0);
                 ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, text, egui::FontId::proportional(font_size), fg);
             }
             ControllerElementKind::Image { source } => {
@@ -379,4 +382,22 @@ pub fn apply_canvas_property_action(model: &mut ControllerModel, action: &crate:
         ("canvas.background", PropertyValue::Color(v)) => model.background = *v,
         _ => {}
     }
+}
+
+fn text_width(ui: &egui::Ui, text: &str, font: &egui::FontId) -> f32 {
+    ui.fonts_mut(|fonts| fonts.layout_no_wrap(text.to_owned(), font.clone(), egui::Color32::WHITE).size().x)
+}
+
+fn fit_text_size(ui: &egui::Ui, text: &str, available: egui::Vec2, min_size: f32, max_size: f32) -> f32 {
+    if text.is_empty() { return min_size; }
+    let mut lo = min_size;
+    let mut hi = max_size.min(available.y.max(min_size));
+    for _ in 0..8 {
+        let mid = (lo + hi) * 0.5;
+        let size = ui.fonts_mut(|fonts| {
+            fonts.layout_no_wrap(text.to_owned(), egui::FontId::proportional(mid), egui::Color32::WHITE).size()
+        });
+        if size.x <= available.x && size.y <= available.y { lo = mid; } else { hi = mid; }
+    }
+    lo
 }
