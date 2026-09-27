@@ -4,7 +4,7 @@ use workflow_ide_framework::{
  project_resource::{ResourceReference,ResourceScope},
  resource_journal::ResourceOperationJournal,
  resource_operation::{ResourceOperationItem,ResourceOperationKind,ResourceOperationPlan},
- resource_recovery::{assess_pending_journal,JournalItemRecoveryState},
+ resource_recovery::{assess_pending_journal,assess_pending_journal_with_application,ApplicationRecoveryState,ApplicationResourceRecoveryAdapter,CombinedRecoveryState,JournalItemRecoveryState},
  resource_state::ResourceRoots,
 };
 fn p(s:&str)->ResourceReference{ResourceReference::new(ResourceScope::Project,s).unwrap()}
@@ -41,3 +41,10 @@ fn delete_missing_source_means_filesystem_applied(){
 fn no_journal_returns_none(){
  let (base,c,r)=setup("none");assert!(assess_pending_journal(&c,&r).unwrap().is_none());let _=fs::remove_dir_all(base);
 }
+
+struct RecoveryApp(ApplicationRecoveryState);
+impl ApplicationResourceRecoveryAdapter for RecoveryApp { type Error=&'static str; fn assess_resource_recovery(&mut self,_:&workflow_ide_framework::resource_journal::ResourceOperationJournal)->Result<ApplicationRecoveryState,Self::Error>{Ok(self.0)} }
+#[test]
+fn combined_recovery_reports_fully_applied(){ let (base,c,r)=setup("combined");fs::write(r.project.join("b"),b"x").unwrap();save(&c,ResourceOperationKind::Move,Some(p("a")),Some(p("b")));let a=assess_pending_journal_with_application(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r).unwrap().unwrap();assert_eq!(a.state,CombinedRecoveryState::Applied);let _=fs::remove_dir_all(base);}
+#[test]
+fn combined_recovery_reports_partial_filesystem_state(){ let (base,c,r)=setup("partial");fs::write(r.project.join("b"),b"x").unwrap();save(&c,ResourceOperationKind::Move,Some(p("a")),Some(p("b")));let a=assess_pending_journal_with_application(&mut RecoveryApp(ApplicationRecoveryState::NotStarted),&c,&r).unwrap().unwrap();assert_eq!(a.state,CombinedRecoveryState::FilesystemApplied);let _=fs::remove_dir_all(base);}
