@@ -36,7 +36,7 @@ fn assess_item(kind:StoredOperationKind,item:&StoredJournalItem,roots:&ResourceR
             (Some(false),Some(false))=>JournalItemRecoveryState::Indeterminate,
             _=>JournalItemRecoveryState::Indeterminate,
         },
-        StoredOperationKind::Import => match (before,after) {
+        StoredOperationKind::Import|StoredOperationKind::Export => match (before,after) {
             (Some(true),Some(false))=>JournalItemRecoveryState::NotStarted,
             (Some(true),Some(true))=>JournalItemRecoveryState::FilesystemApplied,
             (Some(false),Some(true))=>JournalItemRecoveryState::FilesystemApplied,
