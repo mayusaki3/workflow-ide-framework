@@ -163,7 +163,7 @@ pub fn complete_framework_recovery<F:FnMut()->String>(
             StoredOperationKind::Export=>{}
             StoredOperationKind::Rename|StoredOperationKind::Move=>{
                 let before=before.ok_or("invalid move before reference")?;let after=after.ok_or("invalid move after reference")?;
-                if let Some(entry)=registry.find_by_reference(&before).cloned(){let _=registry.remove(&entry.resource_id);let _=registry.register(entry.resource_id,after.clone());changed=true;}
+                if let Some(entry)=registry.find_by_reference(&before).cloned(){let _=registry.remove(&entry.resource_id);let _=registry.register(entry.resource_id,after.clone());changed=true;}else if registry.find_by_reference(&after).is_none(){if let Some(resource_id)=item.resource_id.clone(){let _=registry.register(resource_id,after.clone());changed=true;}}
                 changed|=replace_framework_uses(framework_uses,&before,&after)>0;
             }
             StoredOperationKind::Delete=>{
