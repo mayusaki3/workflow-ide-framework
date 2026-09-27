@@ -140,3 +140,149 @@ Notification Panelは通常のFramework Panelとして扱い、標準instanceは
 Project format、Application API、ResourceReference、Journal、永続化ownership等のConsumer契約を優先して固定する。
 
 Split比率、Panel最小サイズ、未読badge等の細かなUI挙動は仮決めで実装し、明確な不具合がない限りv0.1.0で追加調整しない。
+
+
+## 15. v0.1.0 Public API 型
+
+以下をProject/Resource基盤の公開契約とする。実装内部の保存手順やUIはこれらの型から分離する。
+
+```rust
+pub enum NewProjectStoragePolicy {
+    Deferred,
+    Required,
+}
+
+pub enum ProjectDataCompatibility {
+    Compatible,
+    Converted { reason: Option<String>, handled: bool },
+    Incompatible { reason: Option<String>, handled: bool },
+}
+
+pub enum ProjectDataConsistency {
+    Consistent,
+    Inconsistent {
+        reason: Option<String>,
+        can_open: bool,
+        can_recover: bool,
+        handled: bool,
+    },
+}
+
+pub struct ProjectDirtyState {
+    pub metadata: bool,
+    pub framework: bool,
+    pub application: bool,
+}
+
+pub enum ResourceScope {
+    Application,
+    Project,
+    External,
+}
+
+pub struct ResourceReference {
+    pub scope: ResourceScope,
+    pub path: PathBuf,
+}
+
+pub struct ResourceEntry {
+    pub resource_id: String,
+    pub reference: ResourceReference,
+}
+
+pub enum ResourceRootStatus {
+    Available,
+    Missing,
+    Inaccessible,
+}
+
+pub enum ResourceWatcherStatus {
+    Active,
+    Degraded,
+    Unavailable,
+}
+
+pub enum ResourceState {
+    Available,
+    Missing,
+    RootUnavailable,
+}
+
+pub enum ResourceSelectionMode {
+    Single,
+    Multiple,
+}
+
+pub struct FileTypeFilter {
+    pub label: String,
+    pub extensions: Vec<String>,
+}
+```
+
+`ResourceReference` のpath表現はScopeにより意味が異なる。Application/Projectはrelative、Externalはabsoluteでなければならない。constructor/validation APIはこの不変条件を検証し、不正なreferenceをProject stateへ入れない。
+
+Path normalizationは `.`、冗長separator等のsyntactic normalizationを行うが、Registry dedupのためにsymlink/inode identityへ変換しない。root confinement確認時のみcanonical real pathを使用する。
+
+`ProjectDirtyState::is_dirty()` は3要素のORとする。個別dirty flagは各ownerのsaveが成功するまでclearしない。
+
+## 16. Application Project Adapter
+
+Application固有Project dataはtrait/callback境界を介して扱う。Frameworkは `application/` の内部fileを直接serializeしない。
+
+概念API:
+
+```rust
+trait ApplicationProjectAdapter {
+    fn initialize_project(&mut self, context: &ProjectContext) -> Result<(), ApplicationProjectError>;
+    fn inspect_project_data(
+        &mut self,
+        context: &ProjectContext,
+        stored_data_version: Option<&str>,
+    ) -> Result<ProjectDataCompatibility, ApplicationProjectError>;
+    fn check_project_consistency(
+        &mut self,
+        context: &ProjectContext,
+    ) -> Result<ProjectDataConsistency, ApplicationProjectError>;
+    fn save_project_data(
+        &mut self,
+        context: &ProjectContext,
+        save_id: &str,
+    ) -> Result<ApplicationSaveResult, ApplicationProjectError>;
+    fn save_project_data_as(
+        &mut self,
+        source: &ProjectContext,
+        destination: &ProjectContext,
+        save_id: &str,
+    ) -> Result<ApplicationSaveResult, ApplicationProjectError>;
+}
+```
+
+具体的なcallback所有形態はRust実装時に調整可能だが、FrameworkがApplication dataの意味・migration・保存file構造を所有しないという境界は変更しない。
+
+## 17. Resource Operation Adapter
+
+Frameworkが開始するjournaled Resource operationでは、filesystem mutation前にApplicationへchange setを提示する。
+
+概念API:
+
+```rust
+pub enum ResourceOperationDecision {
+    Accept { journal_data: Option<ApplicationJournalData> },
+    Reject { reason: Option<String>, handled: bool },
+}
+
+pub struct ApplicationJournalData {
+    pub format: String,
+    pub data: Vec<u8>,
+}
+```
+
+ApplicationがRejectした場合、Journal作成およびfilesystem mutationを行わない。ApplicationがAcceptした場合でも、prepareが呼ばれたことだけをoperation成功とはみなさない。
+
+RecoveryではFramework operation情報を含むJournal全体とApplication opaque payloadをApplicationへ渡す。ApplicationJournalDataのformat互換性はApplicationが所有する。
+
+## 18. API互換性方針
+
+v0.1.0公開前は実装検証により型名・細部を修正できる。v0.1.0公開後はProject formatとConsumerが利用する公開型を互換性対象として扱う。
+
+Panelのpixel単位既定値、Split ratio既定値、Notification badge表示等はこの互換性対象に含めない。
