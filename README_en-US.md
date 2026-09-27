@@ -56,6 +56,18 @@ Verification status is published as `○ / ✕ / ?`. Fine UI tuning is not a v0.
 
 `develop` is the v0.1.0 development branch. Development-history Example names such as `stepX_...` and technical validation records are kept as development material and will be separated from purpose-named consumer-facing Examples and documentation before release.
 
+## Sample Application
+
+Consumer-facing features are demonstrated in one integrated Sample Application.
+
+```text
+cargo run --example sample_application
+```
+
+- [Sample Application guide](./docs/ja-JP/03_利用ガイド/01_Sample_Application.md) (Japanese)
+
+Existing `stepX_...` examples are retained temporarily for development and regression history and are not the primary public sample path.
+
 ## Documentation
 
 - [Documentation index](./docs/ja-JP/目次.md) (Japanese)
