@@ -3,6 +3,7 @@ use crate::{
     project_io::atomic_write,
     project_resource::{ApplicationJournalData, ResourceReference, ResourceScope},
     resource_operation::{ResourceOperationKind, ResourceOperationPlan},
+    resource_registry::ResourceRegistry,
 };
 use serde::{Deserialize,Serialize};
 use std::{fs,io,path::PathBuf};
@@ -23,6 +24,7 @@ pub struct ResourceOperationJournal {
 pub enum StoredOperationKind{Import,Export,Rename,Move,Delete,Replace}
 #[derive(Debug,Clone,PartialEq,Eq,Serialize,Deserialize)]
 pub struct StoredJournalItem{
+    #[serde(default,skip_serializing_if="Option::is_none")] pub resource_id:Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub before:Option<StoredReference>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub after:Option<StoredReference>,
 }
@@ -34,8 +36,15 @@ pub struct StoredApplicationJournalData{pub format:String,pub data:Vec<u8>}
 impl ResourceOperationJournal{
     pub fn from_plan(plan:&ResourceOperationPlan,application:Option<ApplicationJournalData>)->Self{
         Self{format_version:RESOURCE_JOURNAL_FORMAT_VERSION,operation_id:plan.operation_id.clone(),kind:plan.kind.into(),
-            items:plan.items.iter().map(|i|StoredJournalItem{before:i.before.as_ref().map(Into::into),after:i.after.as_ref().map(Into::into)}).collect(),
+            items:plan.items.iter().map(|i|StoredJournalItem{resource_id:None,before:i.before.as_ref().map(Into::into),after:i.after.as_ref().map(Into::into)}).collect(),
             application:application.map(|a|StoredApplicationJournalData{format:a.format,data:a.data})}
+    }
+    pub fn from_plan_with_registry(plan:&ResourceOperationPlan,application:Option<ApplicationJournalData>,registry:&ResourceRegistry)->Self{
+        let mut journal=Self::from_plan(plan,application);
+        for (stored,item) in journal.items.iter_mut().zip(&plan.items){
+            stored.resource_id=item.before.as_ref().and_then(|r|registry.find_by_reference(r)).map(|e|e.resource_id.clone());
+        }
+        journal
     }
     pub fn save(&self,context:&ProjectContext)->io::Result<()>{
         let text=toml::to_string_pretty(self).map_err(io::Error::other)?;
