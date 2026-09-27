@@ -41,6 +41,13 @@ impl ResourceOperationJournal{
         let text=toml::to_string_pretty(self).map_err(io::Error::other)?;
         atomic_write(&journal_path(context),text.as_bytes())
     }
+    pub fn load(context:&ProjectContext)->io::Result<Option<Self>>{
+        let path=journal_path(context); if !path.exists(){return Ok(None);}
+        let text=fs::read_to_string(path)?;
+        let journal:Self=toml::from_str(&text).map_err(io::Error::other)?;
+        if journal.format_version!=RESOURCE_JOURNAL_FORMAT_VERSION{return Err(io::Error::new(io::ErrorKind::InvalidData,"unsupported resource journal format"));}
+        Ok(Some(journal))
+    }
     pub fn remove(context:&ProjectContext)->io::Result<()>{
         let path=journal_path(context); if path.exists(){fs::remove_file(path)?;} Ok(())
     }
