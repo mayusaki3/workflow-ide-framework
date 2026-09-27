@@ -86,8 +86,10 @@ fn to_reference(stored:&StoredReference)->Option<ResourceReference>{
 pub fn assess_pending_journal_with_application<A:ApplicationResourceRecoveryAdapter>(
     application:&mut A,context:&ProjectContext,roots:&ResourceRoots,
 )->Result<Option<CombinedRecoveryAssessment>,String>{
-    let empty_registry=ResourceRegistry::default();
-    assess_pending_journal_full(application,context,roots,&empty_registry,&[])
+    let Some(filesystem)=assess_pending_journal(context,roots).map_err(|e|e.to_string())? else{return Ok(None)};
+    let application_state=application.assess_resource_recovery(&filesystem.journal).map_err(|e|e.to_string())?;
+    let state=combine_recovery(&filesystem,application_state);
+    Ok(Some(CombinedRecoveryAssessment{filesystem,framework:FrameworkPersistentRecoveryState::NotApplicable,application:application_state,state}))
 }
 
 pub fn assess_pending_journal_full<A:ApplicationResourceRecoveryAdapter>(
