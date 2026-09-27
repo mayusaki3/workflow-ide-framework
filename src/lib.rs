@@ -16,6 +16,7 @@ pub mod project_save;
 pub mod project_open;
 pub mod project_save_as;
 pub mod resource_registry;
+pub mod resource_state;
 pub mod table;
 pub mod text_editor;
 pub mod tree_viewer;
