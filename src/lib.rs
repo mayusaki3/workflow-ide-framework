@@ -830,3 +830,5 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
 }
 
 pub mod resource_executor;
+
+pub mod resource_recovery;
