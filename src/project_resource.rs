@@ -166,5 +166,6 @@ pub struct ApplicationJournalData {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResourceOperationDecision {
     Accept { journal_data: Option<ApplicationJournalData> },
+    Handled { journal_data: Option<ApplicationJournalData> },
     Reject { reason: Option<String>, handled: bool },
 }
