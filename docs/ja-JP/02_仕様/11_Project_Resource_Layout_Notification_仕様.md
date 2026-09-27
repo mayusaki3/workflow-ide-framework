@@ -114,7 +114,15 @@ Unregisteredは `resources/` に実在するがRegistryに存在しないfileと
 
 両検索結果ともtemporary viewでありProjectへ永続化しない。
 
-## 9. Resource operation / Journal
+## 9. Import / Export
+
+Import / ExportはUIおよび操作概念上、単純file copyとApplication固有data変換を区別しない。Frameworkは操作要求をApplicationへ提示し、Applicationが変換等を必要とする場合はApplicationが処理を担当できる。Applicationが処理を引き取らない標準Resource操作はFrameworkがfile copyとして実行する。
+
+Importは外部/Application側のdataをProjectへ取り込む操作とする。ExportはApplication/Project側のdataをExternalへ出力する操作とする。Application ResourceからもExportを選択可能とする。
+
+Applicationが処理したImport / Exportでも、Framework/Application persistent stateをまたぐ場合は同一のResource Operation Journal契約に従う。ExportしたExternal fileは自動的にResource Registryへ登録せず、既存ResourceReferenceも変更しない。
+
+## 10. Resource operation / Journal
 
 filesystemとFramework/Application persistent stateをまたぐ操作にはResource Operation Journalを使用する。単独のunregistered filesystem operationにはJournalを要求しない。
 
@@ -126,7 +134,7 @@ Journalはrollback logではない。異常終了後はJournalと現在のfilesy
 
 Pending Journalだけを理由にProject Openを禁止しない。
 
-## 10. Missing / Locate-Replace
+## 11. Missing / Locate-Replace
 
 Resourceが消失してもResourceReferenceを自動削除せずMissingとして保持する。
 
@@ -134,7 +142,7 @@ Locate / Replaceは新しいResourceReferenceを選択し、Framework内の同�
 
 元pathへfileが戻った場合はWatcher/RefreshによりRestoredとして扱う。
 
-## 11. Watcher / Root state
+## 12. Watcher / Root state
 
 Watcherはcurrent resource stateを補助する機構でありdurable event historyではない。
 
@@ -142,7 +150,7 @@ Resource stateとWatcher status、Resource Root statusを分離する。Watcher 
 
 Framework initiated operationのeventはPending Operationと相関させ、単純な時間windowだけで無視しない。
 
-## 12. Panel Layout
+## 13. Panel Layout
 
 LayoutはPanelとPanelContainerの再帰treeとする。v0.1.0のContainerはHorizontal / Vertical / Tabsを扱う。
 
@@ -154,7 +162,7 @@ Panel close behaviorはHide / Destroyを区別する。HideはLayout位置を保
 
 Split比率や最小サイズ等の細かな既定値はv0.1.0で強い互換性契約にしない。
 
-## 13. Notification
+## 14. Notification
 
 Notification dataとNotification Panelを分離する。PanelがHiddenでもNotificationは存在できる。
 
@@ -164,14 +172,14 @@ Notification Panelは通常のFramework Panelとして扱い、標準instanceは
 
 同一notification_idの再発行は新規追加ではなく既存通知の更新とする。Notification object自体をProjectの永続状態とせず、Journal、Root、Watcher等のpersistent/current source stateから必要な通知を再構築する。
 
-## 14. v0.1.0調整方針
+## 15. v0.1.0調整方針
 
 Project format、Application API、ResourceReference、Journal、永続化ownership等のConsumer契約を優先して固定する。
 
 Split比率、Panel最小サイズ、未読badge等の細かなUI挙動は仮決めで実装し、明確な不具合がない限りv0.1.0で追加調整しない。
 
 
-## 15. v0.1.0 Public API 型
+## 16. v0.1.0 Public API 型
 
 以下をProject/Resource基盤の公開契約とする。実装内部の保存手順やUIはこれらの型から分離する。
 
@@ -254,7 +262,7 @@ Path normalizationは `.`、冗長separator等のsyntactic normalizationを行�
 
 `ProjectDirtyState::is_dirty()` は3要素のORとする。個別dirty flagは各ownerのsaveが成功するまでclearしない。
 
-## 16. Application Project Adapter
+## 17. Application Project Adapter
 
 Application固有Project dataはtrait/callback境界を介して扱う。Frameworkは `application/` の内部fileを直接serializeしない。
 
@@ -288,7 +296,7 @@ trait ApplicationProjectAdapter {
 
 具体的なcallback所有形態はRust実装時に調整可能だが、FrameworkがApplication dataの意味・migration・保存file構造を所有しないという境界は変更しない。
 
-## 17. Resource Operation Adapter
+## 18. Resource Operation Adapter
 
 Frameworkが開始するjournaled Resource operationでは、filesystem mutation前にApplicationへchange setを提示する。
 
@@ -297,6 +305,7 @@ Frameworkが開始するjournaled Resource operationでは、filesystem mutation
 ```rust
 pub enum ResourceOperationDecision {
     Accept { journal_data: Option<ApplicationJournalData> },
+    Handled { journal_data: Option<ApplicationJournalData> },
     Reject { reason: Option<String>, handled: bool },
 }
 
@@ -310,7 +319,7 @@ ApplicationがRejectした場合、Journal作成およびfilesystem mutationを�
 
 RecoveryではFramework operation情報を含むJournal全体とApplication opaque payloadをApplicationへ渡す。ApplicationJournalDataのformat互換性はApplicationが所有する。
 
-## 18. API互換性方針
+## 19. API互換性方針
 
 v0.1.0公開前は実装検証により型名・細部を修正できる。v0.1.0公開後はProject formatとConsumerが利用する公開型を互換性対象として扱う。
 
