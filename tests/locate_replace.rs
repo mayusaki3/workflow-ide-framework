@@ -1,5 +1,6 @@
 use workflow_ide_framework::{
-    locate_replace::{locate_replace, FrameworkResourceUse},
+    locate_replace::{locate_replace, prepare_locate_replace, ApplicationResourceChangeAdapter, FrameworkResourceUse, LocateReplaceDecision},
+    project_resource::ResourceOperationDecision,
     project_resource::{ResourceReference, ResourceScope},
     resource_registry::ResourceRegistry,
 };
@@ -53,4 +54,20 @@ fn normalized_old_reference_matches_framework_uses() {
     let mut uses=vec![FrameworkResourceUse{owner_id:"x".into(),reference:p("textures/./robot.png")}];
     let plan=locate_replace(&mut registry,&mut uses,&old,p("textures/new.png"),||"new".into());
     assert_eq!(plan.affected_owner_ids,vec!["x"]);
+}
+
+
+struct RejectingApp;
+impl ApplicationResourceChangeAdapter for RejectingApp {
+    type Error = &'static str;
+    fn prepare_resource_change(&mut self, _change: &workflow_ide_framework::locate_replace::ResourceChange) -> Result<ResourceOperationDecision, Self::Error> {
+        Ok(ResourceOperationDecision::Reject { reason: Some("in use".into()), handled: false })
+    }
+}
+
+#[test]
+fn application_can_reject_locate_replace_before_mutation() {
+    let old=p("old.png"); let new=p("new.png");
+    let decision=prepare_locate_replace(&mut RejectingApp,&old,&new).unwrap();
+    assert_eq!(decision,LocateReplaceDecision::Rejected { reason:Some("in use".into()), handled:false });
 }
