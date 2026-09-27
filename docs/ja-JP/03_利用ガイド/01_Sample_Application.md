@@ -12,6 +12,22 @@ Sample Application自体をFramework Consumerのreference implementationとし�
 cargo run --example sample_application
 ```
 
+## 2.1 Project lifecycle
+
+通常起動時はProjectを自動生成しない。起動直後はProject未オープン状態とし、New Project / Open Projectから開始する。
+
+New ProjectではSample ApplicationがSample用Flow、Controller、Text等の初期Application dataを生成する。Deferred Projectの場合、初回SaveでProject Rootを選択する。
+
+これによりSample Application自身で、未オープン → New/Open → Save/Save As → Close/OpenというConsumerの標準Project lifecycleを検証する。
+
+開発中に各Panelを即時確認する用途だけは `--demo-project` を使用し、固定Sample dataを読み込む。これはAcceptance用の通常起動とは分離する。
+
+```text
+cargo run --example sample_application -- --demo-project
+```
+
+現時点ではSample Application UIへのProject lifecycle接続は実装途中であり、通常起動の切替はProject UI/API接続時に行う。
+
 ## 3. 含める機能
 
 - Project / Tree表示
