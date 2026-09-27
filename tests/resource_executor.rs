@@ -2,10 +2,10 @@ use std::{fs,path::PathBuf};
 use workflow_ide_framework::{
  locate_replace::FrameworkResourceUse,
  project::ProjectContext,
- project_resource::{ResourceReference,ResourceScope},
- resource_executor::execute_operation,
+ project_resource::{ApplicationJournalData,ResourceOperationDecision,ResourceReference,ResourceScope},
+ resource_executor::{execute_operation,execute_prepared_operation},
  resource_journal::journal_path,
- resource_operation::{ResourceOperationItem,ResourceOperationKind,ResourceOperationPlan},
+ resource_operation::{ApplicationResourceOperationAdapter,PreparedResourceOperation,ResourceOperationItem,ResourceOperationKind,ResourceOperationPlan},
  resource_registry::ResourceRegistry,
  resource_state::ResourceRoots,
 };
@@ -53,4 +53,32 @@ fn filesystem_failure_leaves_journal_for_recovery(){
  let plan=ResourceOperationPlan{operation_id:"failed".into(),kind:ResourceOperationKind::Move,items:vec![ResourceOperationItem{before:Some(p("missing.txt")),after:Some(p("new.txt"))}]};
  assert!(execute_operation(&context,&roots,&mut registry,&mut uses,&plan,None,||"x".into()).is_err());
  assert!(journal_path(&context).is_file());let _=fs::remove_dir_all(base);
+}
+
+struct ConvertingApp { executed:bool, saw_journal:bool, fail:bool }
+impl ApplicationResourceOperationAdapter for ConvertingApp {
+ type Error=&'static str;
+ fn prepare_resource_operation(&mut self,_:&ResourceOperationPlan)->Result<ResourceOperationDecision,Self::Error>{
+  Ok(ResourceOperationDecision::Handled{journal_data:Some(ApplicationJournalData{format:"test".into(),data:vec![1]})})
+ }
+ fn execute_resource_operation(&mut self,plan:&ResourceOperationPlan,_:Option<&ApplicationJournalData>)->Result<(),Self::Error>{
+  self.saw_journal=plan.items.len()==1; self.executed=true; if self.fail{Err("conversion failed")}else{Ok(())}
+ }
+}
+#[test]
+fn application_handled_export_runs_without_framework_copy_and_clears_journal(){
+ let (base,context,roots)=setup("handled-export");let source=roots.application.join("source.dat");fs::write(&source,b"source").unwrap();
+ let target=base.join("converted.out");let before=ResourceReference::new(ResourceScope::Application,"source.dat").unwrap();let after=ResourceReference::new(ResourceScope::External,target.clone()).unwrap();
+ let plan=ResourceOperationPlan{operation_id:"export".into(),kind:ResourceOperationKind::Export,items:vec![ResourceOperationItem{before:Some(before),after:Some(after)}]};
+ let mut app=ConvertingApp{executed:false,saw_journal:false,fail:false};let mut registry=ResourceRegistry::default();let mut uses=vec![];
+ execute_prepared_operation(&mut app,&context,&roots,&mut registry,&mut uses,&plan,PreparedResourceOperation::Handled{journal_data:Some(ApplicationJournalData{format:"test".into(),data:vec![1]})},||"unused".into()).unwrap();
+ assert!(app.executed&&app.saw_journal);assert!(!target.exists());assert!(!journal_path(&context).exists());let _=fs::remove_dir_all(base);
+}
+#[test]
+fn failed_application_conversion_leaves_journal_for_recovery(){
+ let (base,context,roots)=setup("handled-fail");let target=base.join("converted.out");let before=ResourceReference::new(ResourceScope::Application,"source.dat").unwrap();let after=ResourceReference::new(ResourceScope::External,target).unwrap();
+ let plan=ResourceOperationPlan{operation_id:"export-fail".into(),kind:ResourceOperationKind::Export,items:vec![ResourceOperationItem{before:Some(before),after:Some(after)}]};
+ let mut app=ConvertingApp{executed:false,saw_journal:false,fail:true};let mut registry=ResourceRegistry::default();let mut uses=vec![];
+ assert!(execute_prepared_operation(&mut app,&context,&roots,&mut registry,&mut uses,&plan,PreparedResourceOperation::Handled{journal_data:None},||"unused".into()).is_err());
+ assert!(app.executed);assert!(journal_path(&context).is_file());let _=fs::remove_dir_all(base);
 }
