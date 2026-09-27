@@ -7,6 +7,7 @@ pub mod layout;
 pub mod localization;
 pub mod probe;
 pub mod property_panel;
+pub mod project_resource;
 pub mod table;
 pub mod text_editor;
 pub mod tree_viewer;
