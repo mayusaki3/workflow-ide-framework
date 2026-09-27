@@ -43,6 +43,11 @@ where
                 let after=item.after.as_ref().expect("validated");
                 copy_file(roots,before,after)
             }
+            ResourceOperationKind::Export => {
+                let before=item.before.as_ref().expect("validated");
+                let after=item.after.as_ref().expect("validated");
+                copy_file(roots,before,after)
+            }
             ResourceOperationKind::Rename|ResourceOperationKind::Move => {
                 let before=item.before.as_ref().expect("validated");
                 let after=item.after.as_ref().expect("validated");
@@ -106,6 +111,9 @@ fn apply_framework_state<F:FnMut()->String>(
                 if registry.find_by_reference(after).is_none(){
                     let _=registry.register(new_id(),after.clone());
                 }
+            }
+            ResourceOperationKind::Export=>{
+                // Export does not change Project Registry or Framework references.
             }
             ResourceOperationKind::Rename|ResourceOperationKind::Move=>{
                 let before=item.before.as_ref().expect("validated");
