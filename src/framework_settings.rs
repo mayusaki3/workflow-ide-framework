@@ -1,4 +1,7 @@
-use crate::project_resource::{ResourceEntry, ResourceReference, ResourceScope};
+use crate::{
+    project_resource::{ResourceEntry, ResourceReference, ResourceReferenceError, ResourceScope},
+    resource_registry::ResourceRegistry,
+};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -70,11 +73,30 @@ pub enum FrameworkSettingsError {
     Parse(String),
     UnsupportedNewerFormat { found: u32, supported: u32 },
     InvalidFormatVersion(u32),
+    InvalidResourceReference { resource_id: String, error: ResourceReferenceError },
 }
 
 impl FrameworkSettings {
     pub fn to_toml(&self) -> Result<String, FrameworkSettingsError> {
         toml::to_string_pretty(self).map_err(|error| FrameworkSettingsError::Serialize(error.to_string()))
+    }
+
+    pub fn from_registry(registry: &ResourceRegistry) -> Self {
+        Self {
+            format_version: FRAMEWORK_SETTINGS_FORMAT_VERSION,
+            resources: registry.entries().iter().map(StoredResourceEntry::from_resource).collect(),
+        }
+    }
+
+    pub fn to_registry(&self) -> Result<ResourceRegistry, FrameworkSettingsError> {
+        let mut entries = Vec::with_capacity(self.resources.len());
+        for stored in &self.resources {
+            entries.push(stored.to_resource().map_err(|error| FrameworkSettingsError::InvalidResourceReference {
+                resource_id: stored.resource_id.clone(),
+                error,
+            })?);
+        }
+        Ok(ResourceRegistry::new(entries))
     }
 
     pub fn from_toml(input: &str) -> Result<Self, FrameworkSettingsError> {
