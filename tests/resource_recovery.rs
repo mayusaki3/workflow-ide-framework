@@ -88,3 +88,15 @@ fn full_recovery_detects_mixed_framework_state_as_conflict(){
  let a=assess_pending_journal_full(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r,&registry,&uses).unwrap().unwrap();
  assert_eq!(a.framework,FrameworkPersistentRecoveryState::Mixed);assert_eq!(a.state,CombinedRecoveryState::Conflict);let _=fs::remove_dir_all(base);
 }
+
+#[test]
+fn move_recovery_restores_stable_id_from_journal_when_old_registry_entry_is_gone(){
+ let (base,c,r)=setup("stable-id");fs::write(r.project.join("b"),b"x").unwrap();
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Move,items:vec![ResourceOperationItem{before:Some(p("a")),after:Some(p("b"))}]};
+ let mut original=ResourceRegistry::default();original.register("stable-id",p("a"));
+ ResourceOperationJournal::from_plan_with_registry(&plan,None,&original).save(&c).unwrap();
+ let mut registry=ResourceRegistry::default();let mut uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:p("a")}];
+ let a=assess_pending_journal_full(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r,&registry,&uses).unwrap().unwrap();
+ assert_eq!(complete_framework_recovery(&a,&mut registry,&mut uses,||"wrong-new-id".into()).unwrap(),FrameworkRecoveryResult::Completed);
+ assert_eq!(registry.find_by_reference(&p("b")).unwrap().resource_id,"stable-id");assert_eq!(uses[0].reference,p("b"));let _=fs::remove_dir_all(base);
+}
