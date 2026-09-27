@@ -82,6 +82,9 @@ pub fn prepare_locate_replace<A: ApplicationResourceChangeAdapter>(
         crate::project_resource::ResourceOperationDecision::Accept { journal_data } => {
             Ok(LocateReplaceDecision::Accepted { journal_data })
         }
+        crate::project_resource::ResourceOperationDecision::Handled { journal_data } => {
+            Ok(LocateReplaceDecision::Accepted { journal_data })
+        }
         crate::project_resource::ResourceOperationDecision::Reject { reason, handled } => {
             Ok(LocateReplaceDecision::Rejected { reason, handled })
         }
