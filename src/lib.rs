@@ -13,6 +13,7 @@ pub mod project_lifecycle;
 pub mod project_io;
 pub mod framework_settings;
 pub mod project_save;
+pub mod project_open;
 pub mod table;
 pub mod text_editor;
 pub mod tree_viewer;
