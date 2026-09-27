@@ -4,7 +4,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceOperationKind { Import, Rename, Move, Delete, Replace }
+pub enum ResourceOperationKind { Import, Export, Rename, Move, Delete, Replace }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourceOperationItem {
@@ -25,6 +25,7 @@ pub enum ResourceOperationValidationError {
     RenameRequiresOneItem,
     DeleteRequiresOneItem,
     ProjectScopeRequired,
+    ExportDestinationMustBeExternal,
     MissingBefore,
     MissingAfter,
     SameSourceAndDestination,
@@ -41,6 +42,12 @@ impl ResourceOperationPlan {
                     let before=item.before.as_ref().ok_or(ResourceOperationValidationError::MissingBefore)?;
                     let after=item.after.as_ref().ok_or(ResourceOperationValidationError::MissingAfter)?;
                     if after.scope!=ResourceScope::Project { return Err(ResourceOperationValidationError::ProjectScopeRequired); }
+                    if before==after { return Err(ResourceOperationValidationError::SameSourceAndDestination); }
+                }
+                ResourceOperationKind::Export => {
+                    let before=item.before.as_ref().ok_or(ResourceOperationValidationError::MissingBefore)?;
+                    let after=item.after.as_ref().ok_or(ResourceOperationValidationError::MissingAfter)?;
+                    if after.scope!=ResourceScope::External { return Err(ResourceOperationValidationError::ExportDestinationMustBeExternal); }
                     if before==after { return Err(ResourceOperationValidationError::SameSourceAndDestination); }
                 }
                 ResourceOperationKind::Rename|ResourceOperationKind::Move => {
@@ -78,6 +85,7 @@ pub trait ApplicationResourceOperationAdapter {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PreparedResourceOperation {
     Accepted { journal_data: Option<ApplicationJournalData> },
+    Handled { journal_data: Option<ApplicationJournalData> },
     Rejected { reason: Option<String>, handled: bool },
 }
 
@@ -85,6 +93,7 @@ pub fn prepare_operation<A:ApplicationResourceOperationAdapter>(application:&mut
     plan.validate().map_err(|e|format!("{e:?}"))?;
     match application.prepare_resource_operation(plan).map_err(|e|e.to_string())? {
         ResourceOperationDecision::Accept{journal_data}=>Ok(PreparedResourceOperation::Accepted{journal_data}),
+        ResourceOperationDecision::Handled{journal_data}=>Ok(PreparedResourceOperation::Handled{journal_data}),
         ResourceOperationDecision::Reject{reason,handled}=>Ok(PreparedResourceOperation::Rejected{reason,handled}),
     }
 }
