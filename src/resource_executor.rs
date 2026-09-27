@@ -108,10 +108,12 @@ fn apply_framework_state<F:FnMut()->String>(
     for item in &plan.items {
         match plan.kind {
             ResourceOperationKind::Import=>{
+                let before=item.before.as_ref().expect("validated");
                 let after=item.after.as_ref().expect("validated");
                 if registry.find_by_reference(after).is_none(){
                     let _=registry.register(new_id(),after.clone());
                 }
+                replace_uses(framework_uses,before,after);
             }
             ResourceOperationKind::Export=>{
                 // Export does not change Project Registry or Framework references.
