@@ -62,6 +62,14 @@ Project全体のtransaction/rollbackは要求しない。途中失敗時はDirty
 
 Save Asは新しいProject Rootへ複製保存し、全処理成功後だけCurrent Project Rootを切り替える。Application dataはFrameworkがblind copyせず、Application Save As境界を使用する。
 
+## 3.1 Project Open
+
+Openは `project.toml` を先に読み、formatとApplication IDを検証する。
+
+`framework_settings.toml` が正常なら読み込む。Missingまたはparse/format不正の場合はProject全体を即座に失敗させず、Framework初期設定を使用するrecovery候補としてUIへ返す。元fileをOpen時に自動上書きしない。
+
+Application compatibility / consistencyもOpen処理内で問い合わせるが、Converted / Incompatible / InconsistentをFrameworkが自動解決しない。Applicationの `handled`、`can_open`、`can_recover` とともに上位UIへ返し、必要なuser decisionを行う。
+
 ## 4. Application data compatibility
 
 stored application.data_versionはhintとしてApplicationへ渡す。Applicationは実データを確認し、Compatible / Converted / Incompatibleを返す。
