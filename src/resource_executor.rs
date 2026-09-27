@@ -34,7 +34,7 @@ where
 {
     plan.validate().map_err(|error| ResourceExecutionError::Validation(format!("{error:?}")))?;
 
-    let journal = ResourceOperationJournal::from_plan(plan, application_journal_data);
+    let journal = ResourceOperationJournal::from_plan_with_registry(plan, application_journal_data, registry);
     journal.save(context).map_err(ResourceExecutionError::JournalWrite)?;
 
     for item in &plan.items {
@@ -162,7 +162,7 @@ where A:ApplicationResourceOperationAdapter,F:FnMut()->String {
         PreparedResourceOperation::Accepted{journal_data}=>execute_operation(context,roots,registry,framework_uses,plan,journal_data,new_id),
         PreparedResourceOperation::Handled{journal_data}=>{
             plan.validate().map_err(|error|ResourceExecutionError::Validation(format!("{error:?}")))?;
-            let journal=ResourceOperationJournal::from_plan(plan,journal_data.clone());
+            let journal=ResourceOperationJournal::from_plan_with_registry(plan,journal_data.clone(),registry);
             journal.save(context).map_err(ResourceExecutionError::JournalWrite)?;
             application.execute_resource_operation(plan,journal_data.as_ref()).map_err(|error|ResourceExecutionError::Application(error.to_string()))?;
             let mut new_id=new_id;
