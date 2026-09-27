@@ -17,6 +17,9 @@ pub trait ApplicationResourceRecoveryAdapter {
 }
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
+pub enum FrameworkPersistentRecoveryState { Before, Applied, Mixed, NotApplicable, Indeterminate }
+
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum CombinedRecoveryState { NotStarted, FilesystemApplied, ApplicationApplied, Applied, Conflict, Indeterminate }
 
 
@@ -32,6 +35,7 @@ pub struct JournalRecoveryAssessment {
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub struct CombinedRecoveryAssessment {
     pub filesystem:JournalRecoveryAssessment,
+    pub framework:FrameworkPersistentRecoveryState,
     pub application:ApplicationRecoveryState,
     pub state:CombinedRecoveryState,
 }
@@ -82,10 +86,18 @@ fn to_reference(stored:&StoredReference)->Option<ResourceReference>{
 pub fn assess_pending_journal_with_application<A:ApplicationResourceRecoveryAdapter>(
     application:&mut A,context:&ProjectContext,roots:&ResourceRoots,
 )->Result<Option<CombinedRecoveryAssessment>,String>{
+    let empty_registry=ResourceRegistry::default();
+    assess_pending_journal_full(application,context,roots,&empty_registry,&[])
+}
+
+pub fn assess_pending_journal_full<A:ApplicationResourceRecoveryAdapter>(
+    application:&mut A,context:&ProjectContext,roots:&ResourceRoots,registry:&ResourceRegistry,framework_uses:&[FrameworkResourceUse],
+)->Result<Option<CombinedRecoveryAssessment>,String>{
     let Some(filesystem)=assess_pending_journal(context,roots).map_err(|e|e.to_string())? else{return Ok(None)};
+    let framework=assess_framework_state(&filesystem.journal,registry,framework_uses);
     let application_state=application.assess_resource_recovery(&filesystem.journal).map_err(|e|e.to_string())?;
-    let state=combine_recovery(&filesystem,application_state);
-    Ok(Some(CombinedRecoveryAssessment{filesystem,application:application_state,state}))
+    let state=combine_recovery_full(&filesystem,framework,application_state);
+    Ok(Some(CombinedRecoveryAssessment{filesystem,framework,application:application_state,state}))
 }
 
 fn combine_recovery(fs:&JournalRecoveryAssessment,app:ApplicationRecoveryState)->CombinedRecoveryState{
@@ -102,6 +114,29 @@ fn combine_recovery(fs:&JournalRecoveryAssessment,app:ApplicationRecoveryState)-
     }
 }
 
+fn assess_framework_state(journal:&ResourceOperationJournal,registry:&ResourceRegistry,uses:&[FrameworkResourceUse])->FrameworkPersistentRecoveryState{
+    if journal.kind==StoredOperationKind::Export{return FrameworkPersistentRecoveryState::NotApplicable;}
+    let mut before_count=0usize;let mut after_count=0usize;let mut mixed=false;
+    for item in &journal.items {
+        let before=item.before.as_ref().and_then(to_reference);let after=item.after.as_ref().and_then(to_reference);
+        match journal.kind {
+            StoredOperationKind::Import|StoredOperationKind::Replace=>{let (Some(b),Some(a))=(before,after) else{return FrameworkPersistentRecoveryState::Indeterminate};let a_reg=registry.find_by_reference(&a).is_some();let b_use=uses.iter().any(|u|u.reference==b);let a_use=uses.iter().any(|u|u.reference==a);if a_reg||a_use{after_count+=1;}if b_use&&!a_use{before_count+=1;}if b_use&&a_use{mixed=true;}},
+            StoredOperationKind::Rename|StoredOperationKind::Move=>{let (Some(b),Some(a))=(before,after) else{return FrameworkPersistentRecoveryState::Indeterminate};let b_reg=registry.find_by_reference(&b).is_some();let a_reg=registry.find_by_reference(&a).is_some();let b_use=uses.iter().any(|u|u.reference==b);let a_use=uses.iter().any(|u|u.reference==a);if b_reg||b_use{before_count+=1;}if a_reg||a_use{after_count+=1;}if (b_reg&&a_reg)||(b_use&&a_use){mixed=true;}},
+            StoredOperationKind::Delete=>{let Some(b)=before else{return FrameworkPersistentRecoveryState::Indeterminate};if registry.find_by_reference(&b).is_some(){before_count+=1}else{after_count+=1;}},
+            StoredOperationKind::Export=>{},
+        }
+    }
+    if mixed||(before_count>0&&after_count>0){FrameworkPersistentRecoveryState::Mixed}else if after_count>0{FrameworkPersistentRecoveryState::Applied}else{FrameworkPersistentRecoveryState::Before}
+}
+
+fn combine_recovery_full(fs:&JournalRecoveryAssessment,framework:FrameworkPersistentRecoveryState,app:ApplicationRecoveryState)->CombinedRecoveryState{
+    if matches!(framework,FrameworkPersistentRecoveryState::Mixed|FrameworkPersistentRecoveryState::Indeterminate){return CombinedRecoveryState::Conflict;}
+    let base=combine_recovery(fs,app);match (base,framework){
+        (CombinedRecoveryState::Applied,FrameworkPersistentRecoveryState::Applied|FrameworkPersistentRecoveryState::NotApplicable)=>CombinedRecoveryState::Applied,
+        (CombinedRecoveryState::Applied,FrameworkPersistentRecoveryState::Before)=>CombinedRecoveryState::FilesystemApplied,
+        (other,_)=>other,
+    }
+}
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum FrameworkRecoveryResult { Completed, NoChange }
