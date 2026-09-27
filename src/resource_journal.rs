@@ -20,7 +20,7 @@ pub struct ResourceOperationJournal {
 }
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Serialize,Deserialize)]
 #[serde(rename_all="lowercase")]
-pub enum StoredOperationKind{Import,Rename,Move,Delete,Replace}
+pub enum StoredOperationKind{Import,Export,Rename,Move,Delete,Replace}
 #[derive(Debug,Clone,PartialEq,Eq,Serialize,Deserialize)]
 pub struct StoredJournalItem{
     #[serde(default,skip_serializing_if="Option::is_none")] pub before:Option<StoredReference>,
@@ -52,6 +52,6 @@ impl ResourceOperationJournal{
         let path=journal_path(context); if path.exists(){fs::remove_file(path)?;} Ok(())
     }
 }
-impl From<ResourceOperationKind> for StoredOperationKind{fn from(v:ResourceOperationKind)->Self{match v{ResourceOperationKind::Import=>Self::Import,ResourceOperationKind::Rename=>Self::Rename,ResourceOperationKind::Move=>Self::Move,ResourceOperationKind::Delete=>Self::Delete,ResourceOperationKind::Replace=>Self::Replace}}}
+impl From<ResourceOperationKind> for StoredOperationKind{fn from(v:ResourceOperationKind)->Self{match v{ResourceOperationKind::Import=>Self::Import,ResourceOperationKind::Export=>Self::Export,ResourceOperationKind::Rename=>Self::Rename,ResourceOperationKind::Move=>Self::Move,ResourceOperationKind::Delete=>Self::Delete,ResourceOperationKind::Replace=>Self::Replace}}}
 impl From<&ResourceReference> for StoredReference{fn from(v:&ResourceReference)->Self{Self{scope:match v.scope{ResourceScope::Application=>"application",ResourceScope::Project=>"project",ResourceScope::External=>"external"}.into(),path:v.path.clone()}}}
 pub fn journal_path(context:&ProjectContext)->PathBuf{context.framework_directory().join("pending_resource_operation.toml")}
