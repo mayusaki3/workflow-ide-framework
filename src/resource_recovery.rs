@@ -1,7 +1,9 @@
 use crate::{
     project::ProjectContext,
+    locate_replace::FrameworkResourceUse,
     project_resource::{ResourceReference,ResourceScope},
     resource_journal::{ResourceOperationJournal,StoredJournalItem,StoredOperationKind,StoredReference},
+    resource_registry::ResourceRegistry,
     resource_state::ResourceRoots,
 };
 use std::{fs,io};
@@ -98,4 +100,56 @@ fn combine_recovery(fs:&JournalRecoveryAssessment,app:ApplicationRecoveryState)-
         (_,true,ApplicationRecoveryState::Applied)=>CombinedRecoveryState::Applied,
         _=>CombinedRecoveryState::Indeterminate,
     }
+}
+
+
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
+pub enum FrameworkRecoveryResult { Completed, NoChange }
+
+pub fn complete_framework_recovery<F:FnMut()->String>(
+    assessment:&CombinedRecoveryAssessment,
+    registry:&mut ResourceRegistry,
+    framework_uses:&mut [FrameworkResourceUse],
+    mut new_id:F,
+)->Result<FrameworkRecoveryResult,String>{
+    if matches!(assessment.state,CombinedRecoveryState::Conflict|CombinedRecoveryState::Indeterminate|CombinedRecoveryState::NotStarted|CombinedRecoveryState::ApplicationApplied){
+        return Err(format!("recovery state {:?} is not safe for framework completion",assessment.state));
+    }
+    let mut changed=false;
+    for item in &assessment.filesystem.journal.items {
+        let before=item.before.as_ref().and_then(to_reference);
+        let after=item.after.as_ref().and_then(to_reference);
+        match assessment.filesystem.journal.kind {
+            StoredOperationKind::Import=>{
+                let before=before.ok_or("invalid import before reference")?;let after=after.ok_or("invalid import after reference")?;
+                if registry.find_by_reference(&after).is_none(){let _=registry.register(new_id(),after.clone());changed=true;}
+                changed|=replace_framework_uses(framework_uses,&before,&after)>0;
+            }
+            StoredOperationKind::Export=>{}
+            StoredOperationKind::Rename|StoredOperationKind::Move=>{
+                let before=before.ok_or("invalid move before reference")?;let after=after.ok_or("invalid move after reference")?;
+                if let Some(entry)=registry.find_by_reference(&before).cloned(){let _=registry.remove(&entry.resource_id);let _=registry.register(entry.resource_id,after.clone());changed=true;}
+                changed|=replace_framework_uses(framework_uses,&before,&after)>0;
+            }
+            StoredOperationKind::Delete=>{
+                let before=before.ok_or("invalid delete before reference")?;
+                if let Some(entry)=registry.find_by_reference(&before).cloned(){let _=registry.remove(&entry.resource_id);changed=true;}
+            }
+            StoredOperationKind::Replace=>{
+                let before=before.ok_or("invalid replace before reference")?;let after=after.ok_or("invalid replace after reference")?;
+                if registry.find_by_reference(&after).is_none(){let _=registry.register(new_id(),after.clone());changed=true;}
+                changed|=replace_framework_uses(framework_uses,&before,&after)>0;
+            }
+        }
+    }
+    Ok(if changed{FrameworkRecoveryResult::Completed}else{FrameworkRecoveryResult::NoChange})
+}
+
+pub fn finalize_recovered_journal(context:&ProjectContext,assessment:&CombinedRecoveryAssessment)->Result<(),String>{
+    if assessment.state!=CombinedRecoveryState::Applied{return Err("journal can only be finalized when recovery is fully applied".into());}
+    ResourceOperationJournal::remove(context).map_err(|e|e.to_string())
+}
+
+fn replace_framework_uses(uses:&mut [FrameworkResourceUse],before:&ResourceReference,after:&ResourceReference)->usize{
+    let mut count=0;for usage in uses{if usage.reference==*before{usage.reference=after.clone();count+=1;}}count
 }
