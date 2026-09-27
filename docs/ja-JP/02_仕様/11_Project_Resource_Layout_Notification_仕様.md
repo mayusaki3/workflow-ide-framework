@@ -23,6 +23,27 @@ Frameworkは `project.toml`、`framework/`、Project lifecycleを所有する。
 
 Application IDはApplicationが提供するstable opaque IDとし、Project互換性判定のApplication識別に使用する。Application name / descriptionは表示用であり互換性判定には使用しない。
 
+v0.1.0の `project.toml` は次を基本形とする。
+
+```toml
+[project]
+format_version = 1
+name = "..."
+description = "..."
+language = "ja-JP"
+save_id = "..."
+saved_at = "..."
+
+[application]
+id = "org.example.app"
+name = "..."
+description = "..."
+language = "ja-JP"
+data_version = "..."
+```
+
+`description` と `application.data_version` はoptionalとする。未知の新しい `project.format_version` は勝手に解釈せずOpenを停止する。異なるApplication IDのProjectは対象ApplicationのProjectとしてOpenしない。
+
 Project metadataとApplication metadataはそれぞれlanguageを持てる。自動翻訳は行わない。
 
 ## 3. Save
