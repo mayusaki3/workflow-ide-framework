@@ -20,6 +20,8 @@ pub mod resource_state;
 pub mod file_resource_selector;
 pub mod resource_selection_registry;
 pub mod locate_replace;
+pub mod resource_operation;
+pub mod resource_journal;
 pub mod table;
 pub mod text_editor;
 pub mod tree_viewer;
