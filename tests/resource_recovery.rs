@@ -1,10 +1,12 @@
 use std::{fs,path::PathBuf};
 use workflow_ide_framework::{
  project::ProjectContext,
+ locate_replace::FrameworkResourceUse,
  project_resource::{ResourceReference,ResourceScope},
  resource_journal::ResourceOperationJournal,
  resource_operation::{ResourceOperationItem,ResourceOperationKind,ResourceOperationPlan},
- resource_recovery::{assess_pending_journal,assess_pending_journal_with_application,ApplicationRecoveryState,ApplicationResourceRecoveryAdapter,CombinedRecoveryState,JournalItemRecoveryState},
+ resource_recovery::{assess_pending_journal,assess_pending_journal_with_application,complete_framework_recovery,ApplicationRecoveryState,ApplicationResourceRecoveryAdapter,CombinedRecoveryState,FrameworkRecoveryResult,JournalItemRecoveryState},
+ resource_registry::ResourceRegistry,
  resource_state::ResourceRoots,
 };
 fn p(s:&str)->ResourceReference{ResourceReference::new(ResourceScope::Project,s).unwrap()}
@@ -48,3 +50,19 @@ impl ApplicationResourceRecoveryAdapter for RecoveryApp { type Error=&'static st
 fn combined_recovery_reports_fully_applied(){ let (base,c,r)=setup("combined");fs::write(r.project.join("b"),b"x").unwrap();save(&c,ResourceOperationKind::Move,Some(p("a")),Some(p("b")));let a=assess_pending_journal_with_application(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r).unwrap().unwrap();assert_eq!(a.state,CombinedRecoveryState::Applied);let _=fs::remove_dir_all(base);}
 #[test]
 fn combined_recovery_reports_partial_filesystem_state(){ let (base,c,r)=setup("partial");fs::write(r.project.join("b"),b"x").unwrap();save(&c,ResourceOperationKind::Move,Some(p("a")),Some(p("b")));let a=assess_pending_journal_with_application(&mut RecoveryApp(ApplicationRecoveryState::NotStarted),&c,&r).unwrap().unwrap();assert_eq!(a.state,CombinedRecoveryState::FilesystemApplied);let _=fs::remove_dir_all(base);}
+
+#[test]
+fn recovery_completes_framework_state_after_move_filesystem_applied(){
+ let (base,c,r)=setup("complete-move");fs::write(r.project.join("b"),b"x").unwrap();save(&c,ResourceOperationKind::Move,Some(p("a")),Some(p("b")));
+ let a=assess_pending_journal_with_application(&mut RecoveryApp(ApplicationRecoveryState::NotStarted),&c,&r).unwrap().unwrap();
+ let mut registry=ResourceRegistry::default();registry.register("stable",p("a"));let mut uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:p("a")}];
+ assert_eq!(complete_framework_recovery(&a,&mut registry,&mut uses,||"unused".into()).unwrap(),FrameworkRecoveryResult::Completed);
+ assert_eq!(registry.find_by_id("stable").unwrap().reference,p("b"));assert_eq!(uses[0].reference,p("b"));let _=fs::remove_dir_all(base);
+}
+#[test]
+fn conflict_cannot_mutate_framework_state(){
+ let (base,c,r)=setup("no-complete-conflict");fs::write(r.project.join("a"),b"x").unwrap();fs::write(r.project.join("b"),b"x").unwrap();save(&c,ResourceOperationKind::Move,Some(p("a")),Some(p("b")));
+ let a=assess_pending_journal_with_application(&mut RecoveryApp(ApplicationRecoveryState::NotStarted),&c,&r).unwrap().unwrap();
+ let mut registry=ResourceRegistry::default();registry.register("stable",p("a"));let mut uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:p("a")}];
+ assert!(complete_framework_recovery(&a,&mut registry,&mut uses,||"unused".into()).is_err());assert_eq!(registry.find_by_id("stable").unwrap().reference,p("a"));let _=fs::remove_dir_all(base);
+}
