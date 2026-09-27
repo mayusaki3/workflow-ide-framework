@@ -1,4 +1,6 @@
+use std::path::PathBuf;
 use workflow_ide_framework::{
+    framework_settings::{FrameworkSettings, StoredResourceEntry, StoredResourceScope},
     project_resource::{ResourceReference, ResourceScope},
     resource_registry::{RegisterResult, ResourceRegistry},
 };
@@ -41,4 +43,27 @@ fn replace_reference_preserves_resource_id() {
     assert_eq!(registry.replace_reference(&project("old.png"), project("new.png")), 1);
     let entry = registry.find_by_id("stable-id").unwrap();
     assert_eq!(entry.reference, project("new.png"));
+}
+
+
+#[test]
+fn registry_round_trips_through_framework_settings() {
+    let mut registry = ResourceRegistry::default();
+    registry.register("r1", project("textures/robot.png"));
+    let settings = FrameworkSettings::from_registry(&registry);
+    let restored = settings.to_registry().unwrap();
+    assert_eq!(restored.entries(), registry.entries());
+}
+
+#[test]
+fn invalid_stored_reference_is_not_silently_dropped() {
+    let settings = FrameworkSettings {
+        format_version: 1,
+        resources: vec![StoredResourceEntry {
+            resource_id: "bad".into(),
+            scope: StoredResourceScope::Project,
+            path: PathBuf::from("../escape.png"),
+        }],
+    };
+    assert!(settings.to_registry().is_err());
 }
