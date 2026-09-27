@@ -3,7 +3,7 @@ use crate::{
     project::ProjectContext,
     project_resource::{ApplicationJournalData, ResourceReference, ResourceScope},
     resource_journal::ResourceOperationJournal,
-    resource_operation::{ResourceOperationKind, ResourceOperationPlan},
+    resource_operation::{ApplicationResourceOperationAdapter, PreparedResourceOperation, ResourceOperationKind, ResourceOperationPlan},
     resource_registry::{RegisterResult, ResourceRegistry},
     resource_state::ResourceRoots,
 };
@@ -17,6 +17,7 @@ pub enum ResourceExecutionError {
     JournalRemove(io::Error),
     MissingSource(PathBuf),
     DestinationExists(PathBuf),
+    Application(String),
 }
 
 pub fn execute_operation<F>(
@@ -140,4 +141,31 @@ fn apply_framework_state<F:FnMut()->String>(
 }
 fn replace_uses(uses:&mut [FrameworkResourceUse],before:&ResourceReference,after:&ResourceReference){
     for usage in uses {if usage.reference==*before{usage.reference=after.clone();}}
+}
+
+
+pub fn execute_prepared_operation<A,F>(
+    application:&mut A,
+    context:&ProjectContext,
+    roots:&ResourceRoots,
+    registry:&mut ResourceRegistry,
+    framework_uses:&mut [FrameworkResourceUse],
+    plan:&ResourceOperationPlan,
+    prepared:PreparedResourceOperation,
+    new_id:F,
+)->Result<(),ResourceExecutionError>
+where A:ApplicationResourceOperationAdapter,F:FnMut()->String {
+    match prepared {
+        PreparedResourceOperation::Rejected{reason,..}=>Err(ResourceExecutionError::Application(reason.unwrap_or_else(||"operation rejected".into()))),
+        PreparedResourceOperation::Accepted{journal_data}=>execute_operation(context,roots,registry,framework_uses,plan,journal_data,new_id),
+        PreparedResourceOperation::Handled{journal_data}=>{
+            plan.validate().map_err(|error|ResourceExecutionError::Validation(format!("{error:?}")))?;
+            let journal=ResourceOperationJournal::from_plan(plan,journal_data.clone());
+            journal.save(context).map_err(ResourceExecutionError::JournalWrite)?;
+            application.execute_resource_operation(plan,journal_data.as_ref()).map_err(|error|ResourceExecutionError::Application(error.to_string()))?;
+            let mut new_id=new_id;
+            apply_framework_state(registry,framework_uses,plan,&mut new_id);
+            ResourceOperationJournal::remove(context).map_err(ResourceExecutionError::JournalRemove)
+        }
+    }
 }
