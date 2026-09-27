@@ -57,6 +57,18 @@ Framework を利用するために Consumer が Framework 内部型を fork / �
 
 `develop` は v0.1.0 開発ブランチです。開発中の `stepX_...` Example 名や技術検証資料は開発履歴として扱い、v0.1.0 の Consumer 向け導線では用途ベースの Example / ドキュメントへ整理します。
 
+## Sample Application
+
+Consumer向け機能は1つの統合Sample Applicationで確認できます。
+
+```text
+cargo run --example sample_application
+```
+
+- [Sample Application ガイド](./docs/ja-JP/03_利用ガイド/01_Sample_Application.md)
+
+既存の `stepX_...` Exampleは開発・回帰検証履歴として当面保持し、公開Sampleの主導線には使用しません。
+
 ## ドキュメント
 
 - [ドキュメント目次](./docs/ja-JP/目次.md)
