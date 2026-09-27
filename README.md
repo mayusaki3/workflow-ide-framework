@@ -2,70 +2,77 @@
 
 # Workflow IDE Framework
 
-Workflow IDE Framework は、IDE 型アプリケーションを構築するための Rust ベース IDE Platform Framework です。  
-Windows / macOS / Linux 上で動作する、Dock 型・Scene 型 UI を持つ IDE アプリケーション構築を目的とします。
+Workflow IDE Framework は、Rust で IDE 型アプリケーションを構築するためのアプリケーション組み込み型 Framework です。
+Consumer Application が Framework の Panel、Layout、Project、Resource、Command 等の共通機能を利用し、domain 固有機能を追加する構成を想定しています。
 
-## 開発状態
+> **Status: v0.1.0 development**
+>
+> v0.1.0 は公開準備中です。Windows / Linux / macOS を対象とし、未検証項目は公開検証表で `？` として明示します。
 
-Phase 0 の初期技術検証を完了し、検証結果を `main` へ統合する段階に到達しました。現在は最初の開発版 **v0.1.0** の仕様・実装作業を `develop` ブランチで開始しています。
+## 想定用途
 
-初期検証で未検証または残課題となった OS / IME / GPU Driver 等の項目は記録を保持し、v0.1.0 以降の実装・検証で継続して扱います。
+- Runtime / Simulation IDE
+- AI / Asset Studio
+- Workflow Editor
+- GPU Viewport を持つ開発・検証アプリケーション
 
-## 目的
+## v0.1.0 の範囲
 
-以下のような IDE 型アプリケーションを構築するための共通基盤を提供します。
+現在の実装と v0.1.0 仕様では、次の共通基盤を整備しています。
 
-- Runtime IDE
-- Simulation IDE
-- AI Studio
-- Asset Studio
-- Workflow IDE
-- GPU Viewport IDE
+- Application / Panel 構成
+- Dock / Layout 基盤
+- Text Editor / Log Viewer / Tree Viewer
+- Flow / Graph Editor
+- Property Panel
+- Controller Panel
+- Logging
+- Language / Theme / Font 設定
+- Project persistence
+- Resource Registry / File Resource Selector
+- Application / Project / External Resource の区別
+- Resource filesystem operation の整合性管理
+- Notification
+- Consumer Application 向け拡張境界
 
-## 特徴
+Project、Resource、Panel Container、Notification の一部は v0.1.0 向け設計・実装・検証中です。README上の項目だけを完成済み機能とはみなさず、検証状態はドキュメントの検証表を参照してください。
 
-- Dock 型 UI
-- Scene 切り替え
-- Page ベース UI
-- GPU Viewport
-- Runtime 分離
-- 非同期 Task
-- Event Bus
-- UI API
-- Workspace / Session 保存
-- Command System
+## 責務境界
 
-## UI構造
+Framework は IDE 共通機能と汎用 model/action/API を所有します。Consumer Application は domain model、domain validation、Application 固有 Project data、Resource の意味、Runtime 固有処理を所有します。
 
-```text
-Page
-  ↓
-Tab
-  ↓
-Frame
-  ↓
-Scene
-```
+Framework を利用するために Consumer が Framework 内部型を fork / 直接変更することを前提としません。
 
-## 想定構成
+## 対象OS
 
-```text
-IDE Product
-  ├─ workflow-ide-framework
-  ├─ Runtime
-  ├─ SDK
-  ├─ Domain Model
-  └─ Application Pages
-```
+| OS | v0.1.0方針 |
+| --- | --- |
+| Windows | 実機検証 |
+| Linux | VMを含め検証。実機必須項目は未検証として明示 |
+| macOS | 環境を用意できない項目は未検証として明示 |
+
+検証状態は `○ / ✕ / ？` で公開します。細かなUI調整は v0.1.0 の完了条件に含めず、機能成立、公開API、永続化、状態遷移、Consumer統合を優先します。
+
+## 開発と公開物
+
+`develop` は v0.1.0 開発ブランチです。開発中の `stepX_...` Example 名や技術検証資料は開発履歴として扱い、v0.1.0 の Consumer 向け導線では用途ベースの Example / ドキュメントへ整理します。
 
 ## ドキュメント
 
-- [目次](./docs/ja-JP/目次.md)
+- [ドキュメント目次](./docs/ja-JP/目次.md)
+- [要件定義](./docs/ja-JP/01_要件定義/要件定義目次.md)
+- [仕様](./docs/ja-JP/02_仕様/仕様目次.md)
+- [技術検証](./docs/ja-JP/90_技術検証/技術検証目次.md)
+- [v0.1.0 公開準備チェックリスト](./docs/ja-JP/90_技術検証/v0.1.0_公開準備チェックリスト.md)
 
-## 採用仕様
+## v0.1.0 で固定しないもの
 
-ドキュメントは HLDocS を採用します。
+Panel の最小サイズ、Split の細かな既定比率、Notification の細かな表示挙動など、Application APIやProject互換性へ影響しないUI調整値は v0.1.0 で固定しません。実際に動作させた結果、必要なものを後続版で調整します。
 
-- https://github.com/mayusaki3/HLDocS
+## ライセンス
 
----
+MIT License。詳細は [LICENSE](./LICENSE) を参照してください。
+
+## Documentation specification
+
+設計・仕様文書は [HLDocS](https://github.com/mayusaki3/HLDocS) を採用しています。
