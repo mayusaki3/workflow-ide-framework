@@ -122,7 +122,12 @@ fn assess_framework_state(journal:&ResourceOperationJournal,registry:&ResourceRe
     for item in &journal.items {
         let before=item.before.as_ref().and_then(to_reference);let after=item.after.as_ref().and_then(to_reference);
         match journal.kind {
-            StoredOperationKind::Import|StoredOperationKind::Replace=>{let (Some(b),Some(a))=(before,after) else{return FrameworkPersistentRecoveryState::Indeterminate};let a_reg=registry.find_by_reference(&a).is_some();let b_use=uses.iter().any(|u|u.reference==b);let a_use=uses.iter().any(|u|u.reference==a);if a_reg||a_use{after_count+=1;}if b_use&&!a_use{before_count+=1;}if b_use&&a_use{mixed=true;}},
+            StoredOperationKind::Import|StoredOperationKind::Replace=>{
+                let (Some(b),Some(a))=(before,after) else{return FrameworkPersistentRecoveryState::Indeterminate};
+                let a_entry=registry.find_by_reference(&a);let b_use=uses.iter().any(|u|u.reference==b);let a_use=uses.iter().any(|u|u.reference==a);
+                if let (Some(expected_id),Some(entry))=(item.after_resource_id.as_deref(),a_entry){if entry.resource_id!=expected_id{mixed=true;}}
+                if a_entry.is_some()||a_use{after_count+=1;}if b_use&&!a_use{before_count+=1;}if b_use&&a_use{mixed=true;}
+            },
             StoredOperationKind::Rename|StoredOperationKind::Move=>{
                 let (Some(b),Some(a))=(before,after) else{return FrameworkPersistentRecoveryState::Indeterminate};
                 let b_entry=registry.find_by_reference(&b);let a_entry=registry.find_by_reference(&a);
@@ -169,7 +174,7 @@ pub fn complete_framework_recovery<F:FnMut()->String>(
         match assessment.filesystem.journal.kind {
             StoredOperationKind::Import=>{
                 let before=before.ok_or("invalid import before reference")?;let after=after.ok_or("invalid import after reference")?;
-                if registry.find_by_reference(&after).is_none(){let _=registry.register(new_id(),after.clone());changed=true;}
+                if let Some(entry)=registry.find_by_reference(&after){if item.after_resource_id.as_deref().is_some_and(|id|entry.resource_id!=id){return Err("import destination registry resource ID does not match journal".into());}}else{let id=item.after_resource_id.clone().unwrap_or_else(&mut new_id);let _=registry.register(id,after.clone());changed=true;}
                 changed|=replace_framework_uses(framework_uses,&before,&after)>0;
             }
             StoredOperationKind::Export=>{}
@@ -188,7 +193,7 @@ pub fn complete_framework_recovery<F:FnMut()->String>(
             }
             StoredOperationKind::Replace=>{
                 let before=before.ok_or("invalid replace before reference")?;let after=after.ok_or("invalid replace after reference")?;
-                if registry.find_by_reference(&after).is_none(){let _=registry.register(new_id(),after.clone());changed=true;}
+                if let Some(entry)=registry.find_by_reference(&after){if item.after_resource_id.as_deref().is_some_and(|id|entry.resource_id!=id){return Err("replace destination registry resource ID does not match journal".into());}}else{let id=item.after_resource_id.clone().unwrap_or_else(&mut new_id);let _=registry.register(id,after.clone());changed=true;}
                 changed|=replace_framework_uses(framework_uses,&before,&after)>0;
             }
         }
