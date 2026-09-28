@@ -4,7 +4,7 @@ use workflow_ide_framework::{
  project::ProjectContext,
  project_resource::{ApplicationJournalData,ResourceOperationDecision,ResourceReference,ResourceScope},
  resource_executor::{execute_operation,execute_prepared_operation},
- resource_journal::journal_path,
+ resource_journal::{journal_path,ResourceOperationJournal},
  resource_operation::{ApplicationResourceOperationAdapter,PreparedResourceOperation,ResourceOperationItem,ResourceOperationKind,ResourceOperationPlan},
  resource_registry::ResourceRegistry,
  resource_state::ResourceRoots,
@@ -81,4 +81,16 @@ fn failed_application_conversion_leaves_journal_for_recovery(){
  let mut app=ConvertingApp{executed:false,saw_journal:false,fail:true};let mut registry=ResourceRegistry::default();let mut uses=vec![];
  assert!(execute_prepared_operation(&mut app,&context,&roots,&mut registry,&mut uses,&plan,PreparedResourceOperation::Handled{journal_data:None},||"unused".into()).is_err());
  assert!(app.executed);assert!(journal_path(&context).is_file());let _=fs::remove_dir_all(base);
+}
+
+#[test]
+fn failed_import_journal_preserves_preallocated_target_resource_id(){
+ let (base,context,roots)=setup("import-journal-id");
+ let source=ResourceReference::new(ResourceScope::External,base.join("missing.txt")).unwrap();let target=p("imported/missing.txt");
+ let plan=ResourceOperationPlan{operation_id:"import-fail".into(),kind:ResourceOperationKind::Import,items:vec![ResourceOperationItem{before:Some(source),after:Some(target)}]};
+ let mut registry=ResourceRegistry::default();let mut uses=vec![];
+ assert!(execute_operation(&context,&roots,&mut registry,&mut uses,&plan,None,||"preallocated-target".into()).is_err());
+ let journal=ResourceOperationJournal::load(&context).unwrap().unwrap();
+ assert_eq!(journal.items[0].after_resource_id.as_deref(),Some("preallocated-target"));
+ let _=fs::remove_dir_all(base);
 }
