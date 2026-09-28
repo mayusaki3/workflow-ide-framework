@@ -34,7 +34,9 @@ where
 {
     plan.validate().map_err(|error| ResourceExecutionError::Validation(format!("{error:?}")))?;
 
-    let journal = ResourceOperationJournal::from_plan_with_registry(plan, application_journal_data, registry);
+    let mut journal = ResourceOperationJournal::from_plan_with_registry(plan, application_journal_data, registry);
+    let after_ids=allocate_after_resource_ids(plan,registry,&mut new_id);
+    journal.set_after_resource_ids(&after_ids);
     journal.save(context).map_err(ResourceExecutionError::JournalWrite)?;
 
     for item in &plan.items {
@@ -63,7 +65,7 @@ where
         if let Err(error)=result { return Err(error); }
     }
 
-    apply_framework_state(registry,framework_uses,plan,&mut new_id);
+    apply_framework_state(registry,framework_uses,plan,&journal);
 
     ResourceOperationJournal::remove(context).map_err(ResourceExecutionError::JournalRemove)?;
     Ok(())
@@ -99,25 +101,35 @@ fn require_free_destination(path:&Path)->Result<(),ResourceExecutionError>{
     if path.exists(){Err(ResourceExecutionError::DestinationExists(path.to_path_buf()))}else{Ok(())}
 }
 
-fn apply_framework_state<F:FnMut()->String>(
+fn allocate_after_resource_ids<F:FnMut()->String>(
+    plan:&ResourceOperationPlan,registry:&ResourceRegistry,new_id:&mut F,
+)->Vec<Option<String>>{
+    plan.items.iter().map(|item|match plan.kind {
+        ResourceOperationKind::Import|ResourceOperationKind::Replace=>item.after.as_ref().map(|after|
+            registry.find_by_reference(after).map(|entry|entry.resource_id.clone()).unwrap_or_else(&mut *new_id)
+        ),
+        _=>None,
+    }).collect()
+}
+
+fn apply_framework_state(
     registry:&mut ResourceRegistry,
     framework_uses:&mut [FrameworkResourceUse],
     plan:&ResourceOperationPlan,
-    new_id:&mut F,
+    journal:&ResourceOperationJournal,
 ){
-    for item in &plan.items {
+    for (item,stored) in plan.items.iter().zip(&journal.items) {
         match plan.kind {
             ResourceOperationKind::Import=>{
                 let before=item.before.as_ref().expect("validated");
                 let after=item.after.as_ref().expect("validated");
                 if registry.find_by_reference(after).is_none(){
-                    let _=registry.register(new_id(),after.clone());
+                    let id=stored.after_resource_id.clone().expect("import target ID journaled");
+                    let _=registry.register(id,after.clone());
                 }
                 replace_uses(framework_uses,before,after);
             }
-            ResourceOperationKind::Export=>{
-                // Export does not change Project Registry or Framework references.
-            }
+            ResourceOperationKind::Export=>{}
             ResourceOperationKind::Rename|ResourceOperationKind::Move=>{
                 let before=item.before.as_ref().expect("validated");
                 let after=item.after.as_ref().expect("validated");
@@ -130,12 +142,14 @@ fn apply_framework_state<F:FnMut()->String>(
             ResourceOperationKind::Delete=>{
                 let before=item.before.as_ref().expect("validated");
                 if let Some(entry)=registry.find_by_reference(before).cloned(){let _=registry.remove(&entry.resource_id);}
-                // Framework references intentionally remain and therefore become Missing.
             }
             ResourceOperationKind::Replace=>{
                 let before=item.before.as_ref().expect("validated");
                 let after=item.after.as_ref().expect("validated");
-                if registry.find_by_reference(after).is_none(){let _=registry.register(new_id(),after.clone());}
+                if registry.find_by_reference(after).is_none(){
+                    let id=stored.after_resource_id.clone().expect("replace target ID journaled");
+                    let _=registry.register(id,after.clone());
+                }
                 replace_uses(framework_uses,before,after);
             }
         }
@@ -162,11 +176,13 @@ where A:ApplicationResourceOperationAdapter,F:FnMut()->String {
         PreparedResourceOperation::Accepted{journal_data}=>execute_operation(context,roots,registry,framework_uses,plan,journal_data,new_id),
         PreparedResourceOperation::Handled{journal_data}=>{
             plan.validate().map_err(|error|ResourceExecutionError::Validation(format!("{error:?}")))?;
-            let journal=ResourceOperationJournal::from_plan_with_registry(plan,journal_data.clone(),registry);
+            let mut new_id=new_id;
+            let mut journal=ResourceOperationJournal::from_plan_with_registry(plan,journal_data.clone(),registry);
+            let after_ids=allocate_after_resource_ids(plan,registry,&mut new_id);
+            journal.set_after_resource_ids(&after_ids);
             journal.save(context).map_err(ResourceExecutionError::JournalWrite)?;
             application.execute_resource_operation(plan,journal_data.as_ref()).map_err(|error|ResourceExecutionError::Application(error.to_string()))?;
-            let mut new_id=new_id;
-            apply_framework_state(registry,framework_uses,plan,&mut new_id);
+            apply_framework_state(registry,framework_uses,plan,&journal);
             ResourceOperationJournal::remove(context).map_err(ResourceExecutionError::JournalRemove)
         }
     }
