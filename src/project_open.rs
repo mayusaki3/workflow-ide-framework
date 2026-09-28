@@ -1,5 +1,5 @@
 use crate::{
-    framework_settings::{FrameworkSettings, FrameworkSettingsError},
+    framework_settings::FrameworkSettings,
     project::{ProjectContext, ProjectFile, ProjectFileError},
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
 };
