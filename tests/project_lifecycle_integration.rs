@@ -99,6 +99,8 @@ fn save_as_success_copies_project_resources_and_switches_current_root() {
 fn save_as_application_failure_keeps_original_project_current() {
     let source = ProjectContext::new(root("as-fail-source"));
     let destination = ProjectContext::new(root("as-fail-destination"));
+    fs::create_dir_all(source.resource_root()).unwrap();
+    fs::write(source.resource_root().join("must-not-copy.txt"), b"resource").unwrap();
     let mut session = ProjectSession::new_project(NewProjectStoragePolicy::Required, Some(source.clone())).unwrap();
     let original_dirty = session.dirty;
     let mut file = metadata();
@@ -108,5 +110,6 @@ fn save_as_application_failure_keeps_original_project_current() {
     assert_eq!(session.context(), Some(&source));
     assert_eq!(session.dirty, original_dirty);
     assert!(!destination.project_file_path().exists());
+    assert!(!destination.resource_root().join("must-not-copy.txt").exists());
     let _=fs::remove_dir_all(source.root()); let _=fs::remove_dir_all(destination.root());
 }
