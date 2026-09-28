@@ -140,7 +140,13 @@ fn assess_framework_state(journal:&ResourceOperationJournal,registry:&ResourceRe
                 if a_entry.is_some()||a_use{after_count+=1;}
                 if (b_entry.is_some()&&a_entry.is_some())||(b_use&&a_use){mixed=true;}
             },
-            StoredOperationKind::Delete=>{let Some(b)=before else{return FrameworkPersistentRecoveryState::Indeterminate};if registry.find_by_reference(&b).is_some(){before_count+=1}else{after_count+=1;}},
+            StoredOperationKind::Delete=>{
+                let Some(b)=before else{return FrameworkPersistentRecoveryState::Indeterminate};
+                if let Some(entry)=registry.find_by_reference(&b){
+                    if item.before_resource_id.as_deref().is_some_and(|id|entry.resource_id!=id){mixed=true;}
+                    before_count+=1;
+                }else{after_count+=1;}
+            },
             StoredOperationKind::Export=>{},
         }
     }
@@ -209,7 +215,10 @@ pub fn complete_framework_recovery<F:FnMut()->String>(
             }
             StoredOperationKind::Delete=>{
                 let before=before.ok_or("invalid delete before reference")?;
-                if let Some(entry)=registry.find_by_reference(&before).cloned(){let _=registry.remove(&entry.resource_id);changed=true;}
+                if let Some(entry)=registry.find_by_reference(&before).cloned(){
+                    if item.before_resource_id.as_deref().is_some_and(|id|entry.resource_id!=id){return Err("delete source registry resource ID does not match journal".into());}
+                    let _=registry.remove(&entry.resource_id);changed=true;
+                }
             }
             StoredOperationKind::Replace=>{
                 let before=before.ok_or("invalid replace before reference")?;let after=after.ok_or("invalid replace after reference")?;
