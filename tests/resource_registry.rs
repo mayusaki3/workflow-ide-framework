@@ -59,6 +59,7 @@ fn registry_round_trips_through_framework_settings() {
 fn invalid_stored_reference_is_not_silently_dropped() {
     let settings = FrameworkSettings {
         format_version: 1,
+        save_id: None,
         resources: vec![StoredResourceEntry {
             resource_id: "bad".into(),
             scope: StoredResourceScope::Project,
