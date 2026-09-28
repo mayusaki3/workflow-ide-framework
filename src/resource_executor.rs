@@ -1,7 +1,7 @@
 use crate::{
     locate_replace::FrameworkResourceUse,
     project::ProjectContext,
-    project_resource::{ApplicationJournalData, ResourceReference, ResourceScope},
+    project_resource::{ApplicationJournalData, ResourceReference},
     resource_journal::ResourceOperationJournal,
     resource_operation::{ApplicationResourceOperationAdapter, PreparedResourceOperation, ResourceOperationKind, ResourceOperationPlan},
     resource_registry::{RegisterResult, ResourceRegistry},
