@@ -158,6 +158,12 @@ fn legacy_journal_without_route_defaults_to_application_recovery(){
  let (base,c,r)=setup("legacy-route");fs::write(r.project.join("b"),b"x").unwrap();
  let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Move,items:vec![ResourceOperationItem{before:Some(p("a")),after:Some(p("b"))}]};
  ResourceOperationJournal::from_plan(&plan,None).save(&c).unwrap();
+ let path=workflow_ide_framework::resource_journal::journal_path(&c);
+ let text=fs::read_to_string(&path).unwrap();
+ let legacy=text.lines().filter(|line|!line.trim_start().starts_with("execution_route")).collect::<Vec<_>>().join("\n");
+ fs::write(&path,legacy).unwrap();
+ let loaded=ResourceOperationJournal::load(&c).unwrap().unwrap();
+ assert_eq!(loaded.execution_route,StoredExecutionRoute::Application);
  let a=assess_pending_journal_with_application(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r).unwrap().unwrap();
  assert_eq!(a.application,ApplicationRecoveryState::Applied);assert_eq!(a.state,CombinedRecoveryState::Applied);let _=fs::remove_dir_all(base);
 }
