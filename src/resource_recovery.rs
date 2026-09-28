@@ -226,6 +226,40 @@ pub fn finalize_recovered_journal(context:&ProjectContext,assessment:&CombinedRe
     ResourceOperationJournal::remove(context).map_err(|e|e.to_string())
 }
 
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
+pub enum RecoveryCompletionResult { NoJournal, Completed }
+
+pub fn recover_pending_resource_operation<A,F>(
+    application:&mut A,
+    context:&ProjectContext,
+    roots:&ResourceRoots,
+    registry:&mut ResourceRegistry,
+    framework_uses:&mut [FrameworkResourceUse],
+    new_id:F,
+)->Result<RecoveryCompletionResult,String>
+where A:ApplicationResourceRecoveryAdapter,F:FnMut()->String {
+    let Some(initial)=assess_pending_journal_full(application,context,roots,registry,framework_uses)? else{return Ok(RecoveryCompletionResult::NoJournal)};
+    if matches!(initial.state,CombinedRecoveryState::Conflict|CombinedRecoveryState::Indeterminate){
+        return Err(format!("recovery state {:?} requires manual resolution",initial.state));
+    }
+    complete_application_recovery(application,&initial)?;
+    let Some(after_application)=assess_pending_journal_full(application,context,roots,registry,framework_uses)? else{
+        return Err("resource operation journal disappeared during recovery".into());
+    };
+    if matches!(after_application.state,CombinedRecoveryState::Conflict|CombinedRecoveryState::Indeterminate|CombinedRecoveryState::NotStarted|CombinedRecoveryState::ApplicationApplied){
+        return Err(format!("recovery state {:?} is not safe for framework completion",after_application.state));
+    }
+    complete_framework_recovery(&after_application,registry,framework_uses,new_id)?;
+    let Some(final_assessment)=assess_pending_journal_full(application,context,roots,registry,framework_uses)? else{
+        return Err("resource operation journal disappeared before finalization".into());
+    };
+    if final_assessment.state!=CombinedRecoveryState::Applied{
+        return Err(format!("recovery did not reach Applied state: {:?}",final_assessment.state));
+    }
+    finalize_recovered_journal(context,&final_assessment)?;
+    Ok(RecoveryCompletionResult::Completed)
+}
+
 fn replace_framework_uses(uses:&mut [FrameworkResourceUse],before:&ResourceReference,after:&ResourceReference)->usize{
     let mut count=0;for usage in uses{if usage.reference==*before{usage.reference=after.clone();count+=1;}}count
 }
