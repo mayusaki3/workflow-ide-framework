@@ -130,3 +130,14 @@ fn move_recovery_does_not_overwrite_destination_if_id_changes_after_assessment()
  assert!(complete_framework_recovery(&a,&mut changed_registry,&mut changed_uses,||"unused".into()).is_err());
  assert_eq!(changed_registry.find_by_reference(&p("b")).unwrap().resource_id,"other-id");assert_eq!(changed_uses[0].reference,p("a"));let _=fs::remove_dir_all(base);
 }
+
+#[test]
+fn import_recovery_restores_preallocated_target_resource_id(){
+ let (base,c,r)=setup("import-target-id");let external=base.join("source.txt");fs::write(&external,b"x").unwrap();fs::write(r.project.join("imported.txt"),b"x").unwrap();
+ let source=ResourceReference::new(ResourceScope::External,external).unwrap();let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Import,items:vec![ResourceOperationItem{before:Some(source.clone()),after:Some(p("imported.txt"))}]};
+ let original=ResourceRegistry::default();let mut journal=ResourceOperationJournal::from_plan_with_registry(&plan,None,&original);journal.set_after_resource_ids(&[Some("target-id".into())]);journal.save(&c).unwrap();
+ let mut registry=ResourceRegistry::default();let mut uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:source}];
+ let a=assess_pending_journal_full(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r,&registry,&uses).unwrap().unwrap();
+ assert_eq!(complete_framework_recovery(&a,&mut registry,&mut uses,||"wrong-id".into()).unwrap(),FrameworkRecoveryResult::Completed);
+ assert_eq!(registry.find_by_reference(&p("imported.txt")).unwrap().resource_id,"target-id");assert_eq!(uses[0].reference,p("imported.txt"));let _=fs::remove_dir_all(base);
+}
