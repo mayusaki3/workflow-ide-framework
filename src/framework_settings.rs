@@ -11,12 +11,14 @@ pub const FRAMEWORK_SETTINGS_FORMAT_VERSION: u32 = 1;
 pub struct FrameworkSettings {
     pub format_version: u32,
     #[serde(default)]
+    pub save_id: Option<String>,
+    #[serde(default)]
     pub resources: Vec<StoredResourceEntry>,
 }
 
 impl Default for FrameworkSettings {
     fn default() -> Self {
-        Self { format_version: FRAMEWORK_SETTINGS_FORMAT_VERSION, resources: Vec::new() }
+        Self { format_version: FRAMEWORK_SETTINGS_FORMAT_VERSION, save_id: None, resources: Vec::new() }
     }
 }
 
@@ -84,6 +86,7 @@ impl FrameworkSettings {
     pub fn from_registry(registry: &ResourceRegistry) -> Self {
         Self {
             format_version: FRAMEWORK_SETTINGS_FORMAT_VERSION,
+            save_id: None,
             resources: registry.entries().iter().map(StoredResourceEntry::from_resource).collect(),
         }
     }
