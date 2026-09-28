@@ -231,14 +231,14 @@ pub fn show_with_options(
                             ui.painter().rect_stroke(
                                 caret,
                                 0.0,
-                                egui::Stroke::new(1.0, egui::Color32::YELLOW),
+                                egui::Stroke::new(1.0_f32, egui::Color32::YELLOW),
                                 egui::StrokeKind::Outside,
                             );
                             if let Some(ime) = ime {
                                 ui.painter().rect_stroke(
                                     ime.cursor_rect,
                                     0.0,
-                                    egui::Stroke::new(1.0, egui::Color32::LIGHT_BLUE),
+                                    egui::Stroke::new(1.0_f32, egui::Color32::LIGHT_BLUE),
                                     egui::StrokeKind::Outside,
                                 );
                                 ui.painter().text(
