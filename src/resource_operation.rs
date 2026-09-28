@@ -80,7 +80,7 @@ impl ResourceOperationPlan {
 pub trait ApplicationResourceOperationAdapter {
     type Error: std::fmt::Display;
     fn prepare_resource_operation(&mut self, plan: &ResourceOperationPlan) -> Result<ResourceOperationDecision,Self::Error>;
-    fn execute_resource_operation(&mut self, _plan: &ResourceOperationPlan, _journal_data: Option<&ApplicationJournalData>) -> Result<(),Self::Error> { Ok(()) }
+    fn execute_resource_operation(&mut self, plan: &ResourceOperationPlan, journal_data: Option<&ApplicationJournalData>) -> Result<(),Self::Error>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
