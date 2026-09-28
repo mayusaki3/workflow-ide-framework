@@ -208,3 +208,24 @@ fn orchestrated_recovery_reports_no_journal(){
  assert_eq!(recover_pending_resource_operation(&mut app,&c,&r,&mut registry,&mut uses,||"unused".into()).unwrap(),RecoveryCompletionResult::NoJournal);
  let _=fs::remove_dir_all(base);
 }
+
+#[test]
+fn delete_recovery_conflicts_when_source_reference_has_different_stable_id(){
+ let (base,c,r)=setup("delete-wrong-id");
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Delete,items:vec![ResourceOperationItem{before:Some(p("a")),after:None}]};
+ let mut original=ResourceRegistry::default();original.register("expected-id",p("a"));ResourceOperationJournal::from_plan_with_registry(&plan,None,&original).save(&c).unwrap();
+ let mut registry=ResourceRegistry::default();registry.register("other-id",p("a"));let uses=vec![];
+ let a=assess_pending_journal_full(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r,&registry,&uses).unwrap().unwrap();
+ assert_eq!(a.framework,FrameworkPersistentRecoveryState::Mixed);assert_eq!(a.state,CombinedRecoveryState::Conflict);
+ let _=fs::remove_dir_all(base);
+}
+#[test]
+fn delete_recovery_does_not_remove_different_id_after_assessment(){
+ let (base,c,r)=setup("delete-id-race");
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Delete,items:vec![ResourceOperationItem{before:Some(p("a")),after:None}]};
+ let mut original=ResourceRegistry::default();original.register("expected-id",p("a"));ResourceOperationJournal::from_plan_with_registry(&plan,None,&original).save(&c).unwrap();
+ let registry=original;let uses=vec![];let a=assess_pending_journal_full(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r,&registry,&uses).unwrap().unwrap();
+ let mut changed=ResourceRegistry::default();changed.register("other-id",p("a"));let mut changed_uses=vec![];
+ assert!(complete_framework_recovery(&a,&mut changed,&mut changed_uses,||"unused".into()).is_err());assert_eq!(changed.find_by_reference(&p("a")).unwrap().resource_id,"other-id");
+ let _=fs::remove_dir_all(base);
+}
