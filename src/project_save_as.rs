@@ -38,6 +38,17 @@ pub fn save_project_as<A: ApplicationProjectSaveAs>(
 ) -> Result<(), ProjectSaveError> {
     let source = session.context().cloned();
 
+    let mut candidate = ProjectSession {
+        dirty: session.dirty,
+        current_save_id: session.current_save_id.clone(),
+        storage: ProjectStorageState::Stored(destination.clone()),
+    };
+    let mut adapter = SaveAsAdapter { application, source: source.as_ref() };
+
+    let app = adapter.application
+        .save_project_data_as(adapter.source, &destination, save_id)
+        .map_err(|error| ProjectSaveError::Application(error.to_string()))?;
+
     if let Some(source_context) = &source {
         let source_resources = source_context.resource_root();
         if source_resources.is_dir() {
@@ -46,13 +57,15 @@ pub fn save_project_as<A: ApplicationProjectSaveAs>(
         }
     }
 
-    let mut candidate = ProjectSession {
-        dirty: session.dirty,
-        current_save_id: session.current_save_id.clone(),
-        storage: ProjectStorageState::Stored(destination.clone()),
-    };
-    let mut adapter = SaveAsAdapter { application, source: source.as_ref() };
-    save_project(&mut candidate, &destination, project_file, framework_settings, &mut adapter, save_id, saved_at)?;
+    struct CompletedSaveAs(ApplicationSaveResult);
+    impl crate::project_save::ApplicationProjectSaver for CompletedSaveAs {
+        type Error = std::convert::Infallible;
+        fn save_project_data(&mut self, _context: &ProjectContext, _save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
+            Ok(self.0.clone())
+        }
+    }
+    let mut completed = CompletedSaveAs(app);
+    save_project(&mut candidate, &destination, project_file, framework_settings, &mut completed, save_id, saved_at)?;
     *session = candidate;
     Ok(())
 }
