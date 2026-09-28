@@ -100,3 +100,33 @@ fn move_recovery_restores_stable_id_from_journal_when_old_registry_entry_is_gone
  assert_eq!(complete_framework_recovery(&a,&mut registry,&mut uses,||"wrong-new-id".into()).unwrap(),FrameworkRecoveryResult::Completed);
  assert_eq!(registry.find_by_reference(&p("b")).unwrap().resource_id,"stable-id");assert_eq!(uses[0].reference,p("b"));let _=fs::remove_dir_all(base);
 }
+
+#[test]
+fn full_recovery_accepts_move_destination_with_matching_journal_id(){
+ let (base,c,r)=setup("matching-id");fs::write(r.project.join("b"),b"x").unwrap();
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Move,items:vec![ResourceOperationItem{before:Some(p("a")),after:Some(p("b"))}]};
+ let mut original=ResourceRegistry::default();original.register("stable-id",p("a"));ResourceOperationJournal::from_plan_with_registry(&plan,None,&original).save(&c).unwrap();
+ let mut registry=ResourceRegistry::default();registry.register("stable-id",p("b"));let uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:p("b")}];
+ let a=assess_pending_journal_full(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r,&registry,&uses).unwrap().unwrap();
+ assert_eq!(a.framework,FrameworkPersistentRecoveryState::Applied);assert_eq!(a.state,CombinedRecoveryState::Applied);let _=fs::remove_dir_all(base);
+}
+#[test]
+fn full_recovery_rejects_move_destination_with_different_journal_id(){
+ let (base,c,r)=setup("wrong-id");fs::write(r.project.join("b"),b"x").unwrap();
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Move,items:vec![ResourceOperationItem{before:Some(p("a")),after:Some(p("b"))}]};
+ let mut original=ResourceRegistry::default();original.register("stable-id",p("a"));ResourceOperationJournal::from_plan_with_registry(&plan,None,&original).save(&c).unwrap();
+ let mut registry=ResourceRegistry::default();registry.register("other-id",p("b"));let uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:p("b")}];
+ let a=assess_pending_journal_full(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r,&registry,&uses).unwrap().unwrap();
+ assert_eq!(a.framework,FrameworkPersistentRecoveryState::Mixed);assert_eq!(a.state,CombinedRecoveryState::Conflict);let _=fs::remove_dir_all(base);
+}
+#[test]
+fn move_recovery_does_not_overwrite_destination_if_id_changes_after_assessment(){
+ let (base,c,r)=setup("id-race");fs::write(r.project.join("b"),b"x").unwrap();
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Move,items:vec![ResourceOperationItem{before:Some(p("a")),after:Some(p("b"))}]};
+ let mut original=ResourceRegistry::default();original.register("stable-id",p("a"));ResourceOperationJournal::from_plan_with_registry(&plan,None,&original).save(&c).unwrap();
+ let registry=ResourceRegistry::default();let uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:p("a")}];
+ let a=assess_pending_journal_full(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r,&registry,&uses).unwrap().unwrap();
+ let mut changed_registry=ResourceRegistry::default();changed_registry.register("other-id",p("b"));let mut changed_uses=uses;
+ assert!(complete_framework_recovery(&a,&mut changed_registry,&mut changed_uses,||"unused".into()).is_err());
+ assert_eq!(changed_registry.find_by_reference(&p("b")).unwrap().resource_id,"other-id");assert_eq!(changed_uses[0].reference,p("a"));let _=fs::remove_dir_all(base);
+}
