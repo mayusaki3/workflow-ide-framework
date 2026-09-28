@@ -1,4 +1,4 @@
-use std::{fs,path::PathBuf};
+use std::fs;
 use workflow_ide_framework::{
  project::ProjectContext,
  project_resource::{ResourceOperationDecision,ResourceReference,ResourceScope},
