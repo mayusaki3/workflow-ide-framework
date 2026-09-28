@@ -2,7 +2,7 @@ use crate::{
     locate_replace::FrameworkResourceUse,
     project::ProjectContext,
     project_resource::{ApplicationJournalData, ResourceReference},
-    resource_journal::ResourceOperationJournal,
+    resource_journal::{ResourceOperationJournal,StoredExecutionRoute},
     resource_operation::{ApplicationResourceOperationAdapter, PreparedResourceOperation, ResourceOperationKind, ResourceOperationPlan},
     resource_registry::{RegisterResult, ResourceRegistry},
     resource_state::ResourceRoots,
@@ -35,6 +35,7 @@ where
     plan.validate().map_err(|error| ResourceExecutionError::Validation(format!("{error:?}")))?;
 
     let mut journal = ResourceOperationJournal::from_plan_with_registry(plan, application_journal_data, registry);
+    journal.set_execution_route(StoredExecutionRoute::Framework);
     let after_ids=allocate_after_resource_ids(plan,registry,&mut new_id);
     journal.set_after_resource_ids(&after_ids);
     journal.save(context).map_err(ResourceExecutionError::JournalWrite)?;
@@ -178,6 +179,7 @@ where A:ApplicationResourceOperationAdapter,F:FnMut()->String {
             plan.validate().map_err(|error|ResourceExecutionError::Validation(format!("{error:?}")))?;
             let mut new_id=new_id;
             let mut journal=ResourceOperationJournal::from_plan_with_registry(plan,journal_data.clone(),registry);
+            journal.set_execution_route(StoredExecutionRoute::Application);
             let after_ids=allocate_after_resource_ids(plan,registry,&mut new_id);
             journal.set_after_resource_ids(&after_ids);
             journal.save(context).map_err(ResourceExecutionError::JournalWrite)?;
