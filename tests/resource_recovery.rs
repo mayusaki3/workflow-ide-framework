@@ -13,7 +13,7 @@ fn p(s:&str)->ResourceReference{ResourceReference::new(ResourceScope::Project,s)
 fn setup(name:&str)->(PathBuf,ProjectContext,ResourceRoots){
  let base=std::env::temp_dir().join(format!("wfide-recovery-{name}-{}",std::process::id()));let _=fs::remove_dir_all(&base);
  let project=base.join("project");let resources=project.join("resources");fs::create_dir_all(&resources).unwrap();
- (base,ProjectContext::new(project),ResourceRoots{application:base.join("app"),project:resources})
+ (base.clone(),ProjectContext::new(project),ResourceRoots{application:base.join("app"),project:resources})
 }
 fn save(context:&ProjectContext,kind:ResourceOperationKind,before:Option<ResourceReference>,after:Option<ResourceReference>){
  let plan=ResourceOperationPlan{operation_id:"op".into(),kind,items:vec![ResourceOperationItem{before,after}]};
