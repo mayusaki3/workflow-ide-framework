@@ -18,12 +18,9 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.9"
 
-# Temporary upstream workaround for IME handling.
-# Prepare the local patched crate with scripts/setup_egui_winit_ime_patch.ps1
-# (Windows) or scripts/setup_egui_winit_ime_patch.sh (Linux).
-[patch.crates-io]
-egui-winit = { path = "patches/egui-winit-0.34.3" }
-
+# The previous local egui-winit replacement was disabled because it did not
+# preserve the upstream 0.34.3 public API required by eframe. IME handling
+# must be patched as a minimal change on top of the complete upstream crate.
 # Consumer-facing integrated sample.
 [[example]]
 name = "sample_application"
