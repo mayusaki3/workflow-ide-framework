@@ -15,6 +15,7 @@ pub struct ResourceOperationJournal {
     pub format_version:u32,
     pub operation_id:String,
     pub kind:StoredOperationKind,
+    #[serde(default)] pub execution_route:StoredExecutionRoute,
     pub items:Vec<StoredJournalItem>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub application:Option<StoredApplicationJournalData>,
@@ -22,6 +23,9 @@ pub struct ResourceOperationJournal {
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Serialize,Deserialize)]
 #[serde(rename_all="lowercase")]
 pub enum StoredOperationKind{Import,Export,Rename,Move,Delete,Replace}
+#[derive(Debug,Clone,Copy,PartialEq,Eq,Serialize,Deserialize,Default)]
+#[serde(rename_all="lowercase")]
+pub enum StoredExecutionRoute{Framework,#[default] Application}
 #[derive(Debug,Clone,PartialEq,Eq,Serialize,Deserialize)]
 pub struct StoredJournalItem{
     #[serde(default,skip_serializing_if="Option::is_none")] pub before_resource_id:Option<String>,
@@ -37,7 +41,7 @@ pub struct StoredApplicationJournalData{pub format:String,pub data:Vec<u8>}
 
 impl ResourceOperationJournal{
     pub fn from_plan(plan:&ResourceOperationPlan,application:Option<ApplicationJournalData>)->Self{
-        Self{format_version:RESOURCE_JOURNAL_FORMAT_VERSION,operation_id:plan.operation_id.clone(),kind:plan.kind.into(),
+        Self{format_version:RESOURCE_JOURNAL_FORMAT_VERSION,operation_id:plan.operation_id.clone(),kind:plan.kind.into(),execution_route:StoredExecutionRoute::Application,
             items:plan.items.iter().map(|i|StoredJournalItem{before_resource_id:None,after_resource_id:None,legacy_resource_id:None,before:i.before.as_ref().map(Into::into),after:i.after.as_ref().map(Into::into)}).collect(),
             application:application.map(|a|StoredApplicationJournalData{format:a.format,data:a.data})}
     }
@@ -52,6 +56,7 @@ impl ResourceOperationJournal{
         }
         journal
     }
+    pub fn set_execution_route(&mut self,route:StoredExecutionRoute){self.execution_route=route;}
     pub fn set_after_resource_ids(&mut self,ids:&[Option<String>]){
         for (item,id) in self.items.iter_mut().zip(ids){if id.is_some(){item.after_resource_id=id.clone();}}
     }
