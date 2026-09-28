@@ -28,6 +28,7 @@ impl ApplicationResourceOperationAdapter for Reject{
  fn prepare_resource_operation(&mut self,_:&ResourceOperationPlan)->Result<ResourceOperationDecision,Self::Error>{
   Ok(ResourceOperationDecision::Reject{reason:Some("busy".into()),handled:true})
  }
+ fn execute_resource_operation(&mut self,_:&ResourceOperationPlan,_:Option<&workflow_ide_framework::project_resource::ApplicationJournalData>)->Result<(),Self::Error>{panic!("rejected operation must not execute")}
 }
 #[test]
 fn application_can_reject_before_journal_or_filesystem_stage(){
