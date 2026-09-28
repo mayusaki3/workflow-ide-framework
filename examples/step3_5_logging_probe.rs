@@ -14,8 +14,8 @@ fn main() {
     wfide::tracing::warn!(target: "consumer::sample", "consumer application probe event");
 
     let lines = guard.snapshot();
-    let framework = lines.iter().any(|line| line.contains("framework probe event"));
-    let consumer = lines.iter().any(|line| line.contains("consumer application probe event"));
+    let framework = lines.iter().any(|line| line.message.as_deref().is_some_and(|message| message.contains("framework probe event")));
+    let consumer = lines.iter().any(|line| line.message.as_deref().is_some_and(|message| message.contains("consumer application probe event")));
 
     println!("WFIDE_LOGGING_PROBE framework_in_memory={framework}");
     println!("WFIDE_LOGGING_PROBE consumer_in_memory={consumer}");
