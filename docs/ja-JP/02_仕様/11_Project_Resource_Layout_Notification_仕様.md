@@ -319,6 +319,12 @@ ApplicationがRejectした場合、Journal作成およびfilesystem mutationを�
 
 RecoveryではFramework operation情報を含むJournal全体とApplication opaque payloadをApplicationへ渡す。ApplicationJournalDataのformat互換性はApplicationが所有する。
 
+ApplicationがHandledを返した場合は、Applicationがoperation実行callbackを明示的に実装する。Journalは実行経路をFrameworkまたはApplicationとして保持し、Framework経路ではApplication Recoveryを実行しない。
+
+Application経路のRecoveryではApplication stateを判定し、未完了ならApplication Recoveryを実行して再判定する。Applied確認後にFramework Registry / Framework referenceをRecoveryし、全体がAppliedになった場合だけJournalを削除する。Conflict、Indeterminate、途中失敗ではJournalを保持する。
+
+execution_routeを持たない旧Journalは後方互換のためApplication経路として扱う。
+
 ## 19. API互換性方針
 
 v0.1.0公開前は実装検証により型名・細部を修正できる。v0.1.0公開後はProject formatとConsumerが利用する公開型を互換性対象として扱う。
