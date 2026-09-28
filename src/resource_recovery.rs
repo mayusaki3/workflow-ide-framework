@@ -14,6 +14,7 @@ pub enum ApplicationRecoveryState { NotApplicable, NotStarted, Applied, Conflict
 pub trait ApplicationResourceRecoveryAdapter {
     type Error: std::fmt::Display;
     fn assess_resource_recovery(&mut self, journal:&ResourceOperationJournal)->Result<ApplicationRecoveryState,Self::Error>;
+    fn recover_resource_operation(&mut self, journal:&ResourceOperationJournal)->Result<(),Self::Error>;
 }
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
@@ -152,6 +153,25 @@ fn combine_recovery_full(fs:&JournalRecoveryAssessment,framework:FrameworkPersis
         (CombinedRecoveryState::Applied,FrameworkPersistentRecoveryState::Applied|FrameworkPersistentRecoveryState::NotApplicable)=>CombinedRecoveryState::Applied,
         (CombinedRecoveryState::Applied,FrameworkPersistentRecoveryState::Before)=>CombinedRecoveryState::FilesystemApplied,
         (other,_)=>other,
+    }
+}
+
+pub fn complete_application_recovery<A:ApplicationResourceRecoveryAdapter>(
+    application:&mut A,assessment:&CombinedRecoveryAssessment,
+)->Result<ApplicationRecoveryState,String>{
+    if assessment.filesystem.journal.execution_route!=StoredExecutionRoute::Application{return Ok(ApplicationRecoveryState::NotApplicable);}
+    match assessment.application {
+        ApplicationRecoveryState::Applied=>Ok(ApplicationRecoveryState::Applied),
+        ApplicationRecoveryState::NotStarted=>{
+            application.recover_resource_operation(&assessment.filesystem.journal).map_err(|e|e.to_string())?;
+            match application.assess_resource_recovery(&assessment.filesystem.journal).map_err(|e|e.to_string())? {
+                ApplicationRecoveryState::Applied=>Ok(ApplicationRecoveryState::Applied),
+                other=>Err(format!("application recovery did not reach Applied state: {other:?}")),
+            }
+        }
+        ApplicationRecoveryState::NotApplicable=>Err("Application route cannot have NotApplicable recovery state".into()),
+        ApplicationRecoveryState::Conflict=>Err("application recovery is in Conflict state".into()),
+        ApplicationRecoveryState::Indeterminate=>Err("application recovery is Indeterminate".into()),
     }
 }
 
