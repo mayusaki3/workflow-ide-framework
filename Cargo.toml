@@ -18,6 +18,9 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.9"
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+
 # The previous local egui-winit replacement was disabled because it did not
 # preserve the upstream 0.34.3 public API required by eframe. IME handling
 # must be patched as a minimal change on top of the complete upstream crate.
