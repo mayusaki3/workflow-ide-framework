@@ -127,7 +127,7 @@ fn assess_framework_state(journal:&ResourceOperationJournal,registry:&ResourceRe
                 let (Some(b),Some(a))=(before,after) else{return FrameworkPersistentRecoveryState::Indeterminate};
                 let b_entry=registry.find_by_reference(&b);let a_entry=registry.find_by_reference(&a);
                 let b_use=uses.iter().any(|u|u.reference==b);let a_use=uses.iter().any(|u|u.reference==a);
-                if let Some(expected_id)=item.resource_id.as_deref(){
+                if let Some(expected_id)=item.before_resource_id.as_deref(){
                     if b_entry.is_some_and(|e|e.resource_id!=expected_id)||a_entry.is_some_and(|e|e.resource_id!=expected_id){mixed=true;}
                 }
                 if b_entry.is_some()||b_use{before_count+=1;}
@@ -175,11 +175,11 @@ pub fn complete_framework_recovery<F:FnMut()->String>(
             StoredOperationKind::Export=>{}
             StoredOperationKind::Rename|StoredOperationKind::Move=>{
                 let before=before.ok_or("invalid move before reference")?;let after=after.ok_or("invalid move after reference")?;
-                if let Some(expected_id)=item.resource_id.as_deref(){
+                if let Some(expected_id)=item.before_resource_id.as_deref(){
                     if let Some(entry)=registry.find_by_reference(&before){if entry.resource_id!=expected_id{return Err("move source registry resource ID does not match journal".into());}}
                     if let Some(entry)=registry.find_by_reference(&after){if entry.resource_id!=expected_id{return Err("move destination registry resource ID does not match journal".into());}}
                 }
-                if let Some(entry)=registry.find_by_reference(&before).cloned(){let _=registry.remove(&entry.resource_id);let _=registry.register(entry.resource_id,after.clone());changed=true;}else if registry.find_by_reference(&after).is_none(){if let Some(resource_id)=item.resource_id.clone(){let _=registry.register(resource_id,after.clone());changed=true;}}
+                if let Some(entry)=registry.find_by_reference(&before).cloned(){let _=registry.remove(&entry.resource_id);let _=registry.register(entry.resource_id,after.clone());changed=true;}else if registry.find_by_reference(&after).is_none(){if let Some(resource_id)=item.before_resource_id.clone(){let _=registry.register(resource_id,after.clone());changed=true;}}
                 changed|=replace_framework_uses(framework_uses,&before,&after)>0;
             }
             StoredOperationKind::Delete=>{
