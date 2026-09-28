@@ -5,7 +5,7 @@ use workflow_ide_framework::{
  project_resource::{ResourceReference,ResourceScope},
  resource_journal::{ResourceOperationJournal,StoredExecutionRoute},
  resource_operation::{ResourceOperationItem,ResourceOperationKind,ResourceOperationPlan},
- resource_recovery::{assess_pending_journal,assess_pending_journal_full,assess_pending_journal_with_application,complete_application_recovery,complete_framework_recovery,ApplicationRecoveryState,ApplicationResourceRecoveryAdapter,CombinedRecoveryState,FrameworkPersistentRecoveryState,FrameworkRecoveryResult,JournalItemRecoveryState},
+ resource_recovery::{assess_pending_journal,assess_pending_journal_full,assess_pending_journal_with_application,complete_application_recovery,complete_framework_recovery,recover_pending_resource_operation,ApplicationRecoveryState,ApplicationResourceRecoveryAdapter,CombinedRecoveryState,FrameworkPersistentRecoveryState,FrameworkRecoveryResult,JournalItemRecoveryState,RecoveryCompletionResult},
  resource_registry::ResourceRegistry,
  resource_state::ResourceRoots,
 };
@@ -180,5 +180,31 @@ fn framework_route_application_recovery_is_not_applicable(){
  let mut registry=ResourceRegistry::default();registry.register("stable",p("b"));let uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:p("b")}];
  let a=assess_pending_journal_full(&mut PanicRecoveryApp,&c,&r,&registry,&uses).unwrap().unwrap();
  assert_eq!(complete_application_recovery(&mut PanicRecoveryApp,&a).unwrap(),ApplicationRecoveryState::NotApplicable);
+ let _=fs::remove_dir_all(base);
+}
+
+#[test]
+fn orchestrated_recovery_completes_application_framework_and_removes_journal(){
+ let (base,c,r)=setup("orchestrated");fs::write(r.project.join("b"),b"x").unwrap();
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Move,items:vec![ResourceOperationItem{before:Some(p("a")),after:Some(p("b"))}]};
+ let mut original=ResourceRegistry::default();original.register("stable",p("a"));ResourceOperationJournal::from_plan_with_registry(&plan,None,&original).save(&c).unwrap();
+ let mut registry=original;let mut uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:p("a")}];let mut app=RecoveryApp(ApplicationRecoveryState::NotStarted);
+ assert_eq!(recover_pending_resource_operation(&mut app,&c,&r,&mut registry,&mut uses,||"unused".into()).unwrap(),RecoveryCompletionResult::Completed);
+ assert_eq!(registry.find_by_id("stable").unwrap().reference,p("b"));assert_eq!(uses[0].reference,p("b"));assert!(ResourceOperationJournal::load(&c).unwrap().is_none());
+ let _=fs::remove_dir_all(base);
+}
+#[test]
+fn orchestrated_recovery_keeps_journal_on_conflict(){
+ let (base,c,r)=setup("orchestrated-conflict");fs::write(r.project.join("a"),b"x").unwrap();fs::write(r.project.join("b"),b"x").unwrap();
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Move,items:vec![ResourceOperationItem{before:Some(p("a")),after:Some(p("b"))}]};
+ ResourceOperationJournal::from_plan(&plan,None).save(&c).unwrap();
+ let mut registry=ResourceRegistry::default();let mut uses=vec![];let mut app=RecoveryApp(ApplicationRecoveryState::NotStarted);
+ assert!(recover_pending_resource_operation(&mut app,&c,&r,&mut registry,&mut uses,||"unused".into()).is_err());assert!(ResourceOperationJournal::load(&c).unwrap().is_some());
+ let _=fs::remove_dir_all(base);
+}
+#[test]
+fn orchestrated_recovery_reports_no_journal(){
+ let (base,c,r)=setup("orchestrated-none");let mut registry=ResourceRegistry::default();let mut uses=vec![];let mut app=RecoveryApp(ApplicationRecoveryState::NotStarted);
+ assert_eq!(recover_pending_resource_operation(&mut app,&c,&r,&mut registry,&mut uses,||"unused".into()).unwrap(),RecoveryCompletionResult::NoJournal);
  let _=fs::remove_dir_all(base);
 }
