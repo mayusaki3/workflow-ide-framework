@@ -236,7 +236,7 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
         if let (Some(a), Some(b)) = (from, to) {
             let selected = model.selected_edge_id.as_deref() == Some(edge.id.as_str());
             let stroke = if selected {
-                egui::Stroke::new(3.0, ui.visuals().selection.stroke.color)
+                egui::Stroke::new(3.0_f32, ui.visuals().selection.stroke.color)
             } else {
                 ui.visuals().widgets.inactive.fg_stroke
             };
