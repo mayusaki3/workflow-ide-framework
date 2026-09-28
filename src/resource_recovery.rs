@@ -2,14 +2,14 @@ use crate::{
     project::ProjectContext,
     locate_replace::FrameworkResourceUse,
     project_resource::{ResourceReference,ResourceScope},
-    resource_journal::{ResourceOperationJournal,StoredJournalItem,StoredOperationKind,StoredReference},
+    resource_journal::{ResourceOperationJournal,StoredExecutionRoute,StoredJournalItem,StoredOperationKind,StoredReference},
     resource_registry::ResourceRegistry,
     resource_state::ResourceRoots,
 };
 use std::{fs,io};
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
-pub enum ApplicationRecoveryState { NotStarted, Applied, Conflict, Indeterminate }
+pub enum ApplicationRecoveryState { NotApplicable, NotStarted, Applied, Conflict, Indeterminate }
 
 pub trait ApplicationResourceRecoveryAdapter {
     type Error: std::fmt::Display;
@@ -87,7 +87,7 @@ pub fn assess_pending_journal_with_application<A:ApplicationResourceRecoveryAdap
     application:&mut A,context:&ProjectContext,roots:&ResourceRoots,
 )->Result<Option<CombinedRecoveryAssessment>,String>{
     let Some(filesystem)=assess_pending_journal(context,roots).map_err(|e|e.to_string())? else{return Ok(None)};
-    let application_state=application.assess_resource_recovery(&filesystem.journal).map_err(|e|e.to_string())?;
+    let application_state=if filesystem.journal.execution_route==StoredExecutionRoute::Framework{ApplicationRecoveryState::NotApplicable}else{application.assess_resource_recovery(&filesystem.journal).map_err(|e|e.to_string())?};
     let state=combine_recovery(&filesystem,application_state);
     Ok(Some(CombinedRecoveryAssessment{filesystem,framework:FrameworkPersistentRecoveryState::NotApplicable,application:application_state,state}))
 }
@@ -97,7 +97,7 @@ pub fn assess_pending_journal_full<A:ApplicationResourceRecoveryAdapter>(
 )->Result<Option<CombinedRecoveryAssessment>,String>{
     let Some(filesystem)=assess_pending_journal(context,roots).map_err(|e|e.to_string())? else{return Ok(None)};
     let framework=assess_framework_state(&filesystem.journal,registry,framework_uses);
-    let application_state=application.assess_resource_recovery(&filesystem.journal).map_err(|e|e.to_string())?;
+    let application_state=if filesystem.journal.execution_route==StoredExecutionRoute::Framework{ApplicationRecoveryState::NotApplicable}else{application.assess_resource_recovery(&filesystem.journal).map_err(|e|e.to_string())?};
     let state=combine_recovery_full(&filesystem,framework,application_state);
     Ok(Some(CombinedRecoveryAssessment{filesystem,framework,application:application_state,state}))
 }
@@ -108,10 +108,10 @@ fn combine_recovery(fs:&JournalRecoveryAssessment,app:ApplicationRecoveryState)-
     let fs_not_started=fs.item_states.iter().all(|s|*s==JournalItemRecoveryState::NotStarted);
     let fs_applied=fs.item_states.iter().all(|s|matches!(s,JournalItemRecoveryState::FilesystemApplied|JournalItemRecoveryState::AlreadyComplete));
     match (fs_not_started,fs_applied,app) {
-        (true,_,ApplicationRecoveryState::NotStarted)=>CombinedRecoveryState::NotStarted,
+        (true,_,ApplicationRecoveryState::NotApplicable|ApplicationRecoveryState::NotStarted)=>CombinedRecoveryState::NotStarted,
         (true,_,ApplicationRecoveryState::Applied)=>CombinedRecoveryState::ApplicationApplied,
+        (_,true,ApplicationRecoveryState::NotApplicable|ApplicationRecoveryState::Applied)=>CombinedRecoveryState::Applied,
         (_,true,ApplicationRecoveryState::NotStarted)=>CombinedRecoveryState::FilesystemApplied,
-        (_,true,ApplicationRecoveryState::Applied)=>CombinedRecoveryState::Applied,
         _=>CombinedRecoveryState::Indeterminate,
     }
 }
