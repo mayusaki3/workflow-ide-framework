@@ -5,7 +5,7 @@ use workflow_ide_framework::{
  project_resource::{ResourceReference,ResourceScope},
  resource_journal::{ResourceOperationJournal,StoredExecutionRoute},
  resource_operation::{ResourceOperationItem,ResourceOperationKind,ResourceOperationPlan},
- resource_recovery::{assess_pending_journal,assess_pending_journal_full,assess_pending_journal_with_application,complete_framework_recovery,ApplicationRecoveryState,ApplicationResourceRecoveryAdapter,CombinedRecoveryState,FrameworkPersistentRecoveryState,FrameworkRecoveryResult,JournalItemRecoveryState},
+ resource_recovery::{assess_pending_journal,assess_pending_journal_full,assess_pending_journal_with_application,complete_application_recovery,complete_framework_recovery,ApplicationRecoveryState,ApplicationResourceRecoveryAdapter,CombinedRecoveryState,FrameworkPersistentRecoveryState,FrameworkRecoveryResult,JournalItemRecoveryState},
  resource_registry::ResourceRegistry,
  resource_state::ResourceRoots,
 };
@@ -45,9 +45,9 @@ fn no_journal_returns_none(){
 }
 
 struct RecoveryApp(ApplicationRecoveryState);
-impl ApplicationResourceRecoveryAdapter for RecoveryApp { type Error=&'static str; fn assess_resource_recovery(&mut self,_:&workflow_ide_framework::resource_journal::ResourceOperationJournal)->Result<ApplicationRecoveryState,Self::Error>{Ok(self.0)} }
+impl ApplicationResourceRecoveryAdapter for RecoveryApp { type Error=&'static str; fn assess_resource_recovery(&mut self,_:&workflow_ide_framework::resource_journal::ResourceOperationJournal)->Result<ApplicationRecoveryState,Self::Error>{Ok(self.0)} fn recover_resource_operation(&mut self,_:&workflow_ide_framework::resource_journal::ResourceOperationJournal)->Result<(),Self::Error>{self.0=ApplicationRecoveryState::Applied;Ok(())} }
 struct PanicRecoveryApp;
-impl ApplicationResourceRecoveryAdapter for PanicRecoveryApp { type Error=&'static str; fn assess_resource_recovery(&mut self,_:&workflow_ide_framework::resource_journal::ResourceOperationJournal)->Result<ApplicationRecoveryState,Self::Error>{panic!("Application recovery must not be called for Framework route")} }
+impl ApplicationResourceRecoveryAdapter for PanicRecoveryApp { type Error=&'static str; fn assess_resource_recovery(&mut self,_:&workflow_ide_framework::resource_journal::ResourceOperationJournal)->Result<ApplicationRecoveryState,Self::Error>{panic!("Application recovery must not be called for Framework route")} fn recover_resource_operation(&mut self,_:&workflow_ide_framework::resource_journal::ResourceOperationJournal)->Result<(),Self::Error>{panic!("Application recovery must not run for Framework route")} }
 #[test]
 fn combined_recovery_reports_fully_applied(){ let (base,c,r)=setup("combined");fs::write(r.project.join("b"),b"x").unwrap();save(&c,ResourceOperationKind::Move,Some(p("a")),Some(p("b")));let a=assess_pending_journal_with_application(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r).unwrap().unwrap();assert_eq!(a.state,CombinedRecoveryState::Applied);let _=fs::remove_dir_all(base);}
 #[test]
@@ -160,4 +160,25 @@ fn legacy_journal_without_route_defaults_to_application_recovery(){
  ResourceOperationJournal::from_plan(&plan,None).save(&c).unwrap();
  let a=assess_pending_journal_with_application(&mut RecoveryApp(ApplicationRecoveryState::Applied),&c,&r).unwrap().unwrap();
  assert_eq!(a.application,ApplicationRecoveryState::Applied);assert_eq!(a.state,CombinedRecoveryState::Applied);let _=fs::remove_dir_all(base);
+}
+
+#[test]
+fn application_recovery_executes_and_requires_applied_reassessment(){
+ let (base,c,r)=setup("application-recover");fs::write(r.project.join("b"),b"x").unwrap();
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Move,items:vec![ResourceOperationItem{before:Some(p("a")),after:Some(p("b"))}]};
+ ResourceOperationJournal::from_plan(&plan,None).save(&c).unwrap();
+ let mut app=RecoveryApp(ApplicationRecoveryState::NotStarted);
+ let a=assess_pending_journal_with_application(&mut app,&c,&r).unwrap().unwrap();
+ assert_eq!(complete_application_recovery(&mut app,&a).unwrap(),ApplicationRecoveryState::Applied);
+ let _=fs::remove_dir_all(base);
+}
+#[test]
+fn framework_route_application_recovery_is_not_applicable(){
+ let (base,c,r)=setup("framework-no-app-recover");fs::write(r.project.join("b"),b"x").unwrap();
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Move,items:vec![ResourceOperationItem{before:Some(p("a")),after:Some(p("b"))}]};
+ let mut journal=ResourceOperationJournal::from_plan(&plan,None);journal.set_execution_route(StoredExecutionRoute::Framework);journal.save(&c).unwrap();
+ let mut registry=ResourceRegistry::default();registry.register("stable",p("b"));let uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:p("b")}];
+ let a=assess_pending_journal_full(&mut PanicRecoveryApp,&c,&r,&registry,&uses).unwrap().unwrap();
+ assert_eq!(complete_application_recovery(&mut PanicRecoveryApp,&a).unwrap(),ApplicationRecoveryState::NotApplicable);
+ let _=fs::remove_dir_all(base);
 }
