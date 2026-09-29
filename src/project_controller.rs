@@ -1,0 +1,165 @@
+use crate::{
+    framework_settings::FrameworkSettings,
+    project::{ApplicationMetadata, ProjectContext, ProjectFile, ProjectMetadata, PROJECT_FORMAT_VERSION},
+    project_adapter_erased::ErasedApplicationProjectAdapter,
+    project_lifecycle::ProjectSession,
+    project_open::{open_project, open_requires_user_decision, open_session, FrameworkSettingsOpen, ProjectOpenResult},
+    project_resource::NewProjectStoragePolicy,
+    project_save::save_project,
+    project_save_as::save_project_as,
+};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProjectCommandResult {
+    Completed,
+    NeedsSaveLocation,
+    NeedsOpenDecision(ProjectOpenResult),
+    NeedsDirtyConfirmation,
+    Failed(String),
+}
+
+pub struct ProjectController {
+    application_id: String,
+    application_name: String,
+    pub session: Option<ProjectSession>,
+    pub project_file: Option<ProjectFile>,
+    pub framework_settings: FrameworkSettings,
+}
+
+impl ProjectController {
+    pub fn new(application_id: impl Into<String>, application_name: impl Into<String>) -> Self {
+        Self {
+            application_id: application_id.into(),
+            application_name: application_name.into(),
+            session: None,
+            project_file: None,
+            framework_settings: FrameworkSettings::default(),
+        }
+    }
+
+    pub fn new_project(
+        &mut self,
+        name: impl Into<String>,
+        language: impl Into<String>,
+        policy: NewProjectStoragePolicy,
+        root: Option<ProjectContext>,
+        application: &mut dyn ErasedApplicationProjectAdapter,
+    ) -> ProjectCommandResult {
+        let name = name.into();
+        let language = language.into();
+        let session = match ProjectSession::new_project(policy, root) {
+            Ok(session) => session,
+            Err(_) => return ProjectCommandResult::NeedsSaveLocation,
+        };
+        if let Some(context) = session.context() {
+            if let Err(error) = application.initialize_project(context) {
+                return ProjectCommandResult::Failed(error);
+            }
+        }
+        self.project_file = Some(self.project_template(name, language));
+        self.framework_settings = FrameworkSettings::default();
+        self.session = Some(session);
+        ProjectCommandResult::Completed
+    }
+
+    pub fn open(
+        &mut self,
+        context: ProjectContext,
+        application: &mut dyn ErasedApplicationProjectAdapter,
+    ) -> ProjectCommandResult {
+        let result = match open_project(&context, &self.application_id, application) {
+            Ok(result) => result,
+            Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
+        };
+        if open_requires_user_decision(&result) {
+            return ProjectCommandResult::NeedsOpenDecision(result);
+        }
+        self.accept_open(context, result)
+    }
+
+    pub fn accept_open(&mut self, context: ProjectContext, result: ProjectOpenResult) -> ProjectCommandResult {
+        let session = match open_session(context, &result) {
+            Ok(session) => session,
+            Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
+        };
+        self.framework_settings = match &result.framework_settings {
+            FrameworkSettingsOpen::Loaded(settings) => settings.clone(),
+            _ => FrameworkSettings::default(),
+        };
+        self.project_file = Some(result.project_file);
+        self.session = Some(session);
+        ProjectCommandResult::Completed
+    }
+
+    pub fn save(
+        &mut self,
+        application: &mut dyn ErasedApplicationProjectAdapter,
+        save_id: &str,
+        saved_at: &str,
+    ) -> ProjectCommandResult {
+        let Some(session) = self.session.as_mut() else {
+            return ProjectCommandResult::Failed("no project is open".into());
+        };
+        let Some(context) = session.context().cloned() else {
+            return ProjectCommandResult::NeedsSaveLocation;
+        };
+        let Some(project_file) = self.project_file.as_mut() else {
+            return ProjectCommandResult::Failed("project metadata is unavailable".into());
+        };
+        match save_project(session, &context, project_file, &self.framework_settings, application, save_id, saved_at) {
+            Ok(()) => ProjectCommandResult::Completed,
+            Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
+        }
+    }
+
+    pub fn save_as(
+        &mut self,
+        destination: ProjectContext,
+        application: &mut dyn ErasedApplicationProjectAdapter,
+        save_id: &str,
+        saved_at: &str,
+    ) -> ProjectCommandResult {
+        let Some(session) = self.session.as_mut() else {
+            return ProjectCommandResult::Failed("no project is open".into());
+        };
+        let Some(project_file) = self.project_file.as_mut() else {
+            return ProjectCommandResult::Failed("project metadata is unavailable".into());
+        };
+        match save_project_as(session, destination, project_file, &self.framework_settings, application, save_id, saved_at) {
+            Ok(()) => ProjectCommandResult::Completed,
+            Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
+        }
+    }
+
+    pub fn close(&mut self, confirmed_dirty: bool) -> ProjectCommandResult {
+        if self.session.as_ref().is_some_and(|session| session.dirty.is_dirty()) && !confirmed_dirty {
+            return ProjectCommandResult::NeedsDirtyConfirmation;
+        }
+        self.session = None;
+        self.project_file = None;
+        self.framework_settings = FrameworkSettings::default();
+        ProjectCommandResult::Completed
+    }
+
+    pub fn is_open(&self) -> bool { self.session.is_some() }
+
+    fn project_template(&self, name: String, language: String) -> ProjectFile {
+        ProjectFile {
+            project: ProjectMetadata {
+                format_version: PROJECT_FORMAT_VERSION,
+                name,
+                description: None,
+                language: language.clone(),
+                save_id: String::new(),
+                saved_at: String::new(),
+            },
+            application: ApplicationMetadata {
+                id: self.application_id.clone(),
+                name: self.application_name.clone(),
+                description: None,
+                language,
+                data_version: None,
+            },
+        }
+    }
+}
