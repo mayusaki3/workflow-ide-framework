@@ -43,7 +43,7 @@ pub fn save_project_as<A: ApplicationProjectSaveAs>(
         current_save_id: session.current_save_id.clone(),
         storage: ProjectStorageState::Stored(destination.clone()),
     };
-    let mut adapter = SaveAsAdapter { application, source: source.as_ref() };
+    let adapter = SaveAsAdapter { application, source: source.as_ref() };
 
     let app = adapter.application
         .save_project_data_as(adapter.source, &destination, save_id)
