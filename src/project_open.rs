@@ -54,7 +54,7 @@ pub enum ProjectOpenError {
     Application(String),
 }
 
-pub fn open_project<A: ApplicationProjectInspector>(
+pub fn open_project<A: ApplicationProjectInspector + ?Sized>(
     context: &ProjectContext,
     expected_application_id: &str,
     application: &mut A,
