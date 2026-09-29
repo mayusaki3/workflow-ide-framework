@@ -92,3 +92,22 @@ pub fn open_requires_user_decision(result: &ProjectOpenResult) -> bool {
         || matches!(result.application_compatibility, ProjectDataCompatibility::Converted { .. } | ProjectDataCompatibility::Incompatible { .. })
         || matches!(result.application_consistency, ProjectDataConsistency::Inconsistent { .. })
 }
+
+pub fn open_can_continue(result: &ProjectOpenResult) -> bool {
+    !matches!(result.application_compatibility, ProjectDataCompatibility::Incompatible { .. })
+        && !matches!(
+            result.application_consistency,
+            ProjectDataConsistency::Inconsistent { can_open: false, .. }
+        )
+}
+
+pub fn open_dirty_state(result: &ProjectOpenResult) -> crate::project_resource::ProjectDirtyState {
+    crate::project_resource::ProjectDirtyState {
+        metadata: false,
+        framework: !matches!(result.framework_settings, FrameworkSettingsOpen::Loaded(_)),
+        application: matches!(
+            result.application_compatibility,
+            ProjectDataCompatibility::Converted { .. }
+        ),
+    }
+}
