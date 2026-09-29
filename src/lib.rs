@@ -566,7 +566,13 @@ impl FrameworkHost {
     }
 
     fn project_save_as(&mut self) {
-        let Some(root) = self.project_folder_dialog().pick_folder() else { return; };
+        let Some(parent) = self.project_folder_dialog().pick_folder() else { return; };
+        let Some(project_name) = self.project_controller.as_ref().and_then(|controller| controller.project_name()).map(str::to_owned) else { return; };
+        let root = parent.join(&project_name);
+        if root.exists() {
+            self.project_ui.message = Some(format!("Project folder already exists: {}", root.display()));
+            return;
+        }
         let (save_id, saved_at) = project_save_stamp();
         let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
         let result = controller.save_as(project::ProjectContext::new(root), adapter, &save_id, &saved_at);
@@ -582,14 +588,14 @@ impl FrameworkHost {
     fn project_menu(&mut self, ui: &mut egui::Ui) {
         if self.project_controller.is_none() { return; }
         egui::MenuBar::new().ui(ui, |ui| {
-            ui.menu_button("Project", |ui| {
-                if ui.button("New").clicked() { ui.close(); self.project_new(); }
-                if ui.button("Open...").clicked() { ui.close(); self.project_open(); }
+            ui.menu_button(localization::text("project.menu"), |ui| {
+                if ui.button(localization::text("project.new")).clicked() { ui.close(); self.project_new(); }
+                if ui.button(localization::text("project.open")).clicked() { ui.close(); self.project_open(); }
                 let is_open = self.project_controller.as_ref().is_some_and(|c| c.is_open());
                 ui.add_enabled_ui(is_open, |ui| {
-                    if ui.button("Save").clicked() { ui.close(); self.project_save(); }
-                    if ui.button("Save As...").clicked() { ui.close(); self.project_save_as(); }
-                    if ui.button("Close").clicked() { ui.close(); self.project_close(false); }
+                    if ui.button(localization::text("project.save")).clicked() { ui.close(); self.project_save(); }
+                    if ui.button(localization::text("project.save_as")).clicked() { ui.close(); self.project_save_as(); }
+                    if ui.button(localization::text("project.close")).clicked() { ui.close(); self.project_close(false); }
                 });
             });
         });
