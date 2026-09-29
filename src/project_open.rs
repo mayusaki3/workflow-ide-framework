@@ -3,6 +3,7 @@ use crate::{
     project::{ProjectContext, ProjectFile, ProjectFileError},
     project_lifecycle::{ProjectSession, ProjectStorageState},
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
+    resource_journal::ResourceOperationJournal,
 };
 use std::{fs, io};
 
@@ -33,8 +34,16 @@ pub enum FrameworkSettingsOpen {
 pub struct ProjectOpenResult {
     pub project_file: ProjectFile,
     pub framework_settings: FrameworkSettingsOpen,
+    pub pending_resource_operation: PendingResourceOperationOpen,
     pub application_compatibility: ProjectDataCompatibility,
     pub application_consistency: ProjectDataConsistency,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PendingResourceOperationOpen {
+    None,
+    Pending(ResourceOperationJournal),
+    Invalid { reason: String },
 }
 
 #[derive(Debug)]
@@ -72,6 +81,12 @@ pub fn open_project<A: ApplicationProjectInspector>(
         Err(error) => return Err(ProjectOpenError::ReadFramework(error)),
     };
 
+    let pending_resource_operation = match ResourceOperationJournal::load(context) {
+        Ok(Some(journal)) => PendingResourceOperationOpen::Pending(journal),
+        Ok(None) => PendingResourceOperationOpen::None,
+        Err(error) => PendingResourceOperationOpen::Invalid { reason: error.to_string() },
+    };
+
     let application_compatibility = application
         .inspect_project_data(context, project_file.application.data_version.as_deref())
         .map_err(|error| ProjectOpenError::Application(error.to_string()))?;
@@ -83,6 +98,7 @@ pub fn open_project<A: ApplicationProjectInspector>(
     Ok(ProjectOpenResult {
         project_file,
         framework_settings,
+        pending_resource_operation,
         application_compatibility,
         application_consistency,
     })
@@ -90,6 +106,7 @@ pub fn open_project<A: ApplicationProjectInspector>(
 
 pub fn open_requires_user_decision(result: &ProjectOpenResult) -> bool {
     !matches!(result.framework_settings, FrameworkSettingsOpen::Loaded(_))
+        || !matches!(result.pending_resource_operation, PendingResourceOperationOpen::None)
         || matches!(result.application_compatibility, ProjectDataCompatibility::Converted { .. } | ProjectDataCompatibility::Incompatible { .. })
         || matches!(result.application_consistency, ProjectDataConsistency::Inconsistent { .. })
 }
