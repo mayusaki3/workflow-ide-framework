@@ -94,3 +94,17 @@ fn failed_import_journal_preserves_preallocated_target_resource_id(){
  assert_eq!(journal.items[0].after_resource_id.as_deref(),Some("preallocated-target"));
  let _=fs::remove_dir_all(base);
 }
+
+#[test]
+fn replace_registers_target_with_preallocated_resource_id(){
+ let (base,context,roots)=setup("replace-target-id");
+ let old=p("old.txt");let target=p("replacement.txt");
+ let mut registry=ResourceRegistry::default();registry.register("old-id",old.clone());
+ let mut uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:old.clone()}];
+ let plan=ResourceOperationPlan{operation_id:"replace-1".into(),kind:ResourceOperationKind::Replace,items:vec![ResourceOperationItem{before:Some(old.clone()),after:Some(target.clone())}]};
+ execute_operation(&context,&roots,&mut registry,&mut uses,&plan,None,||"replacement-id".into()).unwrap();
+ assert_eq!(registry.find_by_reference(&target).unwrap().resource_id,"replacement-id");
+ assert_eq!(registry.find_by_reference(&old).unwrap().resource_id,"old-id");
+ assert_eq!(uses[0].reference,target);
+ assert!(!journal_path(&context).exists());let _=fs::remove_dir_all(base);
+}
