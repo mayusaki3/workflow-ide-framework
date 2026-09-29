@@ -111,3 +111,29 @@ fn inconsistent_application_state_is_returned_without_automatic_recovery() {
     assert!(open_requires_user_decision(&result));
     let _=fs::remove_dir_all(r);
 }
+
+#[test]
+fn framework_save_id_mismatch_requires_user_decision() {
+    let r=root("save-id-mismatch"); let context=ProjectContext::new(&r); write_project(&context,None);
+    fs::create_dir_all(context.framework_directory()).unwrap();
+    let mut settings=FrameworkSettings::default(); settings.save_id=Some("different-save".into());
+    fs::write(context.framework_settings_path(),settings.to_toml().unwrap()).unwrap();
+    let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Compatible, consistency:ProjectDataConsistency::Consistent };
+    let result=open_project(&context,"org.example.open",&mut app).unwrap();
+    assert!(matches!(result.framework_settings,FrameworkSettingsOpen::SaveIdMismatch{ref project_save_id,ref framework_save_id}
+        if project_save_id=="s1" && framework_save_id=="different-save"));
+    assert!(open_requires_user_decision(&result));
+    let _=fs::remove_dir_all(r);
+}
+
+#[test]
+fn legacy_framework_settings_without_save_id_remains_openable() {
+    let r=root("legacy-no-save-id"); let context=ProjectContext::new(&r); write_project(&context,None);
+    fs::create_dir_all(context.framework_directory()).unwrap();
+    fs::write(context.framework_settings_path(),"format_version = 1\nresources = []\n").unwrap();
+    let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Compatible, consistency:ProjectDataConsistency::Consistent };
+    let result=open_project(&context,"org.example.open",&mut app).unwrap();
+    assert!(matches!(result.framework_settings,FrameworkSettingsOpen::Loaded(ref settings) if settings.save_id.is_none()));
+    assert!(!open_requires_user_decision(&result));
+    let _=fs::remove_dir_all(r);
+}
