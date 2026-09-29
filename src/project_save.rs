@@ -30,7 +30,7 @@ pub enum ProjectSaveError {
     ProjectWrite(io::Error),
 }
 
-pub fn save_project<A: ApplicationProjectSaver>(
+pub fn save_project<A: ApplicationProjectSaver + ?Sized>(
     session: &mut ProjectSession,
     context: &ProjectContext,
     project_file: &mut ProjectFile,
