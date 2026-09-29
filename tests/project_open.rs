@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 use workflow_ide_framework::{
     framework_settings::FrameworkSettings,
     project::{ApplicationMetadata, ProjectContext, ProjectFile, ProjectMetadata, PROJECT_FORMAT_VERSION},
-    project_open::{open_can_continue, open_dirty_state, open_project, open_requires_user_decision, ApplicationProjectInspector, FrameworkSettingsOpen},
+    project_open::{open_can_continue, open_dirty_state, open_project, open_requires_user_decision, open_session, ApplicationProjectInspector, FrameworkSettingsOpen, ProjectOpenSessionError},
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
 };
 
@@ -176,5 +176,41 @@ fn framework_recovery_choice_is_framework_dirty() {
     let dirty=open_dirty_state(&result);
     assert!(dirty.framework);
     assert!(!dirty.application);
+    let _=fs::remove_dir_all(r);
+}
+
+#[test]
+fn successful_open_session_uses_project_root_save_id_and_clean_state() {
+    let r=root("session-ok"); let context=ProjectContext::new(&r); write_project(&context,None);
+    fs::create_dir_all(context.framework_directory()).unwrap();
+    fs::write(context.framework_settings_path(),FrameworkSettings::default().to_toml().unwrap()).unwrap();
+    let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Compatible, consistency:ProjectDataConsistency::Consistent };
+    let result=open_project(&context,"org.example.open",&mut app).unwrap();
+    let session=open_session(context.clone(),&result).unwrap();
+    assert_eq!(session.context(),Some(&context));
+    assert_eq!(session.current_save_id.as_deref(),Some("s1"));
+    assert!(!session.dirty.is_dirty());
+    let _=fs::remove_dir_all(r);
+}
+
+#[test]
+fn converted_open_session_preserves_application_dirty() {
+    let r=root("session-converted"); let context=ProjectContext::new(&r); write_project(&context,Some("1"));
+    fs::create_dir_all(context.framework_directory()).unwrap();
+    fs::write(context.framework_settings_path(),FrameworkSettings::default().to_toml().unwrap()).unwrap();
+    let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Converted { reason:None, handled:true }, consistency:ProjectDataConsistency::Consistent };
+    let result=open_project(&context,"org.example.open",&mut app).unwrap();
+    let session=open_session(context.clone(),&result).unwrap();
+    assert!(session.dirty.application);
+    assert_eq!(session.current_save_id.as_deref(),Some("s1"));
+    let _=fs::remove_dir_all(r);
+}
+
+#[test]
+fn blocked_open_cannot_create_current_project_session() {
+    let r=root("session-blocked"); let context=ProjectContext::new(&r); write_project(&context,None);
+    let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Incompatible { reason:None, handled:false }, consistency:ProjectDataConsistency::Consistent };
+    let result=open_project(&context,"org.example.open",&mut app).unwrap();
+    assert_eq!(open_session(context.clone(),&result),Err(ProjectOpenSessionError::CannotContinue));
     let _=fs::remove_dir_all(r);
 }
