@@ -235,3 +235,33 @@ fn delete_recovery_does_not_remove_different_id_after_assessment(){
  assert!(complete_framework_recovery(&a,&mut changed,&mut changed_uses,||"unused".into()).is_err());assert_eq!(changed.find_by_reference(&p("a")).unwrap().resource_id,"other-id");
  let _=fs::remove_dir_all(base);
 }
+
+#[test]
+fn replace_recovery_restores_preallocated_target_resource_id(){
+ let (base,c,r)=setup("replace-target-id");
+ let old=p("old.txt");let target=p("replacement.txt");
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Replace,items:vec![ResourceOperationItem{before:Some(old.clone()),after:Some(target.clone())}]};
+ let original=ResourceRegistry::default();let mut journal=ResourceOperationJournal::from_plan_with_registry(&plan,None,&original);
+ journal.set_execution_route(StoredExecutionRoute::Framework);journal.set_after_resource_ids(&[Some("replacement-id".into())]);journal.save(&c).unwrap();
+ let mut registry=ResourceRegistry::default();registry.register("old-id",old.clone());
+ let mut uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:old.clone()}];
+ let a=assess_pending_journal_full(&mut PanicRecoveryApp,&c,&r,&registry,&uses).unwrap().unwrap();
+ assert_eq!(complete_framework_recovery(&a,&mut registry,&mut uses,||"wrong-id".into()).unwrap(),FrameworkRecoveryResult::Completed);
+ assert_eq!(registry.find_by_reference(&target).unwrap().resource_id,"replacement-id");
+ assert_eq!(registry.find_by_reference(&old).unwrap().resource_id,"old-id");assert_eq!(uses[0].reference,target);
+ let _=fs::remove_dir_all(base);
+}
+
+#[test]
+fn replace_recovery_conflicts_with_different_target_resource_id(){
+ let (base,c,r)=setup("replace-wrong-id");
+ let old=p("old.txt");let target=p("replacement.txt");
+ let plan=ResourceOperationPlan{operation_id:"op".into(),kind:ResourceOperationKind::Replace,items:vec![ResourceOperationItem{before:Some(old.clone()),after:Some(target.clone())}]};
+ let original=ResourceRegistry::default();let mut journal=ResourceOperationJournal::from_plan_with_registry(&plan,None,&original);
+ journal.set_execution_route(StoredExecutionRoute::Framework);journal.set_after_resource_ids(&[Some("expected-id".into())]);journal.save(&c).unwrap();
+ let mut registry=ResourceRegistry::default();registry.register("old-id",old.clone());registry.register("other-id",target.clone());
+ let uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:old}];
+ let a=assess_pending_journal_full(&mut PanicRecoveryApp,&c,&r,&registry,&uses).unwrap().unwrap();
+ assert_eq!(a.framework,FrameworkPersistentRecoveryState::Mixed);assert_eq!(a.state,CombinedRecoveryState::Conflict);
+ let _=fs::remove_dir_all(base);
+}
