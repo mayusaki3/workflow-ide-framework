@@ -11,6 +11,7 @@ pub mod project_resource;
 pub mod project;
 pub mod project_lifecycle;
 pub mod project_adapter;
+pub mod project_adapter_erased;
 pub mod project_io;
 pub mod framework_settings;
 pub mod project_save;
@@ -180,6 +181,7 @@ pub struct Application {
     flow_property_links: Vec<FlowPropertyLink>,
     controller_panels: std::collections::HashMap<String, controller_panel::ControllerModel>,
     controller_property_links: Vec<ControllerPropertyLink>,
+    project_adapter: Option<Box<dyn project_adapter_erased::ErasedApplicationProjectAdapter>>,
 }
 
 impl Application {
@@ -199,6 +201,7 @@ impl Application {
             flow_property_links: Vec::new(),
             controller_panels: std::collections::HashMap::new(),
             controller_property_links: Vec::new(),
+            project_adapter: None,
         }
     }
 
@@ -286,6 +289,15 @@ impl Application {
         self
     }
 
+    /// Attach the Consumer Project lifecycle implementation to the Framework host.
+    pub fn project_adapter<A>(mut self, adapter: A) -> Self
+    where
+        A: project_adapter::ApplicationProjectAdapter + 'static,
+    {
+        self.project_adapter = Some(Box::new(adapter));
+        self
+    }
+
     pub fn panel(mut self, panel: PanelDefinition) -> Self {
         self.config.panels.push(panel);
         self
@@ -340,6 +352,7 @@ impl Application {
         let flow_property_links = self.flow_property_links;
         let controller_panels = self.controller_panels;
         let controller_property_links = self.controller_property_links;
+        let project_adapter = self.project_adapter;
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
             config.panels.push(
                 PanelDefinition::new(probe::PANEL_ID, "WFIDE Probe", PanelKind::StandardUi)
@@ -438,6 +451,7 @@ impl Application {
                     flow_property_links,
                     controller_panels,
                     controller_property_links,
+                    project_adapter,
                     theme_editor: None,
                 }))
             }),
@@ -477,6 +491,7 @@ struct FrameworkHost {
     flow_property_links: Vec<FlowPropertyLink>,
     controller_panels: std::collections::HashMap<String, controller_panel::ControllerModel>,
     controller_property_links: Vec<ControllerPropertyLink>,
+    project_adapter: Option<Box<dyn project_adapter_erased::ErasedApplicationProjectAdapter>>,
     theme_editor: Option<theme::ThemeEditor>,
 }
 
