@@ -540,13 +540,14 @@ impl FrameworkHost {
     }
 
     fn project_folder_dialog(&self) -> rfd::FileDialog {
-        let dialog = rfd::FileDialog::new();
-        self.project_controller.as_ref()
+        let parent = self.project_controller.as_ref()
             .and_then(|controller| controller.session.as_ref())
             .and_then(|session| session.context())
-            .and_then(|context| context.root().parent())
-            .map(|parent| dialog.set_directory(parent))
-            .unwrap_or(dialog)
+            .and_then(|context| context.root().parent());
+        match parent {
+            Some(parent) => rfd::FileDialog::new().set_directory(parent),
+            None => rfd::FileDialog::new(),
+        }
     }
 
     fn project_open(&mut self) {
