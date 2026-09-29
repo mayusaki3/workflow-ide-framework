@@ -1,6 +1,7 @@
 use crate::{
     framework_settings::FrameworkSettings,
     project::{ProjectContext, ProjectFile, ProjectFileError},
+    project_lifecycle::{ProjectSession, ProjectStorageState},
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
 };
 use std::{fs, io};
@@ -110,4 +111,23 @@ pub fn open_dirty_state(result: &ProjectOpenResult) -> crate::project_resource::
             ProjectDataCompatibility::Converted { .. }
         ),
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectOpenSessionError {
+    CannotContinue,
+}
+
+pub fn open_session(
+    context: ProjectContext,
+    result: &ProjectOpenResult,
+) -> Result<ProjectSession, ProjectOpenSessionError> {
+    if !open_can_continue(result) {
+        return Err(ProjectOpenSessionError::CannotContinue);
+    }
+    Ok(ProjectSession {
+        dirty: open_dirty_state(result),
+        current_save_id: Some(result.project_file.project.save_id.clone()),
+        storage: ProjectStorageState::Stored(context),
+    })
 }
