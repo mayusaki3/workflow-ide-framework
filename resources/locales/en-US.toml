@@ -15,6 +15,13 @@ name = "English"
 "language.title" = "Language Settings"
 "language.description" = "Change the display language at runtime."
 
+"project.menu" = "Project"
+"project.new" = "New"
+"project.open" = "Open..."
+"project.save" = "Save"
+"project.save_as" = "Save As..."
+"project.close" = "Close"
+
 "text_editor.save" = "Save"
 "text_editor.read_only" = "Read only"
 "text_editor.line" = "Ln"
