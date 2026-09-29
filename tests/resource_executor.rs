@@ -108,3 +108,50 @@ fn replace_registers_target_with_preallocated_resource_id(){
  assert_eq!(uses[0].reference,target);
  assert!(!journal_path(&context).exists());let _=fs::remove_dir_all(base);
 }
+
+struct JournalInspectingReplaceApp {
+ context: ProjectContext,
+ expected_id: String,
+ saw_preallocated_id: bool,
+ fail: bool,
+}
+impl ApplicationResourceOperationAdapter for JournalInspectingReplaceApp {
+ type Error=&'static str;
+ fn prepare_resource_operation(&mut self,_:&ResourceOperationPlan)->Result<ResourceOperationDecision,Self::Error>{
+  Ok(ResourceOperationDecision::Handled{journal_data:None})
+ }
+ fn execute_resource_operation(&mut self,_:&ResourceOperationPlan,_:Option<&ApplicationJournalData>)->Result<(),Self::Error>{
+  let journal=ResourceOperationJournal::load(&self.context).unwrap().expect("journal must exist before Application execution");
+  self.saw_preallocated_id=journal.items[0].after_resource_id.as_deref()==Some(self.expected_id.as_str());
+  if self.fail{Err("replace conversion failed")}else{Ok(())}
+ }
+}
+
+#[test]
+fn application_handled_replace_journals_target_id_before_application_execution(){
+ let (base,context,roots)=setup("handled-replace-id");
+ let old=p("old.txt");let target=p("converted.txt");
+ let plan=ResourceOperationPlan{operation_id:"replace-handled".into(),kind:ResourceOperationKind::Replace,items:vec![ResourceOperationItem{before:Some(old.clone()),after:Some(target.clone())}]};
+ let mut registry=ResourceRegistry::default();registry.register("old-id",old.clone());
+ let mut uses=vec![FrameworkResourceUse{owner_id:"editor".into(),reference:old}];
+ let mut app=JournalInspectingReplaceApp{context:context.clone(),expected_id:"converted-id".into(),saw_preallocated_id:false,fail:false};
+ execute_prepared_operation(&mut app,&context,&roots,&mut registry,&mut uses,&plan,PreparedResourceOperation::Handled{journal_data:None},||"converted-id".into()).unwrap();
+ assert!(app.saw_preallocated_id);
+ assert_eq!(registry.find_by_reference(&target).unwrap().resource_id,"converted-id");
+ assert_eq!(uses[0].reference,target);assert!(!journal_path(&context).exists());
+ let _=fs::remove_dir_all(base);
+}
+
+#[test]
+fn failed_application_handled_replace_keeps_preallocated_target_id_in_journal(){
+ let (base,context,roots)=setup("handled-replace-fail-id");
+ let old=p("old.txt");let target=p("converted.txt");
+ let plan=ResourceOperationPlan{operation_id:"replace-handled-fail".into(),kind:ResourceOperationKind::Replace,items:vec![ResourceOperationItem{before:Some(old),after:Some(target)}]};
+ let mut registry=ResourceRegistry::default();let mut uses=vec![];
+ let mut app=JournalInspectingReplaceApp{context:context.clone(),expected_id:"converted-id".into(),saw_preallocated_id:false,fail:true};
+ assert!(execute_prepared_operation(&mut app,&context,&roots,&mut registry,&mut uses,&plan,PreparedResourceOperation::Handled{journal_data:None},||"converted-id".into()).is_err());
+ assert!(app.saw_preallocated_id);
+ let journal=ResourceOperationJournal::load(&context).unwrap().unwrap();
+ assert_eq!(journal.items[0].after_resource_id.as_deref(),Some("converted-id"));
+ let _=fs::remove_dir_all(base);
+}
