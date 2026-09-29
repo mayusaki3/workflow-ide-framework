@@ -16,11 +16,11 @@ pub trait ApplicationProjectSaveAs {
     ) -> Result<ApplicationSaveResult, Self::Error>;
 }
 
-pub struct SaveAsAdapter<'a, A> {
+pub struct SaveAsAdapter<'a, A: ?Sized> {
     application: &'a mut A,
     source: Option<&'a ProjectContext>,
 }
-impl<A: ApplicationProjectSaveAs> crate::project_save::ApplicationProjectSaver for SaveAsAdapter<'_, A> {
+impl<A: ApplicationProjectSaveAs + ?Sized> crate::project_save::ApplicationProjectSaver for SaveAsAdapter<'_, A> {
     type Error = A::Error;
     fn save_project_data(&mut self, destination: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
         self.application.save_project_data_as(self.source, destination, save_id)
