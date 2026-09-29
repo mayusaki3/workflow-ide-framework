@@ -452,7 +452,9 @@ impl Application {
                     flow_property_links,
                     controller_panels,
                     controller_property_links,
+                    project_controller: project_adapter.as_ref().map(|_| project_controller::ProjectController::new(config.id.clone(), config.name.clone())),
                     project_adapter,
+                    project_ui: ProjectUiState::default(),
                     theme_editor: None,
                 }))
             }),
@@ -493,7 +495,125 @@ struct FrameworkHost {
     controller_panels: std::collections::HashMap<String, controller_panel::ControllerModel>,
     controller_property_links: Vec<ControllerPropertyLink>,
     project_adapter: Option<Box<dyn project_adapter_erased::ErasedApplicationProjectAdapter>>,
+    project_controller: Option<project_controller::ProjectController>,
+    project_ui: ProjectUiState,
     theme_editor: Option<theme::ThemeEditor>,
+}
+
+#[derive(Default)]
+struct ProjectUiState {
+    message: Option<String>,
+    pending_open: Option<(project::ProjectContext, project_open::ProjectOpenResult)>,
+    confirm_close: bool,
+}
+
+fn project_save_stamp() -> (String, String) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SEQUENCE: AtomicU64 = AtomicU64::new(1);
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+    let sequence = SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    (format!("save-{}-{}", now.as_nanos(), sequence), format!("unix:{}.{:09}", now.as_secs(), now.subsec_nanos()))
+}
+
+impl FrameworkHost {
+    fn handle_project_result(&mut self, result: project_controller::ProjectCommandResult, open_context: Option<project::ProjectContext>) {
+        use project_controller::ProjectCommandResult;
+        match result {
+            ProjectCommandResult::Completed => self.project_ui.message = None,
+            ProjectCommandResult::NeedsSaveLocation => self.project_save_as(),
+            ProjectCommandResult::NeedsOpenDecision(result) => {
+                if let Some(context) = open_context { self.project_ui.pending_open = Some((context, result)); }
+            }
+            ProjectCommandResult::NeedsDirtyConfirmation => self.project_ui.confirm_close = true,
+            ProjectCommandResult::Failed(error) => self.project_ui.message = Some(error),
+        }
+    }
+
+    fn project_new(&mut self) {
+        let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
+        let result = controller.new_project("Untitled", localization::current_locale(), project_resource::NewProjectStoragePolicy::Deferred, None, adapter);
+        self.handle_project_result(result, None);
+    }
+
+    fn project_open(&mut self) {
+        let Some(root) = rfd::FileDialog::new().pick_folder() else { return; };
+        let context = project::ProjectContext::new(root);
+        let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
+        let result = controller.open(context.clone(), adapter);
+        self.handle_project_result(result, Some(context));
+    }
+
+    fn project_save(&mut self) {
+        let (save_id, saved_at) = project_save_stamp();
+        let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
+        let result = controller.save(adapter, &save_id, &saved_at);
+        self.handle_project_result(result, None);
+    }
+
+    fn project_save_as(&mut self) {
+        let Some(root) = rfd::FileDialog::new().pick_folder() else { return; };
+        let (save_id, saved_at) = project_save_stamp();
+        let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
+        let result = controller.save_as(project::ProjectContext::new(root), adapter, &save_id, &saved_at);
+        self.handle_project_result(result, None);
+    }
+
+    fn project_close(&mut self, confirmed: bool) {
+        let Some(controller) = self.project_controller.as_mut() else { return; };
+        let result = controller.close(confirmed);
+        self.handle_project_result(result, None);
+    }
+
+    fn project_menu(&mut self, ui: &mut egui::Ui) {
+        if self.project_controller.is_none() { return; }
+        egui::MenuBar::new().ui(ui, |ui| {
+            ui.menu_button("Project", |ui| {
+                if ui.button("New").clicked() { ui.close(); self.project_new(); }
+                if ui.button("Open...").clicked() { ui.close(); self.project_open(); }
+                let is_open = self.project_controller.as_ref().is_some_and(|c| c.is_open());
+                ui.add_enabled_ui(is_open, |ui| {
+                    if ui.button("Save").clicked() { ui.close(); self.project_save(); }
+                    if ui.button("Save As...").clicked() { ui.close(); self.project_save_as(); }
+                    if ui.button("Close").clicked() { ui.close(); self.project_close(false); }
+                });
+            });
+        });
+    }
+
+    fn project_dialogs(&mut self, ctx: &egui::Context) {
+        if self.project_ui.confirm_close {
+            egui::Window::new("Unsaved changes").collapsible(false).resizable(false).show(ctx, |ui| {
+                ui.label("This project has unsaved changes. Close it without saving?");
+                ui.horizontal(|ui| {
+                    if ui.button("Close without saving").clicked() { self.project_ui.confirm_close = false; self.project_close(true); }
+                    if ui.button("Cancel").clicked() { self.project_ui.confirm_close = false; }
+                });
+            });
+        }
+        if self.project_ui.pending_open.is_some() {
+            egui::Window::new("Project requires attention").collapsible(false).resizable(false).show(ctx, |ui| {
+                ui.label("The project has compatibility, consistency, framework settings, or pending resource-operation information that requires a decision.");
+                let can_continue = self.project_ui.pending_open.as_ref().is_some_and(|(_, result)| project_open::open_can_continue(result));
+                ui.horizontal(|ui| {
+                    if ui.add_enabled(can_continue, egui::Button::new("Open with recovery defaults")).clicked() {
+                        if let Some((context, result)) = self.project_ui.pending_open.take() {
+                            if let Some(controller) = self.project_controller.as_mut() {
+                                let outcome = controller.accept_open(context, result);
+                                self.handle_project_result(outcome, None);
+                            }
+                        }
+                    }
+                    if ui.button("Cancel").clicked() { self.project_ui.pending_open = None; }
+                });
+            });
+        }
+        if let Some(message) = self.project_ui.message.clone() {
+            egui::Window::new("Project error").collapsible(false).resizable(false).show(ctx, |ui| {
+                ui.label(message);
+                if ui.button("OK").clicked() { self.project_ui.message = None; }
+            });
+        }
+    }
 }
 
 impl eframe::App for FrameworkHost {
@@ -520,6 +640,9 @@ impl eframe::App for FrameworkHost {
             0.0,
             ui.visuals().panel_fill,
         );
+
+        self.project_menu(ui);
+        self.project_dialogs(ui.ctx());
 
         ui.heading(&self.config.name);
         ui.label(format!("Application ID: {}", self.config.id));
