@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 use workflow_ide_framework::{
     framework_settings::FrameworkSettings,
     project::{ApplicationMetadata, ProjectContext, ProjectFile, ProjectMetadata, PROJECT_FORMAT_VERSION},
-    project_open::{open_project, open_requires_user_decision, ApplicationProjectInspector, FrameworkSettingsOpen},
+    project_open::{open_can_continue, open_dirty_state, open_project, open_requires_user_decision, ApplicationProjectInspector, FrameworkSettingsOpen},
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
 };
 
@@ -135,5 +135,46 @@ fn legacy_framework_settings_without_save_id_remains_openable() {
     let result=open_project(&context,"org.example.open",&mut app).unwrap();
     assert!(matches!(result.framework_settings,FrameworkSettingsOpen::Loaded(ref settings) if settings.save_id.is_none()));
     assert!(!open_requires_user_decision(&result));
+    let _=fs::remove_dir_all(r);
+}
+
+#[test]
+fn incompatible_application_cannot_continue_open() {
+    let r=root("incompatible-block"); let context=ProjectContext::new(&r); write_project(&context,None);
+    let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Incompatible { reason:None, handled:true }, consistency:ProjectDataConsistency::Consistent };
+    let result=open_project(&context,"org.example.open",&mut app).unwrap();
+    assert!(!open_can_continue(&result));
+    let _=fs::remove_dir_all(r);
+}
+
+#[test]
+fn inconsistent_can_open_false_cannot_continue_open() {
+    let r=root("consistency-block"); let context=ProjectContext::new(&r); write_project(&context,None);
+    let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Compatible, consistency:ProjectDataConsistency::Inconsistent { reason:None, can_open:false, can_recover:true, handled:true } };
+    let result=open_project(&context,"org.example.open",&mut app).unwrap();
+    assert!(!open_can_continue(&result));
+    let _=fs::remove_dir_all(r);
+}
+
+#[test]
+fn converted_application_marks_application_dirty() {
+    let r=root("converted-dirty"); let context=ProjectContext::new(&r); write_project(&context,Some("1"));
+    let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Converted { reason:Some("migrated".into()), handled:true }, consistency:ProjectDataConsistency::Consistent };
+    let result=open_project(&context,"org.example.open",&mut app).unwrap();
+    assert!(open_can_continue(&result));
+    let dirty=open_dirty_state(&result);
+    assert!(dirty.application);
+    assert!(dirty.is_dirty());
+    let _=fs::remove_dir_all(r);
+}
+
+#[test]
+fn framework_recovery_choice_is_framework_dirty() {
+    let r=root("framework-dirty"); let context=ProjectContext::new(&r); write_project(&context,None);
+    let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Compatible, consistency:ProjectDataConsistency::Consistent };
+    let result=open_project(&context,"org.example.open",&mut app).unwrap();
+    let dirty=open_dirty_state(&result);
+    assert!(dirty.framework);
+    assert!(!dirty.application);
     let _=fs::remove_dir_all(r);
 }
