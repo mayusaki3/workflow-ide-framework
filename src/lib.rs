@@ -12,6 +12,7 @@ pub mod project;
 pub mod project_lifecycle;
 pub mod project_adapter;
 pub mod project_adapter_erased;
+pub mod project_controller;
 pub mod project_io;
 pub mod framework_settings;
 pub mod project_save;
