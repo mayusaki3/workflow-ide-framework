@@ -10,6 +10,7 @@ pub mod property_panel;
 pub mod project_resource;
 pub mod project;
 pub mod project_lifecycle;
+pub mod project_adapter;
 pub mod project_io;
 pub mod framework_settings;
 pub mod project_save;
