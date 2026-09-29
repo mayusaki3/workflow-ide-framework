@@ -648,6 +648,13 @@ impl eframe::App for FrameworkHost {
         self.project_menu(ui);
         self.project_dialogs(ui.ctx());
 
+        let application_title = self.config.window.title.as_deref().unwrap_or(&self.config.name);
+        let window_title = self.project_controller.as_ref()
+            .and_then(|controller| controller.project_name())
+            .map(|project_name| format!("{application_title} - {project_name}"))
+            .unwrap_or_else(|| application_title.to_owned());
+        ui.ctx().send_viewport_cmd(egui::ViewportCommand::Title(window_title));
+
         ui.heading(&self.config.name);
         ui.label(format!("Application ID: {}", self.config.id));
         ui.label("workflow-ide-framework v0.1.0 Sample");
