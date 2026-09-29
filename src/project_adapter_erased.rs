@@ -71,7 +71,7 @@ impl<A: ApplicationProjectAdapter> ErasedApplicationProjectAdapter for A {
     }
 }
 
-impl crate::project_open::ApplicationProjectInspector for dyn ErasedApplicationProjectAdapter {
+impl crate::project_open::ApplicationProjectInspector for dyn ErasedApplicationProjectAdapter + '_ {
     type Error = String;
     fn inspect_project_data(&mut self, context: &ProjectContext, stored_data_version: Option<&str>) -> Result<ProjectDataCompatibility, Self::Error> {
         ErasedApplicationProjectAdapter::inspect_project_data(self, context, stored_data_version)
@@ -81,14 +81,14 @@ impl crate::project_open::ApplicationProjectInspector for dyn ErasedApplicationP
     }
 }
 
-impl crate::project_save::ApplicationProjectSaver for dyn ErasedApplicationProjectAdapter {
+impl crate::project_save::ApplicationProjectSaver for dyn ErasedApplicationProjectAdapter + '_ {
     type Error = String;
     fn save_project_data(&mut self, context: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
         ErasedApplicationProjectAdapter::save_project_data(self, context, save_id)
     }
 }
 
-impl crate::project_save_as::ApplicationProjectSaveAs for dyn ErasedApplicationProjectAdapter {
+impl crate::project_save_as::ApplicationProjectSaveAs for dyn ErasedApplicationProjectAdapter + '_ {
     type Error = String;
     fn save_project_data_as(&mut self, source: Option<&ProjectContext>, destination: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
         ErasedApplicationProjectAdapter::save_project_data_as(self, source, destination, save_id)
