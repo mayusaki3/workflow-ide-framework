@@ -440,6 +440,10 @@ impl Application {
                     }
                 }
 
+                let project_controller = project_adapter.as_ref().map(|_| {
+                    project_controller::ProjectController::new(config.id.clone(), config.name.clone())
+                });
+
                 Ok(Box::new(FrameworkHost {
                     config,
                     dock_state,
@@ -452,7 +456,7 @@ impl Application {
                     flow_property_links,
                     controller_panels,
                     controller_property_links,
-                    project_controller: project_adapter.as_ref().map(|_| project_controller::ProjectController::new(config.id.clone(), config.name.clone())),
+                    project_controller,
                     project_adapter,
                     project_ui: ProjectUiState::default(),
                     theme_editor: None,
