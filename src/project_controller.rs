@@ -143,6 +143,10 @@ impl ProjectController {
 
     pub fn is_open(&self) -> bool { self.session.is_some() }
 
+    pub fn project_name(&self) -> Option<&str> {
+        self.project_file.as_ref().map(|file| file.project.name.as_str())
+    }
+
     fn project_template(&self, name: String, language: String) -> ProjectFile {
         ProjectFile {
             project: ProjectMetadata {
