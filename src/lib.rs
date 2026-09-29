@@ -539,8 +539,18 @@ impl FrameworkHost {
         self.handle_project_result(result, None);
     }
 
+    fn project_folder_dialog(&self) -> rfd::FileDialog {
+        let dialog = rfd::FileDialog::new();
+        self.project_controller.as_ref()
+            .and_then(|controller| controller.session.as_ref())
+            .and_then(|session| session.context())
+            .and_then(|context| context.root().parent())
+            .map(|parent| dialog.set_directory(parent))
+            .unwrap_or(dialog)
+    }
+
     fn project_open(&mut self) {
-        let Some(root) = rfd::FileDialog::new().pick_folder() else { return; };
+        let Some(root) = self.project_folder_dialog().pick_folder() else { return; };
         let context = project::ProjectContext::new(root);
         let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
         let result = controller.open(context.clone(), adapter);
@@ -555,7 +565,7 @@ impl FrameworkHost {
     }
 
     fn project_save_as(&mut self) {
-        let Some(root) = rfd::FileDialog::new().pick_folder() else { return; };
+        let Some(root) = self.project_folder_dialog().pick_folder() else { return; };
         let (save_id, saved_at) = project_save_stamp();
         let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
         let result = controller.save_as(project::ProjectContext::new(root), adapter, &save_id, &saved_at);
