@@ -25,6 +25,7 @@ pub enum FrameworkSettingsOpen {
     Loaded(FrameworkSettings),
     MissingUseDefaults,
     InvalidUseDefaults { reason: String },
+    SaveIdMismatch { project_save_id: String, framework_save_id: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,7 +56,15 @@ pub fn open_project<A: ApplicationProjectInspector>(
 
     let framework_settings = match fs::read_to_string(context.framework_settings_path()) {
         Ok(text) => match FrameworkSettings::from_toml(&text) {
-            Ok(settings) => FrameworkSettingsOpen::Loaded(settings),
+            Ok(settings) => match settings.save_id.as_deref() {
+                Some(framework_save_id) if framework_save_id != project_file.project.save_id => {
+                    FrameworkSettingsOpen::SaveIdMismatch {
+                        project_save_id: project_file.project.save_id.clone(),
+                        framework_save_id: framework_save_id.to_owned(),
+                    }
+                }
+                _ => FrameworkSettingsOpen::Loaded(settings),
+            },
             Err(error) => FrameworkSettingsOpen::InvalidUseDefaults { reason: format!("{error:?}") },
         },
         Err(error) if error.kind() == io::ErrorKind::NotFound => FrameworkSettingsOpen::MissingUseDefaults,
