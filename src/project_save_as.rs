@@ -27,7 +27,7 @@ impl<A: ApplicationProjectSaveAs> crate::project_save::ApplicationProjectSaver f
     }
 }
 
-pub fn save_project_as<A: ApplicationProjectSaveAs>(
+pub fn save_project_as<A: ApplicationProjectSaveAs + ?Sized>(
     session: &mut ProjectSession,
     destination: ProjectContext,
     project_file: &mut ProjectFile,
