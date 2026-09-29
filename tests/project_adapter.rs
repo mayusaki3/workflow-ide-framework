@@ -87,3 +87,12 @@ fn unified_adapter_bridges_all_project_lifecycle_callbacks() {
     assert!(app.saved);
     assert!(app.saved_as);
 }
+
+#[test]
+fn application_builder_accepts_unified_project_adapter() {
+    let _application = workflow_ide_framework::Application::new(
+        "org.workflow-ide-framework.adapter-test",
+        "Adapter Test",
+    )
+    .project_adapter(App::default());
+}
