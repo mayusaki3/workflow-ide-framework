@@ -15,6 +15,13 @@ name = "日本語"
 "language.title" = "言語設定"
 "language.description" = "表示言語を実行中に切り替えます。"
 
+"project.menu" = "プロジェクト"
+"project.new" = "新規"
+"project.open" = "開く..."
+"project.save" = "保存"
+"project.save_as" = "名前を付けて保存..."
+"project.close" = "閉じる"
+
 "text_editor.save" = "保存"
 "text_editor.read_only" = "読み取り専用"
 "text_editor.line" = "行"
