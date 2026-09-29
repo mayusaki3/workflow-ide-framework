@@ -2,8 +2,9 @@ use std::{fs, path::PathBuf};
 use workflow_ide_framework::{
     framework_settings::FrameworkSettings,
     project::{ApplicationMetadata, ProjectContext, ProjectFile, ProjectMetadata, PROJECT_FORMAT_VERSION},
-    project_open::{open_can_continue, open_dirty_state, open_project, open_requires_user_decision, open_session, ApplicationProjectInspector, FrameworkSettingsOpen, ProjectOpenSessionError},
+    project_open::{open_can_continue, open_dirty_state, open_project, open_requires_user_decision, open_session, ApplicationProjectInspector, FrameworkSettingsOpen, PendingResourceOperationOpen, ProjectOpenSessionError},
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
+    resource_journal::{ResourceOperationJournal, StoredExecutionRoute, StoredOperationKind},
 };
 
 fn root(name: &str) -> PathBuf {
@@ -212,5 +213,35 @@ fn blocked_open_cannot_create_current_project_session() {
     let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Incompatible { reason:None, handled:false }, consistency:ProjectDataConsistency::Consistent };
     let result=open_project(&context,"org.example.open",&mut app).unwrap();
     assert_eq!(open_session(context.clone(),&result),Err(ProjectOpenSessionError::CannotContinue));
+    let _=fs::remove_dir_all(r);
+}
+
+#[test]
+fn pending_resource_journal_is_reported_without_blocking_open() {
+    let r=root("pending-journal"); let context=ProjectContext::new(&r); write_project(&context,None);
+    fs::create_dir_all(context.framework_directory()).unwrap();
+    fs::write(context.framework_settings_path(),FrameworkSettings::default().to_toml().unwrap()).unwrap();
+    let journal=ResourceOperationJournal { format_version:1, operation_id:"pending-1".into(), kind:StoredOperationKind::Delete, execution_route:StoredExecutionRoute::Framework, items:vec![], application:None };
+    journal.save(&context).unwrap();
+    let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Compatible, consistency:ProjectDataConsistency::Consistent };
+    let result=open_project(&context,"org.example.open",&mut app).unwrap();
+    assert!(matches!(result.pending_resource_operation,PendingResourceOperationOpen::Pending(ref pending) if pending.operation_id=="pending-1"));
+    assert!(open_requires_user_decision(&result));
+    assert!(open_can_continue(&result));
+    assert!(open_session(context.clone(),&result).is_ok());
+    let _=fs::remove_dir_all(r);
+}
+
+#[test]
+fn invalid_resource_journal_is_reported_without_failing_project_parse() {
+    let r=root("invalid-journal"); let context=ProjectContext::new(&r); write_project(&context,None);
+    fs::create_dir_all(context.framework_directory()).unwrap();
+    fs::write(context.framework_settings_path(),FrameworkSettings::default().to_toml().unwrap()).unwrap();
+    fs::write(context.framework_directory().join("pending_resource_operation.toml"),"not = [valid").unwrap();
+    let mut app=Inspector { seen_version:None, compatibility:ProjectDataCompatibility::Compatible, consistency:ProjectDataConsistency::Consistent };
+    let result=open_project(&context,"org.example.open",&mut app).unwrap();
+    assert!(matches!(result.pending_resource_operation,PendingResourceOperationOpen::Invalid{..}));
+    assert!(open_requires_user_decision(&result));
+    assert!(open_can_continue(&result));
     let _=fs::remove_dir_all(r);
 }
