@@ -45,6 +45,7 @@ pub enum PanelKind {
 pub struct PanelDefinition {
     pub id: String,
     pub name: String,
+    pub localized_names: std::collections::HashMap<String, String>,
     pub kind: PanelKind,
     pub initially_visible: bool,
 }
@@ -54,9 +55,20 @@ impl PanelDefinition {
         Self {
             id: id.into(),
             name: name.into(),
+            localized_names: std::collections::HashMap::new(),
             kind,
             initially_visible: true,
         }
+    }
+
+    /// Add a display name for a locale. The base name remains the fallback.
+    pub fn localized_name(mut self, locale: impl Into<String>, name: impl Into<String>) -> Self {
+        self.localized_names.insert(locale.into(), name.into());
+        self
+    }
+
+    pub fn display_name(&self, locale: &str) -> &str {
+        self.localized_names.get(locale).map(String::as_str).unwrap_or(&self.name)
     }
 
     pub fn initially_visible(mut self, visible: bool) -> Self {
@@ -560,8 +572,13 @@ impl FrameworkHost {
 
     fn project_menu(&mut self, ui: &mut egui::Ui) {
         if self.project_controller.is_none() { return; }
-        egui::MenuBar::new().ui(ui, |ui| {
-            ui.menu_button(localization::text("project.menu"), |ui| {
+        let frame = egui::Frame::new()
+            .fill(ui.visuals().faint_bg_color)
+            .inner_margin(egui::Margin::symmetric(6, 3))
+            .stroke(egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color));
+        frame.show(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
+                ui.menu_button(localization::text("project.menu"), |ui| {
                 if ui.button(localization::text("project.new")).clicked() { ui.close(); self.project_new(); }
                 if ui.button(localization::text("project.open")).clicked() { ui.close(); self.project_open(); }
                 let is_open = self.project_controller.as_ref().is_some_and(|c| c.is_open());
@@ -570,6 +587,7 @@ impl FrameworkHost {
                     if ui.button(localization::text("project.save_as")).clicked() { ui.close(); self.project_save_as(); }
                     if ui.button(localization::text("project.close")).clicked() { ui.close(); self.project_close(false); }
                 });
+            });
             });
         });
     }
@@ -734,12 +752,16 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
     }
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        self.panels
-            .iter()
-            .find(|panel| panel.id == *tab)
-            .map(|panel| panel.name.as_str())
-            .unwrap_or(tab.as_str())
-            .into()
+        let locale = localization::current_locale();
+        if let Some(panel) = self.panels.iter().find(|panel| panel.id == *tab) {
+            return panel.display_name(&locale).into();
+        }
+        match tab.as_str() {
+            "__wfide_language_settings" => localization::text("language.title").into(),
+            "__wfide_logging_settings" => localization::text("logging.title").into(),
+            "__wfide_theme_settings" => localization::text("theme.title").into(),
+            _ => tab.as_str().into(),
+        }
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
