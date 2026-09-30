@@ -298,6 +298,12 @@ impl Application {
     }
 
     /// Set the initial Framework/Consumer tracing level before logging is initialized.
+    /// Add application-owned localization resources. Files use the same locale TOML format as Framework resources.
+    pub fn localization_resources(mut self, directory: impl Into<std::path::PathBuf>) -> Self {
+        self.config.localization.application_resource_directories.push(directory.into());
+        self
+    }
+
     pub fn log_level(mut self, level: logging::LogLevel) -> Self {
         self.config.logging.level = level;
         self
@@ -342,7 +348,7 @@ impl Application {
         }
         if config.logging_settings_panel && !config.panels.iter().any(|panel| panel.id == "__wfide_logging_settings") {
             config.panels.push(
-                PanelDefinition::new("__wfide_logging_settings", "Logging Settings", PanelKind::StandardUi)
+                PanelDefinition::new("__wfide_logging_settings", "logging.title", PanelKind::StandardUi)
             );
             if let Some(layout) = &mut config.layout {
                 layout.root_panel_ids.push("__wfide_logging_settings".to_owned());
@@ -350,7 +356,7 @@ impl Application {
         }
         if config.language_settings_panel && !config.panels.iter().any(|panel| panel.id == "__wfide_language_settings") {
             config.panels.push(
-                PanelDefinition::new("__wfide_language_settings", "Language Settings", PanelKind::StandardUi)
+                PanelDefinition::new("__wfide_language_settings", "language.title", PanelKind::StandardUi)
             );
             if let Some(layout) = &mut config.layout {
                 layout.root_panel_ids.push("__wfide_language_settings".to_owned());
@@ -358,7 +364,7 @@ impl Application {
         }
         if config.theme_settings_panel && !config.panels.iter().any(|panel| panel.id == "__wfide_theme_settings") {
             config.panels.push(
-                PanelDefinition::new("__wfide_theme_settings", "Theme Settings", PanelKind::StandardUi)
+                PanelDefinition::new("__wfide_theme_settings", "theme.title", PanelKind::StandardUi)
             );
             if let Some(layout) = &mut config.layout {
                 layout.root_panel_ids.push("__wfide_theme_settings".to_owned());
