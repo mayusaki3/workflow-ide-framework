@@ -15,7 +15,7 @@ name = "English"
 "language.title" = "Language Settings"
 "language.description" = "Change the display language at runtime."
 
-"project.menu" = "Project"
+"project.menu" = "Project (P)"
 "project.new" = "New"
 "project.open" = "Open..."
 "project.save" = "Save"
