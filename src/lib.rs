@@ -33,6 +33,23 @@ pub mod theme;
 pub use layout::{LayoutConfig, LayoutSplit, SplitDirection};
 pub use tracing;
 
+pub const FRAMEWORK_NAME: &str = "workflow-ide-framework";
+pub const FRAMEWORK_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[derive(Debug, Clone, Copy)]
+pub struct FrameworkInfo {
+    pub name: &'static str,
+    pub version: &'static str,
+}
+
+impl FrameworkInfo {
+    pub const fn current() -> Self {
+        Self { name: FRAMEWORK_NAME, version: FRAMEWORK_VERSION }
+    }
+}
+
+pub type AboutRenderer = Box<dyn FnMut(&mut egui::Ui, FrameworkInfo)>;
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelKind {
@@ -163,6 +180,7 @@ pub struct Application {
     controller_panels: std::collections::HashMap<String, controller_panel::ControllerModel>,
     controller_property_links: Vec<ControllerPropertyLink>,
     project_adapter: Option<Box<dyn project_adapter_erased::ErasedApplicationProjectAdapter>>,
+    about_renderer: Option<AboutRenderer>,
 }
 
 impl Application {
@@ -183,6 +201,7 @@ impl Application {
             controller_panels: std::collections::HashMap::new(),
             controller_property_links: Vec::new(),
             project_adapter: None,
+            about_renderer: None,
         }
     }
 
@@ -285,6 +304,15 @@ impl Application {
         self
     }
 
+    /// Let the Consumer/Application render the About contents. Framework metadata is supplied on each render.
+    pub fn about_renderer<F>(mut self, renderer: F) -> Self
+    where
+        F: FnMut(&mut egui::Ui, FrameworkInfo) + 'static,
+    {
+        self.about_renderer = Some(Box::new(renderer));
+        self
+    }
+
     pub fn panel(mut self, panel: PanelDefinition) -> Self {
         self.config.panels.push(panel);
         self
@@ -346,6 +374,7 @@ impl Application {
         let controller_panels = self.controller_panels;
         let controller_property_links = self.controller_property_links;
         let project_adapter = self.project_adapter;
+        let about_renderer = self.about_renderer;
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
             config.panels.push(
                 PanelDefinition::new(probe::PANEL_ID, "WFIDE Probe", PanelKind::StandardUi)
@@ -444,6 +473,7 @@ impl Application {
                     controller_property_links,
                     project_controller,
                     project_adapter,
+                    about_renderer,
                     project_ui: ProjectUiState::default(),
                     theme_editor: None,
                     fonts_initialized: false,
@@ -487,6 +517,7 @@ struct FrameworkHost {
     controller_property_links: Vec<ControllerPropertyLink>,
     project_adapter: Option<Box<dyn project_adapter_erased::ErasedApplicationProjectAdapter>>,
     project_controller: Option<project_controller::ProjectController>,
+    about_renderer: Option<AboutRenderer>,
     project_ui: ProjectUiState,
     theme_editor: Option<theme::ThemeEditor>,
     fonts_initialized: bool,
