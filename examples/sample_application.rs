@@ -1,3 +1,28 @@
+fn register_sample_localization() {
+    for (locale, values) in [
+        ("en-US", [
+            ("sample.panel.project", "Project"),
+            ("sample.panel.flow", "Flow"),
+            ("sample.panel.controller", "Controller"),
+            ("sample.panel.properties", "Properties"),
+            ("sample.panel.text_editor", "Text Editor"),
+            ("sample.panel.logs", "Logs"),
+        ]),
+        ("ja-JP", [
+            ("sample.panel.project", "プロジェクト"),
+            ("sample.panel.flow", "フロー"),
+            ("sample.panel.controller", "コントローラー"),
+            ("sample.panel.properties", "プロパティ"),
+            ("sample.panel.text_editor", "テキスト"),
+            ("sample.panel.logs", "ログ"),
+        ]),
+    ] {
+        for (key, value) in values {
+            let _ = workflow_ide_framework::localization::register(locale, key, value);
+        }
+    }
+}
+
 use workflow_ide_framework::{
     Application, LayoutConfig, PanelDefinition, PanelKind,
     controller_panel::{ControllerElement, ControllerElementKind, ControllerModel, ControllerMode, LineShape},
@@ -42,6 +67,7 @@ impl ApplicationProjectAdapter for SampleProjectAdapter {
 }
 
 fn main() -> eframe::Result<()> {
+    register_sample_localization();
     let project = TreeNode::new("project", "サンプルプロジェクト / Sample Project")
         .node_type("project")
         .child(
@@ -109,12 +135,12 @@ fn main() -> eframe::Result<()> {
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
         .log_level(LogLevel::Debug)
         .project_adapter(SampleProjectAdapter)
-        .panel(PanelDefinition::new("project", "Project", PanelKind::StandardUi).localized_name("ja-JP", "プロジェクト"))
-        .panel(PanelDefinition::new("flow", "Flow", PanelKind::StandardUi).localized_name("ja-JP", "フロー"))
-        .panel(PanelDefinition::new("controller", "Controller", PanelKind::StandardUi).localized_name("ja-JP", "コントローラー"))
-        .panel(PanelDefinition::new("properties", "Properties", PanelKind::StandardUi).localized_name("ja-JP", "プロパティ"))
-        .panel(PanelDefinition::new("text-editor", "Text Editor", PanelKind::StandardUi).localized_name("ja-JP", "テキスト"))
-        .panel(PanelDefinition::new("logs", "Logs", PanelKind::StandardUi).localized_name("ja-JP", "ログ"))
+        .panel(PanelDefinition::new("project", "sample.panel.project", PanelKind::StandardUi))
+        .panel(PanelDefinition::new("flow", "sample.panel.flow", PanelKind::StandardUi))
+        .panel(PanelDefinition::new("controller", "sample.panel.controller", PanelKind::StandardUi))
+        .panel(PanelDefinition::new("properties", "sample.panel.properties", PanelKind::StandardUi))
+        .panel(PanelDefinition::new("text-editor", "sample.panel.text_editor", PanelKind::StandardUi))
+        .panel(PanelDefinition::new("logs", "sample.panel.logs", PanelKind::StandardUi))
         .layout(
             LayoutConfig::new(["flow", "controller", "text-editor"])
                 .split_left("flow", 0.20, ["project"])
