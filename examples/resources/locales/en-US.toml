@@ -1,0 +1,10 @@
+locale = "en-US"
+name = "English"
+
+[strings]
+"sample.panel.project" = "Project"
+"sample.panel.flow" = "Flow"
+"sample.panel.controller" = "Controller"
+"sample.panel.properties" = "Properties"
+"sample.panel.text_editor" = "Text Editor"
+"sample.panel.logs" = "Logs"
