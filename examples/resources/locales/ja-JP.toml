@@ -1,0 +1,10 @@
+locale = "ja-JP"
+name = "日本語"
+
+[strings]
+"sample.panel.project" = "プロジェクト"
+"sample.panel.flow" = "フロー"
+"sample.panel.controller" = "コントローラー"
+"sample.panel.properties" = "プロパティ"
+"sample.panel.text_editor" = "テキスト"
+"sample.panel.logs" = "ログ"
