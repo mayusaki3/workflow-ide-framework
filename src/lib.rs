@@ -994,7 +994,7 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
         }
 
         if let Some(panel) = self.panels.iter().find(|panel| panel.id == *tab) {
-            ui.heading(&panel.name);
+            ui.heading(localization::text(&panel.title_key));
             ui.label(format!("Panel ID: {}", panel.id));
             ui.label(format!("Panel kind: {:?}", panel.kind));
             ui.label("Step 4 layout placeholder; panel content is implemented in a later step.");
