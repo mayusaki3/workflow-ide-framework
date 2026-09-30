@@ -431,6 +431,7 @@ impl Application {
                     project_adapter,
                     project_ui: ProjectUiState::default(),
                     theme_editor: None,
+                    fonts_initialized: false,
                 }))
             }),
         )
@@ -473,6 +474,7 @@ struct FrameworkHost {
     project_controller: Option<project_controller::ProjectController>,
     project_ui: ProjectUiState,
     theme_editor: Option<theme::ThemeEditor>,
+    fonts_initialized: bool,
 }
 
 #[derive(Default)]
@@ -610,6 +612,20 @@ impl FrameworkHost {
 
 impl eframe::App for FrameworkHost {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        if !self.fonts_initialized {
+            let locale = localization::current_locale();
+            match locale_font::install_for_locale(
+                ui.ctx(),
+                &locale,
+                self.config.appearance.font_path.as_deref(),
+            ) {
+                Ok(paths) if !paths.is_empty() => tracing::info!(target: "wfide::font", %locale, count = paths.len(), "initial-frame fallback fonts loaded"),
+                Ok(_) => tracing::warn!(target: "wfide::font", %locale, "no OS or locale fallback font found on initial frame"),
+                Err(error) => tracing::warn!(target: "wfide::font", %locale, %error, "failed to configure fonts on initial frame"),
+            }
+            self.fonts_initialized = true;
+            ui.ctx().request_repaint();
+        }
         if self.config.appearance.theme == theme::Theme::System {
             let system_dark = ui
                 .ctx()
@@ -753,7 +769,7 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                     if let Err(error) = localization::set_locale(&locale) {
                         tracing::error!(target: "wfide::i18n", %error, %locale, "failed to change locale");
                     } else {
-                        match locale_font::install_for_locale(ui.ctx(), &locale, None) {
+                        match locale_font::install_for_locale(ui.ctx(), &locale, self.config.appearance.font_path.as_deref()) {
                             Ok(paths) if !paths.is_empty() => tracing::info!(target: "wfide::font", %locale, count = paths.len(), "fallback fonts loaded"),
                             Ok(_) => tracing::warn!(target: "wfide::font", %locale, "no OS or locale fallback font found"),
                             Err(error) => tracing::warn!(target: "wfide::font", %locale, %error, "failed to configure locale font"),
