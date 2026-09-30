@@ -44,31 +44,20 @@ pub enum PanelKind {
 #[derive(Debug, Clone)]
 pub struct PanelDefinition {
     pub id: String,
-    pub name: String,
-    pub localized_names: std::collections::HashMap<String, String>,
+    /// Localization resource key used for the panel title.
+    pub title_key: String,
     pub kind: PanelKind,
     pub initially_visible: bool,
 }
 
 impl PanelDefinition {
-    pub fn new(id: impl Into<String>, name: impl Into<String>, kind: PanelKind) -> Self {
+    pub fn new(id: impl Into<String>, title_key: impl Into<String>, kind: PanelKind) -> Self {
         Self {
             id: id.into(),
-            name: name.into(),
-            localized_names: std::collections::HashMap::new(),
+            title_key: title_key.into(),
             kind,
             initially_visible: true,
         }
-    }
-
-    /// Add a display name for a locale. The base name remains the fallback.
-    pub fn localized_name(mut self, locale: impl Into<String>, name: impl Into<String>) -> Self {
-        self.localized_names.insert(locale.into(), name.into());
-        self
-    }
-
-    pub fn display_name(&self, locale: &str) -> &str {
-        self.localized_names.get(locale).map(String::as_str).unwrap_or(&self.name)
     }
 
     pub fn initially_visible(mut self, visible: bool) -> Self {
@@ -713,7 +702,7 @@ impl eframe::App for FrameworkHost {
             for panel in &self.config.panels {
                 ui.label(format!(
                     "{} [{}] {:?} visible={}",
-                    panel.name, panel.id, panel.kind, panel.initially_visible
+                    localization::text(&panel.title_key), panel.id, panel.kind, panel.initially_visible
                 ));
             }
         }
@@ -752,9 +741,8 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
     }
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        let locale = localization::current_locale();
         if let Some(panel) = self.panels.iter().find(|panel| panel.id == *tab) {
-            return panel.display_name(&locale).into();
+            return localization::text(&panel.title_key).into();
         }
         match tab.as_str() {
             "__wfide_language_settings" => localization::text("language.title").into(),
