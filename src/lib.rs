@@ -565,8 +565,34 @@ impl FrameworkHost {
         self.handle_project_result(result, None);
     }
 
+    fn project_menu_item(ui: &mut egui::Ui, label: String, shortcut: &str, enabled: bool) -> bool {
+        let width = 230.0;
+        ui.add_enabled_ui(enabled, |ui| {
+            ui.set_min_width(width);
+            ui.horizontal(|ui| {
+                let response = ui.add_sized([150.0, 22.0], egui::Button::new(label).frame(false));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.weak(shortcut);
+                });
+                response.clicked()
+            }).inner
+        }).inner
+    }
+
+    fn project_shortcuts(&mut self, ui: &egui::Ui) {
+        let modifiers = ui.input(|input| input.modifiers);
+        let ctrl = modifiers.command;
+        if !ctrl { return; }
+        let is_open = self.project_controller.as_ref().is_some_and(|c| c.is_open());
+        if ui.input(|input| input.key_pressed(egui::Key::N)) { self.project_new(); }
+        else if ui.input(|input| input.key_pressed(egui::Key::O)) { self.project_open(); }
+        else if is_open && modifiers.shift && ui.input(|input| input.key_pressed(egui::Key::S)) { self.project_save_as(); }
+        else if is_open && ui.input(|input| input.key_pressed(egui::Key::S)) { self.project_save(); }
+    }
+
     fn project_menu(&mut self, ui: &mut egui::Ui) {
         if self.project_controller.is_none() { return; }
+        self.project_shortcuts(ui);
         let frame = egui::Frame::new()
             .fill(ui.visuals().faint_bg_color)
             .inner_margin(egui::Margin::symmetric(6, 3))
@@ -574,15 +600,15 @@ impl FrameworkHost {
         frame.show(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button(localization::text("project.menu"), |ui| {
-                if ui.button(localization::text("project.new")).clicked() { ui.close(); self.project_new(); }
-                if ui.button(localization::text("project.open")).clicked() { ui.close(); self.project_open(); }
-                let is_open = self.project_controller.as_ref().is_some_and(|c| c.is_open());
-                ui.add_enabled_ui(is_open, |ui| {
-                    if ui.button(localization::text("project.save")).clicked() { ui.close(); self.project_save(); }
-                    if ui.button(localization::text("project.save_as")).clicked() { ui.close(); self.project_save_as(); }
-                    if ui.button(localization::text("project.close")).clicked() { ui.close(); self.project_close(false); }
+                    let is_open = self.project_controller.as_ref().is_some_and(|c| c.is_open());
+                    if Self::project_menu_item(ui, localization::text("project.new"), "Ctrl+N", true) { ui.close(); self.project_new(); }
+                    if Self::project_menu_item(ui, localization::text("project.open"), "Ctrl+O", true) { ui.close(); self.project_open(); }
+                    ui.separator();
+                    if Self::project_menu_item(ui, localization::text("project.save"), "Ctrl+S", is_open) { ui.close(); self.project_save(); }
+                    if Self::project_menu_item(ui, localization::text("project.save_as"), "Ctrl+Shift+S", is_open) { ui.close(); self.project_save_as(); }
+                    ui.separator();
+                    if Self::project_menu_item(ui, localization::text("project.close"), "", is_open) { ui.close(); self.project_close(false); }
                 });
-            });
             });
         });
     }
