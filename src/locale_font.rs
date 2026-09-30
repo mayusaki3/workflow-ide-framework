@@ -2,25 +2,41 @@ use eframe::egui;
 use std::path::{Path, PathBuf};
 
 const LOCALE_FONT_NAME: &str = "wfide_locale_fallback";
+const OS_FONT_NAME: &str = "wfide_os_fallback";
 
 pub fn install_for_locale(
     ctx: &egui::Context,
     locale: &str,
     application_font: Option<&Path>,
-) -> Result<Option<PathBuf>, String> {
+) -> Result<Vec<PathBuf>, String> {
     let mut fonts = egui::FontDefinitions::default();
+    let mut loaded = Vec::new();
 
     if let Some(path) = application_font {
         install_font(&mut fonts, "wfide_application_font", path, true)?;
     }
 
-    let locale_font = find_locale_font(locale);
-    if let Some(path) = locale_font.as_deref() {
-        install_font(&mut fonts, LOCALE_FONT_NAME, path, false)?;
+    if let Some(path) = find_os_fallback_font() {
+        install_font(&mut fonts, OS_FONT_NAME, &path, false)?;
+        loaded.push(path);
+    }
+
+    if let Some(path) = find_locale_font(locale) {
+        if !loaded.contains(&path) {
+            install_font(&mut fonts, LOCALE_FONT_NAME, &path, false)?;
+            loaded.push(path);
+        }
     }
 
     ctx.set_fonts(fonts);
-    Ok(locale_font)
+    Ok(loaded)
+}
+
+pub fn find_os_fallback_font() -> Option<PathBuf> {
+    // File-system and project names may contain local-script characters even
+    // when the Framework UI locale is English. Keep an OS-appropriate font
+    // available independently from the selected UI locale.
+    locale_font_candidates().into_iter().find(|path| path.is_file())
 }
 
 fn install_font(
@@ -105,7 +121,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn unsupported_locale_does_not_request_fallback() {
+    fn unsupported_locale_does_not_request_locale_fallback() {
         assert_eq!(find_locale_font("en-US"), None);
     }
 
