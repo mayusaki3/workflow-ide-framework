@@ -15,7 +15,7 @@ name = "日本語"
 "language.title" = "言語設定"
 "language.description" = "表示言語を実行中に切り替えます。"
 
-"project.menu" = "プロジェクト"
+"project.menu" = "プロジェクト (P)"
 "project.new" = "新規"
 "project.open" = "開く..."
 "project.save" = "保存"
