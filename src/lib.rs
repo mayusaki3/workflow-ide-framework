@@ -673,6 +673,7 @@ impl eframe::App for FrameworkHost {
                 theme_settings_enabled: self.config.theme_settings_panel,
                 theme: &mut self.config.appearance.theme,
                 theme_editor: &mut self.theme_editor,
+                application_font_path: self.config.appearance.font_path.as_deref(),
                 dock_active: true,
                 logging_directory: self.config.logging.directory.clone(),
                 logging_file_prefix: self.config.logging.file_prefix.clone(),
@@ -709,6 +710,7 @@ struct FrameworkTabViewer<'a> {
     theme_settings_enabled: bool,
     theme: &'a mut theme::Theme,
     theme_editor: &'a mut Option<theme::ThemeEditor>,
+    application_font_path: Option<&'a std::path::Path>,
     dock_active: bool,
     logging_directory: std::path::PathBuf,
     logging_file_prefix: String,
@@ -769,7 +771,7 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                     if let Err(error) = localization::set_locale(&locale) {
                         tracing::error!(target: "wfide::i18n", %error, %locale, "failed to change locale");
                     } else {
-                        match locale_font::install_for_locale(ui.ctx(), &locale, self.config.appearance.font_path.as_deref()) {
+                        match locale_font::install_for_locale(ui.ctx(), &locale, self.application_font_path) {
                             Ok(paths) if !paths.is_empty() => tracing::info!(target: "wfide::font", %locale, count = paths.len(), "fallback fonts loaded"),
                             Ok(_) => tracing::warn!(target: "wfide::font", %locale, "no OS or locale fallback font found"),
                             Err(error) => tracing::warn!(target: "wfide::font", %locale, %error, "failed to configure locale font"),
