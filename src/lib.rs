@@ -661,8 +661,16 @@ impl FrameworkHost {
             egui::Window::new(localization::text("project.unsaved.title")).collapsible(false).resizable(false).show(ctx, |ui| {
                 ui.label(localization::text("project.unsaved.message"));
                 ui.horizontal(|ui| {
-                    if ui.button(localization::text("project.unsaved.close")).clicked() { self.project_ui.confirm_close = false; self.project_close(true); }
-                    if ui.button(localization::text("common.cancel")).clicked() { self.project_ui.confirm_close = false; }
+                    if ui.button(localization::text("project.unsaved.close")).clicked() {
+                        self.project_ui.confirm_close = false;
+                        let exit = self.project_ui.exit_after_close;
+                        self.project_close(true);
+                        if exit { ctx.send_viewport_cmd(egui::ViewportCommand::Close); }
+                    }
+                    if ui.button(localization::text("common.cancel")).clicked() {
+                        self.project_ui.confirm_close = false;
+                        self.project_ui.exit_after_close = false;
+                    }
                 });
             });
         }
@@ -681,6 +689,17 @@ impl FrameworkHost {
                     }
                     if ui.button(localization::text("common.cancel")).clicked() { self.project_ui.pending_open = None; }
                 });
+            });
+        }
+        if self.project_ui.show_about {
+            egui::Window::new(localization::text("about.title")).collapsible(false).resizable(false).show(ctx, |ui| {
+                ui.heading(&self.config.name);
+                ui.label(format!("{}: {}", localization::text("about.application"), self.config.name));
+                ui.label(format!("{}: {}", localization::text("about.version"), self.config.version.as_deref().unwrap_or("-")));
+                ui.separator();
+                ui.label(format!("{}: workflow-ide-framework", localization::text("about.framework")));
+                ui.label(format!("{}: {}", localization::text("about.version"), env!("CARGO_PKG_VERSION")));
+                if ui.button(localization::text("about.close")).clicked() { self.project_ui.show_about = false; }
             });
         }
         if let Some(message) = self.project_ui.message.clone() {
