@@ -5,6 +5,7 @@ pub mod logging;
 pub mod log_viewer;
 pub mod layout;
 pub mod localization;
+pub mod locale_font;
 pub mod probe;
 pub mod property_panel;
 pub mod project_resource;
@@ -133,30 +134,6 @@ impl Default for AppearanceConfig {
             theme: theme::Theme::System,
         }
     }
-}
-
-fn install_application_font(
-    ctx: &egui::Context,
-    path: &std::path::Path,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let bytes = std::fs::read(path)?;
-    let mut fonts = egui::FontDefinitions::default();
-    fonts.font_data.insert(
-        "wfide_application_font".to_owned(),
-        egui::FontData::from_owned(bytes).into(),
-    );
-    for family in [
-        egui::FontFamily::Proportional,
-        egui::FontFamily::Monospace,
-    ] {
-        fonts
-            .families
-            .entry(family)
-            .or_default()
-            .insert(0, "wfide_application_font".to_owned());
-    }
-    ctx.set_fonts(fonts);
-    Ok(())
 }
 
 #[derive(Debug, Clone)]
@@ -423,21 +400,16 @@ impl Application {
                 if let Some(scale) = config.appearance.ui_scale {
                     cc.egui_ctx.set_zoom_factor(scale);
                 }
-                if let Some(font_path) = config.appearance.font_path.as_deref() {
-                    if let Err(error) = install_application_font(&cc.egui_ctx, font_path) {
-                        tracing::warn!(
-                            target: "wfide::font",
-                            path = %font_path.display(),
-                            %error,
-                            "failed to load application font; using egui defaults"
-                        );
-                    } else {
-                        tracing::info!(
-                            target: "wfide::font",
-                            path = %font_path.display(),
-                            "application font loaded"
-                        );
-                    }
+                let locale = localization::current_locale();
+                match locale_font::install_for_locale(
+                    &cc.egui_ctx,
+                    &locale,
+                    config.appearance.font_path.as_deref(),
+                ) {
+                    Ok(Some(path)) => tracing::info!(target: "wfide::font", %locale, path = %path.display(), "locale fallback font loaded"),
+                    Ok(None) if locale.eq_ignore_ascii_case(localization::JA_JP) => tracing::warn!(target: "wfide::font", %locale, "no locale fallback font found"),
+                    Ok(None) => {}
+                    Err(error) => tracing::warn!(target: "wfide::font", %locale, %error, "failed to configure fonts"),
                 }
 
                 let project_controller = project_adapter.as_ref().map(|_| {
@@ -781,6 +753,13 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                 if ui.radio(selected, name).clicked() && !selected {
                     if let Err(error) = localization::set_locale(&locale) {
                         tracing::error!(target: "wfide::i18n", %error, %locale, "failed to change locale");
+                    } else {
+                        match locale_font::install_for_locale(ui.ctx(), &locale, None) {
+                            Ok(Some(path)) => tracing::info!(target: "wfide::font", %locale, path = %path.display(), "locale fallback font loaded"),
+                            Ok(None) if locale.eq_ignore_ascii_case(localization::JA_JP) => tracing::warn!(target: "wfide::font", %locale, "no locale fallback font found"),
+                            Ok(None) => {}
+                            Err(error) => tracing::warn!(target: "wfide::font", %locale, %error, "failed to configure locale font"),
+                        }
                     }
                 }
             }
