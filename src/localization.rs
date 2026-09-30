@@ -10,6 +10,7 @@ pub const JA_JP: &str = "ja-JP";
 pub struct LocalizationConfig {
     pub default_locale: String,
     pub resource_directory: PathBuf,
+    pub application_resource_directories: Vec<PathBuf>,
 }
 
 impl Default for LocalizationConfig {
@@ -17,6 +18,7 @@ impl Default for LocalizationConfig {
         Self {
             default_locale: EN_US.to_owned(),
             resource_directory: PathBuf::from("resources/locales"),
+            application_resource_directories: Vec::new(),
         }
     }
 }
@@ -39,7 +41,10 @@ struct LocalizationState {
 static STATE: OnceLock<RwLock<LocalizationState>> = OnceLock::new();
 
 pub fn init(config: &LocalizationConfig) {
-    let resources = load_resources(&config.resource_directory);
+    let mut resources = load_resources(&config.resource_directory);
+    for directory in &config.application_resource_directories {
+        merge_resources(&mut resources, load_resources(directory));
+    }
     let current = if resources.contains_key(&config.default_locale) {
         config.default_locale.clone()
     } else if resources.contains_key(EN_US) {
@@ -76,6 +81,19 @@ fn load_resources(directory: &Path) -> HashMap<String, LocaleResource> {
         }
     }
     resources
+}
+
+fn merge_resources(target: &mut HashMap<String, LocaleResource>, sources: HashMap<String, LocaleResource>) {
+    for (locale, source) in sources {
+        match target.get_mut(&locale) {
+            Some(target_resource) => {
+                for (key, value) in source.strings {
+                    target_resource.strings.insert(key, value);
+                }
+            }
+            None => { target.insert(locale, source); }
+        }
+    }
 }
 
 pub fn current_locale() -> String {
