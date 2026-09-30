@@ -605,8 +605,20 @@ impl FrameworkHost {
         else if is_open && ui.input(|input| input.key_pressed(egui::Key::S)) { self.project_save(); }
     }
 
-    fn project_menu(&mut self, ui: &mut egui::Ui) {
-        if self.project_controller.is_none() { return; }
+    fn request_exit(&mut self, ctx: &egui::Context) {
+        let is_open = self.project_controller.as_ref().is_some_and(|controller| controller.is_open());
+        if !is_open {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            return;
+        }
+        self.project_ui.exit_after_close = true;
+        self.project_close(false);
+        if !self.project_ui.confirm_close && self.project_controller.as_ref().is_none_or(|controller| !controller.is_open()) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+    }
+
+    fn application_menu(&mut self, ui: &mut egui::Ui) {
         self.project_shortcuts(ui);
         let frame = egui::Frame::new()
             .fill(ui.visuals().faint_bg_color)
@@ -614,23 +626,31 @@ impl FrameworkHost {
             .stroke(egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color));
         frame.show(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
-                let menu_label = localization::text("project.menu");
-                let access_key = ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::P));
-                let button = egui::Button::new(menu_label);
-                let response = ui.add(button);
-                let popup_id = response.id.with("popup");
-                if access_key {
-                    egui::Popup::open_id(ui.ctx(), popup_id);
-                }
-                egui::Popup::menu(&response).show(|ui| {
+                let file_access_key = ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::F));
+                let file_response = ui.add(egui::Button::new(localization::text("file.menu")));
+                if file_access_key { egui::Popup::open_id(ui.ctx(), file_response.id.with("popup")); }
+                egui::Popup::menu(&file_response).show(|ui| {
+                    let has_project_support = self.project_controller.is_some();
                     let is_open = self.project_controller.as_ref().is_some_and(|c| c.is_open());
-                    if Self::project_menu_item(ui, localization::text("project.new"), "Ctrl+N", true) { ui.close(); self.project_new(); }
-                    if Self::project_menu_item(ui, localization::text("project.open"), "Ctrl+O", true) { ui.close(); self.project_open(); }
+                    if Self::project_menu_item(ui, localization::text("file.new_project"), "Ctrl+N", has_project_support) { ui.close(); self.project_new(); }
+                    if Self::project_menu_item(ui, localization::text("file.open_project"), "Ctrl+O", has_project_support) { ui.close(); self.project_open(); }
                     ui.separator();
-                    if Self::project_menu_item(ui, localization::text("project.save"), "Ctrl+S", is_open) { ui.close(); self.project_save(); }
-                    if Self::project_menu_item(ui, localization::text("project.save_as"), "Ctrl+Shift+S", is_open) { ui.close(); self.project_save_as(); }
+                    if Self::project_menu_item(ui, localization::text("file.save"), "Ctrl+S", is_open) { ui.close(); self.project_save(); }
+                    if Self::project_menu_item(ui, localization::text("file.save_as"), "Ctrl+Shift+S", is_open) { ui.close(); self.project_save_as(); }
                     ui.separator();
-                    if Self::project_menu_item(ui, localization::text("project.close"), "", is_open) { ui.close(); self.project_close(false); }
+                    if Self::project_menu_item(ui, localization::text("file.close_project"), "", is_open) { ui.close(); self.project_close(false); }
+                    ui.separator();
+                    if Self::project_menu_item(ui, localization::text("file.exit"), "", true) { ui.close(); self.request_exit(ui.ctx()); }
+                });
+
+                let help_access_key = ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::H));
+                let help_response = ui.add(egui::Button::new(localization::text("help.menu")));
+                if help_access_key { egui::Popup::open_id(ui.ctx(), help_response.id.with("popup")); }
+                egui::Popup::menu(&help_response).show(|ui| {
+                    if Self::project_menu_item(ui, localization::text("help.about"), "", true) {
+                        ui.close();
+                        self.project_ui.show_about = true;
+                    }
                 });
             });
         });
@@ -711,7 +731,7 @@ impl eframe::App for FrameworkHost {
             ui.visuals().panel_fill,
         );
 
-        self.project_menu(ui);
+        self.application_menu(ui);
         self.project_dialogs(ui.ctx());
 
         let application_title = self.config.window.title.as_deref().unwrap_or(&self.config.name);
