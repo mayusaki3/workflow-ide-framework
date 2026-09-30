@@ -406,9 +406,8 @@ impl Application {
                     &locale,
                     config.appearance.font_path.as_deref(),
                 ) {
-                    Ok(Some(path)) => tracing::info!(target: "wfide::font", %locale, path = %path.display(), "locale fallback font loaded"),
-                    Ok(None) if locale.eq_ignore_ascii_case(localization::JA_JP) => tracing::warn!(target: "wfide::font", %locale, "no locale fallback font found"),
-                    Ok(None) => {}
+                    Ok(paths) if !paths.is_empty() => tracing::info!(target: "wfide::font", %locale, count = paths.len(), "fallback fonts loaded"),
+                    Ok(_) => tracing::warn!(target: "wfide::font", %locale, "no OS or locale fallback font found")
                     Err(error) => tracing::warn!(target: "wfide::font", %locale, %error, "failed to configure fonts"),
                 }
 
@@ -755,9 +754,8 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                         tracing::error!(target: "wfide::i18n", %error, %locale, "failed to change locale");
                     } else {
                         match locale_font::install_for_locale(ui.ctx(), &locale, None) {
-                            Ok(Some(path)) => tracing::info!(target: "wfide::font", %locale, path = %path.display(), "locale fallback font loaded"),
-                            Ok(None) if locale.eq_ignore_ascii_case(localization::JA_JP) => tracing::warn!(target: "wfide::font", %locale, "no locale fallback font found"),
-                            Ok(None) => {}
+                            Ok(paths) if !paths.is_empty() => tracing::info!(target: "wfide::font", %locale, count = paths.len(), "fallback fonts loaded"),
+                            Ok(_) => tracing::warn!(target: "wfide::font", %locale, "no OS or locale fallback font found")
                             Err(error) => tracing::warn!(target: "wfide::font", %locale, %error, "failed to configure locale font"),
                         }
                     }
