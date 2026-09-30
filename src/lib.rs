@@ -604,7 +604,15 @@ impl FrameworkHost {
             .stroke(egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color));
         frame.show(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
-                ui.menu_button(localization::text("project.menu"), |ui| {
+                let menu_label = localization::text("project.menu");
+                let access_key = ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::P));
+                let button = egui::Button::new(menu_label);
+                let response = ui.add(button);
+                let popup_id = response.id.with("popup");
+                if access_key {
+                    egui::Popup::open_id(ui.ctx(), popup_id);
+                }
+                egui::Popup::menu(&response).show(|ui| {
                     let is_open = self.project_controller.as_ref().is_some_and(|c| c.is_open());
                     if Self::project_menu_item(ui, localization::text("project.new"), "Ctrl+N", true) { ui.close(); self.project_new(); }
                     if Self::project_menu_item(ui, localization::text("project.open"), "Ctrl+O", true) { ui.close(); self.project_open(); }
