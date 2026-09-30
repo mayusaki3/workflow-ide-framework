@@ -70,6 +70,7 @@ impl PanelDefinition {
 pub struct ApplicationConfig {
     pub id: String,
     pub name: String,
+    pub version: Option<String>,
     pub window: WindowConfig,
     pub appearance: AppearanceConfig,
     pub panels: Vec<PanelDefinition>,
@@ -87,6 +88,7 @@ impl ApplicationConfig {
         Self {
             id: id.into(),
             name: name.into(),
+            version: None,
             window: WindowConfig::default(),
             appearance: AppearanceConfig::default(),
             panels: Vec::new(),
@@ -274,6 +276,12 @@ impl Application {
         A: project_adapter::ApplicationProjectAdapter + 'static,
     {
         self.project_adapter = Some(Box::new(adapter));
+        self
+    }
+
+    /// Set the Consumer/Application version shown by the Framework About dialog.
+    pub fn version(mut self, version: impl Into<String>) -> Self {
+        self.config.version = Some(version.into());
         self
     }
 
@@ -489,6 +497,8 @@ struct ProjectUiState {
     message: Option<String>,
     pending_open: Option<(project::ProjectContext, project_open::ProjectOpenResult)>,
     confirm_close: bool,
+    exit_after_close: bool,
+    show_about: bool,
 }
 
 fn project_save_stamp() -> (String, String) {
