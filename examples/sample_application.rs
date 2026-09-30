@@ -106,6 +106,7 @@ fn main() -> eframe::Result<()> {
     };
 
     Application::new("org.workflow-ide-framework.sample", "Workflow IDE Framework Sample Application")
+        .version(env!("CARGO_PKG_VERSION"))
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
         .localization_resources("examples/resources/locales")
         .log_level(LogLevel::Debug)
