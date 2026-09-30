@@ -628,20 +628,20 @@ impl FrameworkHost {
 
     fn project_dialogs(&mut self, ctx: &egui::Context) {
         if self.project_ui.confirm_close {
-            egui::Window::new("Unsaved changes").collapsible(false).resizable(false).show(ctx, |ui| {
-                ui.label("This project has unsaved changes. Close it without saving?");
+            egui::Window::new(localization::text("project.unsaved.title")).collapsible(false).resizable(false).show(ctx, |ui| {
+                ui.label(localization::text("project.unsaved.message"));
                 ui.horizontal(|ui| {
-                    if ui.button("Close without saving").clicked() { self.project_ui.confirm_close = false; self.project_close(true); }
-                    if ui.button("Cancel").clicked() { self.project_ui.confirm_close = false; }
+                    if ui.button(localization::text("project.unsaved.close")).clicked() { self.project_ui.confirm_close = false; self.project_close(true); }
+                    if ui.button(localization::text("common.cancel")).clicked() { self.project_ui.confirm_close = false; }
                 });
             });
         }
         if self.project_ui.pending_open.is_some() {
-            egui::Window::new("Project requires attention").collapsible(false).resizable(false).show(ctx, |ui| {
-                ui.label("The project has compatibility, consistency, framework settings, or pending resource-operation information that requires a decision.");
+            egui::Window::new(localization::text("project.attention.title")).collapsible(false).resizable(false).show(ctx, |ui| {
+                ui.label(localization::text("project.attention.message"));
                 let can_continue = self.project_ui.pending_open.as_ref().is_some_and(|(_, result)| project_open::open_can_continue(result));
                 ui.horizontal(|ui| {
-                    if ui.add_enabled(can_continue, egui::Button::new("Open with recovery defaults")).clicked() {
+                    if ui.add_enabled(can_continue, egui::Button::new(localization::text("project.attention.open_recovery"))).clicked() {
                         if let Some((context, result)) = self.project_ui.pending_open.take() {
                             if let Some(controller) = self.project_controller.as_mut() {
                                 let outcome = controller.accept_open(context, result);
@@ -649,14 +649,14 @@ impl FrameworkHost {
                             }
                         }
                     }
-                    if ui.button("Cancel").clicked() { self.project_ui.pending_open = None; }
+                    if ui.button(localization::text("common.cancel")).clicked() { self.project_ui.pending_open = None; }
                 });
             });
         }
         if let Some(message) = self.project_ui.message.clone() {
-            egui::Window::new("Project error").collapsible(false).resizable(false).show(ctx, |ui| {
+            egui::Window::new(localization::text("project.error.title")).collapsible(false).resizable(false).show(ctx, |ui| {
                 ui.label(message);
-                if ui.button("OK").clicked() { self.project_ui.message = None; }
+                if ui.button(localization::text("common.ok")).clicked() { self.project_ui.message = None; }
             });
         }
     }
