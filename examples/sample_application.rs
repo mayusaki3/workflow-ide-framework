@@ -1,3 +1,46 @@
+use workflow_ide_framework::{
+    Application, LayoutConfig, PanelDefinition, PanelKind,
+    controller_panel::{ControllerElement, ControllerElementKind, ControllerModel, ControllerMode, LineShape},
+    flow_editor::{FlowEdge, FlowModel, FlowNode, FlowPort, PortDirection},
+    logging::LogLevel,
+    project::ProjectContext,
+    project_adapter::ApplicationProjectAdapter,
+    project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
+    project_save::ApplicationSaveResult,
+    property_panel::PropertyModel,
+    text_editor::TextDocument,
+    tree_viewer::{TreeModel, TreeNode},
+};
+
+#[derive(Default)]
+struct SampleProjectAdapter;
+
+impl ApplicationProjectAdapter for SampleProjectAdapter {
+    type Error = std::io::Error;
+
+    fn initialize_project(&mut self, context: &ProjectContext) -> Result<(), Self::Error> {
+        std::fs::create_dir_all(context.application_directory())
+    }
+
+    fn inspect_project_data(&mut self, _context: &ProjectContext, _stored_data_version: Option<&str>) -> Result<ProjectDataCompatibility, Self::Error> {
+        Ok(ProjectDataCompatibility::Compatible)
+    }
+
+    fn check_project_consistency(&mut self, _context: &ProjectContext) -> Result<ProjectDataConsistency, Self::Error> {
+        Ok(ProjectDataConsistency::Consistent)
+    }
+
+    fn save_project_data(&mut self, context: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
+        std::fs::create_dir_all(context.application_directory())?;
+        std::fs::write(context.application_directory().join("sample.txt"), format!("sample project data\\nsave_id={save_id}\\n"))?;
+        Ok(ApplicationSaveResult { data_version: Some("1".into()) })
+    }
+
+    fn save_project_data_as(&mut self, _source: Option<&ProjectContext>, destination: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
+        self.save_project_data(destination, save_id)
+    }
+}
+
 fn main() -> eframe::Result<()> {
     let project = TreeNode::new("project", "サンプルプロジェクト / Sample Project")
         .node_type("project")
