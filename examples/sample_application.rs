@@ -1,73 +1,4 @@
-fn register_sample_localization() {
-    for (locale, values) in [
-        ("en-US", [
-            ("sample.panel.project", "Project"),
-            ("sample.panel.flow", "Flow"),
-            ("sample.panel.controller", "Controller"),
-            ("sample.panel.properties", "Properties"),
-            ("sample.panel.text_editor", "Text Editor"),
-            ("sample.panel.logs", "Logs"),
-        ]),
-        ("ja-JP", [
-            ("sample.panel.project", "プロジェクト"),
-            ("sample.panel.flow", "フロー"),
-            ("sample.panel.controller", "コントローラー"),
-            ("sample.panel.properties", "プロパティ"),
-            ("sample.panel.text_editor", "テキスト"),
-            ("sample.panel.logs", "ログ"),
-        ]),
-    ] {
-        for (key, value) in values {
-            let _ = workflow_ide_framework::localization::register(locale, key, value);
-        }
-    }
-}
-
-use workflow_ide_framework::{
-    Application, LayoutConfig, PanelDefinition, PanelKind,
-    controller_panel::{ControllerElement, ControllerElementKind, ControllerModel, ControllerMode, LineShape},
-    flow_editor::{FlowEdge, FlowModel, FlowNode, FlowPort, PortDirection},
-    logging::LogLevel,
-    project::ProjectContext,
-    project_adapter::ApplicationProjectAdapter,
-    project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
-    project_save::ApplicationSaveResult,
-    property_panel::PropertyModel,
-    text_editor::TextDocument,
-    tree_viewer::{TreeModel, TreeNode},
-};
-
-#[derive(Default)]
-struct SampleProjectAdapter;
-
-impl ApplicationProjectAdapter for SampleProjectAdapter {
-    type Error = std::io::Error;
-
-    fn initialize_project(&mut self, context: &ProjectContext) -> Result<(), Self::Error> {
-        std::fs::create_dir_all(context.application_directory())
-    }
-
-    fn inspect_project_data(&mut self, _context: &ProjectContext, _stored_data_version: Option<&str>) -> Result<ProjectDataCompatibility, Self::Error> {
-        Ok(ProjectDataCompatibility::Compatible)
-    }
-
-    fn check_project_consistency(&mut self, _context: &ProjectContext) -> Result<ProjectDataConsistency, Self::Error> {
-        Ok(ProjectDataConsistency::Consistent)
-    }
-
-    fn save_project_data(&mut self, context: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
-        std::fs::create_dir_all(context.application_directory())?;
-        std::fs::write(context.application_directory().join("sample.txt"), format!("sample project data\\nsave_id={save_id}\\n"))?;
-        Ok(ApplicationSaveResult { data_version: Some("1".into()) })
-    }
-
-    fn save_project_data_as(&mut self, _source: Option<&ProjectContext>, destination: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
-        self.save_project_data(destination, save_id)
-    }
-}
-
 fn main() -> eframe::Result<()> {
-    register_sample_localization();
     let project = TreeNode::new("project", "サンプルプロジェクト / Sample Project")
         .node_type("project")
         .child(
@@ -133,6 +64,7 @@ fn main() -> eframe::Result<()> {
 
     Application::new("org.workflow-ide-framework.sample", "Workflow IDE Framework Sample Application")
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
+        .localization_resources("examples/resources/locales")
         .log_level(LogLevel::Debug)
         .project_adapter(SampleProjectAdapter)
         .panel(PanelDefinition::new("project", "sample.panel.project", PanelKind::StandardUi))
