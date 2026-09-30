@@ -724,12 +724,17 @@ impl FrameworkHost {
         }
         if self.project_ui.show_about {
             egui::Window::new(localization::text("about.title")).collapsible(false).resizable(false).show(ctx, |ui| {
-                ui.heading(&self.config.name);
-                ui.label(format!("{}: {}", localization::text("about.application"), self.config.name));
-                ui.label(format!("{}: {}", localization::text("about.version"), self.config.version.as_deref().unwrap_or("-")));
+                if let Some(renderer) = self.about_renderer.as_mut() {
+                    renderer(ui, FrameworkInfo::current());
+                } else {
+                    ui.heading(&self.config.name);
+                    ui.label(format!("{}: {}", localization::text("about.application"), self.config.name));
+                    ui.label(format!("{}: {}", localization::text("about.version"), self.config.version.as_deref().unwrap_or("-")));
+                    ui.separator();
+                    ui.label(format!("{}: {}", localization::text("about.framework"), FRAMEWORK_NAME));
+                    ui.label(format!("{}: {}", localization::text("about.version"), FRAMEWORK_VERSION));
+                }
                 ui.separator();
-                ui.label(format!("{}: workflow-ide-framework", localization::text("about.framework")));
-                ui.label(format!("{}: {}", localization::text("about.version"), env!("CARGO_PKG_VERSION")));
                 if ui.button(localization::text("about.close")).clicked() { self.project_ui.show_about = false; }
             });
         }
