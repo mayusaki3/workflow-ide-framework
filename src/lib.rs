@@ -407,7 +407,7 @@ impl Application {
                     config.appearance.font_path.as_deref(),
                 ) {
                     Ok(paths) if !paths.is_empty() => tracing::info!(target: "wfide::font", %locale, count = paths.len(), "fallback fonts loaded"),
-                    Ok(_) => tracing::warn!(target: "wfide::font", %locale, "no OS or locale fallback font found")
+                    Ok(_) => tracing::warn!(target: "wfide::font", %locale, "no OS or locale fallback font found"),
                     Err(error) => tracing::warn!(target: "wfide::font", %locale, %error, "failed to configure fonts"),
                 }
 
@@ -755,7 +755,7 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                     } else {
                         match locale_font::install_for_locale(ui.ctx(), &locale, None) {
                             Ok(paths) if !paths.is_empty() => tracing::info!(target: "wfide::font", %locale, count = paths.len(), "fallback fonts loaded"),
-                            Ok(_) => tracing::warn!(target: "wfide::font", %locale, "no OS or locale fallback font found")
+                            Ok(_) => tracing::warn!(target: "wfide::font", %locale, "no OS or locale fallback font found"),
                             Err(error) => tracing::warn!(target: "wfide::font", %locale, %error, "failed to configure locale font"),
                         }
                     }
