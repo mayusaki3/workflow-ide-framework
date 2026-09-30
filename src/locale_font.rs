@@ -13,7 +13,14 @@ pub fn install_for_locale(
     let mut loaded = Vec::new();
 
     if let Some(path) = application_font {
-        install_font(&mut fonts, "wfide_application_font", path, true)?;
+        if let Err(error) = install_font(&mut fonts, "wfide_application_font", path, true) {
+            tracing::warn!(
+                target: "wfide::font",
+                path = %path.display(),
+                %error,
+                "application font unavailable; continuing with OS fallback"
+            );
+        }
     }
 
     if let Some(path) = find_os_fallback_font() {
@@ -131,4 +138,12 @@ mod tests {
             assert!(!locale_font_candidates().is_empty());
         }
     }
+    #[test]
+    fn missing_application_font_does_not_prevent_os_fallback_resolution() {
+        let missing = PathBuf::from("__wfide_missing_application_font__.ttf");
+        let ctx = egui::Context::default();
+        let result = install_for_locale(&ctx, "en-US", Some(&missing));
+        assert!(result.is_ok());
+    }
+
 }
