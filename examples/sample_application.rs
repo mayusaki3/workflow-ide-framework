@@ -107,6 +107,14 @@ fn main() -> eframe::Result<()> {
 
     Application::new("org.workflow-ide-framework.sample", "Workflow IDE Framework Sample Application")
         .version(env!("CARGO_PKG_VERSION"))
+        .about_renderer(|ui, framework| {
+            ui.heading("Workflow IDE Framework Sample Application");
+            ui.label(format!("Application version: {}", env!("CARGO_PKG_VERSION")));
+            ui.label("Consumer-defined About content");
+            ui.separator();
+            ui.label(format!("Framework: {}", framework.name));
+            ui.label(format!("Framework version: {}", framework.version));
+        })
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
         .localization_resources("examples/resources/locales")
         .log_level(LogLevel::Debug)
