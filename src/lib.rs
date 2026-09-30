@@ -569,13 +569,18 @@ impl FrameworkHost {
         let width = 230.0;
         ui.add_enabled_ui(enabled, |ui| {
             ui.set_min_width(width);
-            ui.horizontal(|ui| {
-                let response = ui.add_sized([150.0, 22.0], egui::Button::new(label).frame(false));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.weak(shortcut);
-                });
-                response.clicked()
-            }).inner
+            let response = ui.allocate_ui_with_layout(
+                egui::vec2(width, 22.0),
+                egui::Layout::left_to_right(egui::Align::Center),
+                |ui| {
+                    let label_response = ui.selectable_label(false, label);
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.weak(shortcut);
+                    });
+                    label_response
+                },
+            ).inner;
+            response.clicked()
         }).inner
     }
 
