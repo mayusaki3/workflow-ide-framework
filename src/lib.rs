@@ -680,7 +680,7 @@ impl FrameworkHost {
         let frame = egui::Frame::new()
             .fill(ui.visuals().faint_bg_color)
             .inner_margin(egui::Margin::symmetric(6, 3))
-            .stroke(egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color));
+            .stroke(egui::Stroke::new(1.0_f32, ui.visuals().widgets.noninteractive.bg_stroke.color));
         frame.show(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 let file_access_key = ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::F));
