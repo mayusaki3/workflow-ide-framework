@@ -113,7 +113,8 @@ fn main() -> eframe::Result<()> {
             ui.label(format!("{}: {}", localization::text("sample.about.application_version"), env!("CARGO_PKG_VERSION")));
             ui.label(localization::text("sample.about.description"));
             ui.separator();
-            ui.label(format!("{}: {}", localization::text("sample.about.framework"), framework.name));
+            let framework_name = if localization::current_locale().starts_with("ja") { framework.name_ja } else { framework.name_en };
+            ui.label(format!("{}: {}", localization::text("sample.about.framework"), framework_name));
             ui.label(format!("{}: {}", localization::text("sample.about.framework_version"), framework.version));
         })
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
