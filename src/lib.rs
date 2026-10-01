@@ -33,18 +33,24 @@ pub mod theme;
 pub use layout::{LayoutConfig, LayoutSplit, SplitDirection};
 pub use tracing;
 
-pub const FRAMEWORK_NAME: &str = "workflow-ide-framework";
+pub const FRAMEWORK_NAME_EN: &str = "Workflow IDE Framework";
+pub const FRAMEWORK_NAME_JA: &str = "ワークフローIDEフレームワーク";
 pub const FRAMEWORK_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Clone, Copy)]
 pub struct FrameworkInfo {
-    pub name: &'static str,
+    pub name_en: &'static str,
+    pub name_ja: &'static str,
     pub version: &'static str,
 }
 
 impl FrameworkInfo {
     pub const fn current() -> Self {
-        Self { name: FRAMEWORK_NAME, version: FRAMEWORK_VERSION }
+        Self {
+            name_en: FRAMEWORK_NAME_EN,
+            name_ja: FRAMEWORK_NAME_JA,
+            version: FRAMEWORK_VERSION,
+        }
     }
 }
 
@@ -730,16 +736,7 @@ impl FrameworkHost {
             egui::Window::new(localization::text("about.title")).collapsible(false).resizable(false).show(ctx, |ui| {
                 if let Some(renderer) = self.about_renderer.as_mut() {
                     renderer(ui, FrameworkInfo::current());
-                } else {
-                    ui.heading(&self.config.name);
-                    ui.label(format!("{}: {}", localization::text("about.application"), self.config.name));
-                    ui.label(format!("{}: {}", localization::text("about.version"), self.config.version.as_deref().unwrap_or("-")));
-                    ui.separator();
-                    ui.label(format!("{}: {}", localization::text("about.framework"), FRAMEWORK_NAME));
-                    ui.label(format!("{}: {}", localization::text("about.version"), FRAMEWORK_VERSION));
                 }
-                ui.separator();
-                if ui.button(localization::text("about.close")).clicked() { self.project_ui.show_about = false; }
             });
         }
         if let Some(message) = self.project_ui.message.clone() {
