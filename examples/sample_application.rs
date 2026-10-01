@@ -7,10 +7,12 @@ use workflow_ide_framework::{
     project::ProjectContext,
     project_adapter::ApplicationProjectAdapter,
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
+    project_panel::{ProjectPanelModel, ProjectPanelNode, ProvidedResource, ResourceProviderKind},
+    resource_registry::ResourceRegistry,
     project_save::ApplicationSaveResult,
     property_panel::PropertyModel,
     text_editor::TextDocument,
-    tree_viewer::{TreeModel, TreeNode},
+    tree_viewer::TreeModel,
 };
 
 #[derive(Default)]
@@ -43,18 +45,24 @@ impl ApplicationProjectAdapter for SampleProjectAdapter {
 }
 
 fn main() -> eframe::Result<()> {
-    let project = TreeNode::new("project", "サンプルプロジェクト / Sample Project")
-        .node_type("project")
-        .child(
-            TreeNode::new("src", "src")
-                .node_type("folder")
-                .child(TreeNode::new("main", "main.rs").node_type("file")),
-        )
-        .child(
-            TreeNode::new("resources", "resources")
-                .node_type("folder")
-                .child(TreeNode::new("robot", "robot.glb").node_type("file")),
-        );
+    let project_panel = ProjectPanelModel {
+        roots: vec![
+            ProjectPanelNode::logical("project", "サンプルプロジェクト / Sample Project")
+                .child(ProjectPanelNode::logical("workflow", "Workflow"))
+                .child(ProjectPanelNode::resources(
+                    "resources",
+                    "Resources",
+                    [ResourceProviderKind::Framework, ResourceProviderKind::Application, ResourceProviderKind::Project],
+                )),
+        ],
+        framework_resources: vec![ProvidedResource::new(
+            "framework-theme-sakura", "Sakura Theme", "themes/sakura.toml", ResourceProviderKind::Framework,
+        )],
+        application_resources: vec![ProvidedResource::new(
+            "sample-controller-image", "Controller Image", "images/controller.png", ResourceProviderKind::Application,
+        )],
+    };
+    let project = project_panel.tree(&ResourceRegistry::default());
 
     let base = FlowNode::new("base", "ベース / base_link", [70.0, 100.0])
         .port(FlowPort::new("child", "child", PortDirection::Output));
@@ -140,7 +148,7 @@ fn main() -> eframe::Result<()> {
                 .split_below("flow", 0.72, ["logs"])
                 .selected("flow"),
         )
-        .tree_viewer_panel("project", TreeModel { roots: vec![project], selected_id: None })
+        .tree_viewer_panel("project", project)
         .flow_editor_panel("flow", flow)
         .controller_panel("controller", controller)
         .property_panel("properties", PropertyModel::default())
