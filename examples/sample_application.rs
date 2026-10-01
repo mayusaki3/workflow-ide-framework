@@ -108,14 +108,20 @@ fn main() -> eframe::Result<()> {
 
     Application::new("org.workflow-ide-framework.sample", "Workflow IDE Framework Sample Application")
         .version(env!("CARGO_PKG_VERSION"))
-        .about_renderer(|ui, framework| {
-            ui.heading(localization::text("sample.about.title"));
-            ui.label(format!("{}: {}", localization::text("sample.about.application_version"), env!("CARGO_PKG_VERSION")));
-            ui.label(localization::text("sample.about.description"));
-            ui.separator();
-            let framework_name = if localization::current_locale().starts_with("ja") { framework.name_ja } else { framework.name_en };
-            ui.label(format!("{}: {}", localization::text("sample.about.framework"), framework_name));
-            ui.label(format!("{}: {}", localization::text("sample.about.framework_version"), framework.version));
+        .about_renderer(|ctx, framework, open| {
+            let mut window_open = *open;
+            eframe::egui::Window::new(localization::text("sample.about.title"))
+                .open(&mut window_open)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.heading(localization::text("sample.about.title"));
+                    ui.label(format!("{}: {}", localization::text("sample.about.application_version"), env!("CARGO_PKG_VERSION")));
+                    ui.label(localization::text("sample.about.description"));
+                    ui.separator();
+                    ui.label(format!("{}: {}", localization::text("sample.about.framework"), framework.name));
+                    ui.label(format!("{}: {}", localization::text("sample.about.framework_version"), framework.version));
+                });
+            *open = window_open;
         })
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
         .localization_resources("examples/resources/locales")
