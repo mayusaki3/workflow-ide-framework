@@ -977,7 +977,7 @@ impl FrameworkHost {
                     if state.name.trim().is_empty() { ui.weak(localization::text("project.new_dialog.name_required")); }
                     ui.horizontal(|ui| {
                         create = ui.add_enabled(!state.name.trim().is_empty(), egui::Button::new(localization::text("project.new_dialog.create"))).clicked();
-                        details = ui.add_enabled(!state.name.trim().is_empty(), egui::Button::new(localization::text("project.new_dialog.details"))).clicked();
+                        details = ui.button(localization::text("project.new_dialog.details")).clicked();
                         cancel = ui.button(localization::text("common.cancel")).clicked();
                     });
                 });
