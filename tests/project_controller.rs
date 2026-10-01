@@ -22,7 +22,7 @@ impl ApplicationProjectAdapter for App {
 fn deferred_new_routes_save_to_save_as_and_close_requires_confirmation() {
     let mut controller = ProjectController::new("org.test", "Test");
     let mut app = App;
-    assert_eq!(controller.new_project("Untitled", "en", NewProjectStoragePolicy::Deferred, None, &mut app), ProjectCommandResult::Completed);
+    assert_eq!(controller.new_project("Untitled", "en", None, NewProjectStoragePolicy::Deferred, None, &mut app), ProjectCommandResult::Completed);
     assert!(controller.is_open());
     assert_eq!(controller.save(&mut app, "save-1", "2026-09-29T00:00:00Z"), ProjectCommandResult::NeedsSaveLocation);
     assert_eq!(controller.close(false), ProjectCommandResult::NeedsDirtyConfirmation);
@@ -35,6 +35,20 @@ fn deferred_new_routes_save_to_save_as_and_close_requires_confirmation() {
 fn required_new_without_root_requests_location() {
     let mut controller = ProjectController::new("org.test", "Test");
     let mut app = App;
-    assert_eq!(controller.new_project("Untitled", "en", NewProjectStoragePolicy::Required, None, &mut app), ProjectCommandResult::NeedsSaveLocation);
+    assert_eq!(controller.new_project("Untitled", "en", None, NewProjectStoragePolicy::Required, None, &mut app), ProjectCommandResult::NeedsSaveLocation);
     assert!(!controller.is_open());
+}
+
+#[test]
+fn new_project_keeps_name_description_and_language_metadata() {
+    let mut controller = ProjectController::new("org.test", "Test");
+    let mut app = App;
+    assert_eq!(
+        controller.new_project("Demo", "ja-JP", Some("説明".into()), NewProjectStoragePolicy::Deferred, None, &mut app),
+        ProjectCommandResult::Completed
+    );
+    let file = controller.project_file.as_ref().unwrap();
+    assert_eq!(file.project.name, "Demo");
+    assert_eq!(file.project.description.as_deref(), Some("説明"));
+    assert_eq!(file.project.language, "ja-JP");
 }
