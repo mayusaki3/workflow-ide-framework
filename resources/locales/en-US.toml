@@ -2,6 +2,7 @@ locale = "en-US"
 name = "English"
 
 [strings]
+"framework.product_name" = "Workflow IDE Framework"
 "logging.title" = "Logging Settings"
 "logging.framework_panel" = "Framework standard panel"
 "logging.runtime_level" = "Runtime Log Level"
