@@ -797,24 +797,38 @@ impl FrameworkHost {
                 });
                 ui.label(localization::text(if is_save { "project.folder.save_hint" } else { "project.folder.open_hint" }));
                 ui.separator();
-                let mut entries = std::fs::read_dir(&directory).ok().into_iter().flatten().flatten()
-                    .filter_map(|entry| entry.file_type().ok().filter(|kind| kind.is_dir()).map(|_| entry.path()))
-                    .collect::<Vec<_>>();
-                entries.sort_by_key(|path| path.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default());
-                egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
-                    for path in entries {
-                        let is_project = path.join("project.toml").is_file();
-                        let name = path.file_name().map(|name| name.to_string_lossy()).unwrap_or_default();
-                        let kind = localization::text(if is_project { "project.folder.project" } else { "project.folder.folder" });
-                        let response = ui.add_enabled(!is_save || !is_project, egui::Button::new(format!("{name}    [{kind}]")).frame(false));
-                        if response.double_clicked() {
-                            if is_project {
-                                if !is_save { open_project = Some(path.clone()); }
-                            } else {
-                                navigate_to = Some(path.clone());
+                let application_id = self.config.id.clone();
+                ui.columns(2, |columns| {
+                    egui::ScrollArea::vertical().max_height(280.0).show(&mut columns[0], |ui| {
+                        ui.strong(localization::text("project.folder.computer"));
+                        for root in project_browser_roots() {
+                            show_project_folder_tree(ui, &root, &directory, &application_id, &mut navigate_to);
+                        }
+                    });
+                    let mut entries = std::fs::read_dir(&directory).ok().into_iter().flatten().flatten()
+                        .filter_map(|entry| entry.file_type().ok().filter(|kind| kind.is_dir()).map(|_| entry.path()))
+                        .collect::<Vec<_>>();
+                    entries.sort_by_key(|path| path.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default());
+                    egui::ScrollArea::vertical().max_height(280.0).show(&mut columns[1], |ui| {
+                        for path in entries {
+                            let kind = project_folder_kind(&path, &application_id);
+                            let name = path.file_name().map(|name| name.to_string_lossy()).unwrap_or_default();
+                            let label = match kind {
+                                ProjectFolderKind::Folder => name.into_owned(),
+                                ProjectFolderKind::Project => format!("{name}    [{}]", localization::text("project.folder.project")),
+                                ProjectFolderKind::UnavailableProject => format!("{name}    [{}]", localization::text("project.folder.unavailable_project")),
+                            };
+                            let enabled = !is_save || kind == ProjectFolderKind::Folder;
+                            let response = ui.add_enabled(enabled, egui::Button::new(label).frame(false));
+                            if response.double_clicked() {
+                                match kind {
+                                    ProjectFolderKind::Folder => navigate_to = Some(path.clone()),
+                                    ProjectFolderKind::Project if !is_save => open_project = Some(path.clone()),
+                                    _ => {}
+                                }
                             }
                         }
-                    }
+                    });
                 });
                 ui.separator();
                 ui.horizontal(|ui| {
