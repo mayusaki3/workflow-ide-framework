@@ -9,6 +9,7 @@ pub mod locale_font;
 pub mod probe;
 pub mod property_panel;
 pub mod project_resource;
+pub mod project_panel;
 pub mod project;
 pub mod project_lifecycle;
 pub mod project_adapter;
