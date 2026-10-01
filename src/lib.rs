@@ -1027,7 +1027,16 @@ impl FrameworkHost {
             if let Some(renderer) = self.about_renderer.as_mut() {
                 renderer(ctx, FrameworkInfo::current(), &mut self.project_ui.show_about);
             } else {
-                self.project_ui.show_about = false;
+                let mut open = self.project_ui.show_about;
+                egui::Window::new(localization::text("about.title")).open(&mut open).collapsible(false).resizable(false).show(ctx, |ui| {
+                    ui.heading(&self.config.name);
+                    if let Some(version) = &self.config.version { ui.label(format!("{}: {}", localization::text("about.version"), version)); }
+                    ui.separator();
+                    let framework = FrameworkInfo::current();
+                    ui.label(format!("{}: {}", localization::text("about.framework"), framework.name));
+                    ui.label(format!("{}: {}", localization::text("about.version"), framework.version));
+                });
+                self.project_ui.show_about = open;
             }
         }
         if self.project_ui.project_properties.is_some() {
