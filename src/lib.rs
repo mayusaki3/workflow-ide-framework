@@ -732,6 +732,70 @@ impl FrameworkHost {
     }
 
     fn project_dialogs(&mut self, ctx: &egui::Context) {
+        if self.project_ui.folder_dialog.is_some() {
+            let mut navigate_to = None;
+            let mut open_project = None;
+            let mut save_parent = None;
+            let mut cancel = false;
+            let state = self.project_ui.folder_dialog.as_ref().expect("project folder dialog");
+            let is_save = matches!(state.mode, ProjectFolderDialogMode::SaveAs);
+            let title = localization::text(if is_save { "project.folder.save_title" } else { "project.folder.open_title" });
+            let directory = state.directory.clone();
+            egui::Window::new(title).collapsible(false).resizable(true).default_size([620.0, 420.0]).show(ctx, |ui| {
+                ui.label(localization::text("project.folder.location"));
+                ui.horizontal(|ui| {
+                    if ui.button(localization::text("project.folder.up")).clicked() {
+                        if let Some(parent) = directory.parent() { navigate_to = Some(parent.to_path_buf()); }
+                    }
+                    ui.monospace(directory.display().to_string());
+                });
+                ui.label(localization::text(if is_save { "project.folder.save_hint" } else { "project.folder.open_hint" }));
+                ui.separator();
+                let mut entries = std::fs::read_dir(&directory).ok().into_iter().flatten().flatten()
+                    .filter_map(|entry| entry.file_type().ok().filter(|kind| kind.is_dir()).map(|_| entry.path()))
+                    .collect::<Vec<_>>();
+                entries.sort_by_key(|path| path.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default());
+                egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
+                    for path in entries {
+                        let is_project = path.join("project.toml").is_file();
+                        let name = path.file_name().map(|name| name.to_string_lossy()).unwrap_or_default();
+                        let kind = localization::text(if is_project { "project.folder.project" } else { "project.folder.folder" });
+                        let response = ui.add_enabled(!is_save || !is_project, egui::Button::new(format!("{name}    [{kind}]")).frame(false));
+                        if response.double_clicked() {
+                            if is_project {
+                                if !is_save { open_project = Some(path.clone()); }
+                            } else {
+                                navigate_to = Some(path.clone());
+                            }
+                        }
+                    }
+                });
+                ui.separator();
+                ui.horizontal(|ui| {
+                    if is_save {
+                        let inside_project = directory.ancestors().any(|ancestor| ancestor.join("project.toml").is_file());
+                        let target_exists = self.project_controller.as_ref().and_then(|controller| controller.project_name()).is_some_and(|name| directory.join(name).exists());
+                        if ui.add_enabled(!inside_project && !target_exists, egui::Button::new(localization::text("project.folder.save_here"))).clicked() {
+                            save_parent = Some(directory.clone());
+                        }
+                        if target_exists { ui.weak(localization::text("project.folder.project_exists")); }
+                    }
+                    if ui.button(localization::text("common.cancel")).clicked() { cancel = true; }
+                });
+            });
+            if let Some(path) = navigate_to {
+                if let Some(state) = self.project_ui.folder_dialog.as_mut() { state.directory = path; }
+            }
+            if let Some(path) = open_project {
+                self.project_ui.folder_dialog = None;
+                self.open_project_at(path);
+            } else if let Some(parent) = save_parent {
+                self.project_ui.folder_dialog = None;
+                self.save_project_as_at(parent);
+            } else if cancel {
+                self.project_ui.folder_dialog = None;
+            }
+        }
         if self.project_ui.new_project.is_some() {
             let mut create = false;
             let mut cancel = false;
