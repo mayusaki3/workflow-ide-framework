@@ -152,6 +152,27 @@ impl ProjectController {
         self.project_file.as_ref().map(|file| file.project.name.as_str())
     }
 
+    pub fn project_description(&self) -> Option<&str> {
+        self.project_file.as_ref().and_then(|file| file.project.description.as_deref())
+    }
+
+    pub fn update_project_metadata(&mut self, name: impl Into<String>, description: Option<String>) -> ProjectCommandResult {
+        let Some(project_file) = self.project_file.as_mut() else {
+            return ProjectCommandResult::Failed("no project is open".into());
+        };
+        let name = name.into();
+        if name.trim().is_empty() {
+            return ProjectCommandResult::Failed("project name is required".into());
+        }
+        project_file.project.name = name.trim().to_owned();
+        project_file.project.description = description.and_then(|value| {
+            let value = value.trim().to_owned();
+            (!value.is_empty()).then_some(value)
+        });
+        if let Some(session) = self.session.as_mut() { session.mark_metadata_dirty(); }
+        ProjectCommandResult::Completed
+    }
+
     fn project_template(&self, name: String, language: String, description: Option<String>) -> ProjectFile {
         ProjectFile {
             project: ProjectMetadata {
