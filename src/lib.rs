@@ -532,7 +532,6 @@ struct FrameworkHost {
 struct NewProjectDialogState {
     name: String,
     description: String,
-    language: String,
 }
 
 #[derive(Default)]
@@ -571,11 +570,11 @@ impl FrameworkHost {
         self.project_ui.new_project = Some(NewProjectDialogState {
             name: String::new(),
             description: String::new(),
-            language: localization::current_locale(),
         });
     }
 
-    fn create_new_project(&mut self, name: String, description: String, language: String) {
+    fn create_new_project(&mut self, name: String, description: String) {
+        let language = localization::current_locale();
         let description = (!description.trim().is_empty()).then(|| description.trim().to_owned());
         let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
         let result = controller.new_project(name.trim(), language, description, project_resource::NewProjectStoragePolicy::Deferred, None, adapter);
@@ -726,17 +725,7 @@ impl FrameworkHost {
                     ui.text_edit_singleline(&mut state.name);
                     ui.label(localization::text("project.new_dialog.description"));
                     ui.text_edit_multiline(&mut state.description);
-                    ui.label(localization::text("project.new_dialog.language"));
-                    let locales = localization::locales();
-                    let selected_name = locales.iter().find(|(code, _)| code == &state.language).map(|(_, name)| name.as_str()).unwrap_or(&state.language);
-                    egui::ComboBox::from_id_salt("new_project_language")
-                        .selected_text(selected_name)
-                        .show_ui(ui, |ui| {
-                            for (code, name) in locales {
-                                ui.selectable_value(&mut state.language, code, name);
-                            }
-                        });
-                    if state.name.trim().is_empty() {
+                     if state.name.trim().is_empty() {
                         ui.weak(localization::text("project.new_dialog.name_required"));
                     }
                     ui.horizontal(|ui| {
@@ -746,7 +735,7 @@ impl FrameworkHost {
                 });
             if create {
                 if let Some(state) = self.project_ui.new_project.take() {
-                    self.create_new_project(state.name, state.description, state.language);
+                    self.create_new_project(state.name, state.description);
                 }
             } else if cancel {
                 self.project_ui.new_project = None;
