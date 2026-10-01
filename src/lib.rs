@@ -596,14 +596,14 @@ fn show_project_folder_tree(ui: &mut egui::Ui, path: &std::path::Path, selected:
         if ui.selectable_label(path == selected, format!("{name}{suffix}")).clicked() && kind == ProjectFolderKind::Project { *next = Some(path.to_path_buf()); }
         return;
     }
-    egui::CollapsingHeader::new(format!("{name}{suffix}")).id_salt(path).show(ui, |ui| {
-        if ui.selectable_label(path == selected, localization::text("project.folder.location")).clicked() { *next = Some(path.to_path_buf()); }
+    let response = egui::CollapsingHeader::new(format!("{name}{suffix}")).id_salt(path).show(ui, |ui| {
         let mut children = std::fs::read_dir(path).ok().into_iter().flatten().flatten()
             .filter_map(|entry| entry.file_type().ok().filter(|kind| kind.is_dir()).map(|_| entry.path()))
             .collect::<Vec<_>>();
         children.sort_by_key(|child| child.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default());
         for child in children { show_project_folder_tree(ui, &child, selected, application_id, next); }
     });
+    if response.header_response.clicked() { *next = Some(path.to_path_buf()); }
 }
 
 impl FrameworkHost {
@@ -799,7 +799,7 @@ impl FrameworkHost {
                 ui.separator();
                 let application_id = self.config.id.clone();
                 ui.columns(2, |columns| {
-                    egui::ScrollArea::vertical().max_height(280.0).show(&mut columns[0], |ui| {
+                    egui::ScrollArea::vertical().id_salt("project_browser_tree").max_height(280.0).show(&mut columns[0], |ui| {
                         ui.strong(localization::text("project.folder.computer"));
                         for root in project_browser_roots() {
                             show_project_folder_tree(ui, &root, &directory, &application_id, &mut navigate_to);
@@ -809,7 +809,7 @@ impl FrameworkHost {
                         .filter_map(|entry| entry.file_type().ok().filter(|kind| kind.is_dir()).map(|_| entry.path()))
                         .collect::<Vec<_>>();
                     entries.sort_by_key(|path| path.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default());
-                    egui::ScrollArea::vertical().max_height(280.0).show(&mut columns[1], |ui| {
+                    egui::ScrollArea::vertical().id_salt("project_browser_contents").max_height(280.0).show(&mut columns[1], |ui| {
                         for path in entries {
                             let kind = project_folder_kind(&path, &application_id);
                             let name = path.file_name().map(|name| name.to_string_lossy()).unwrap_or_default();
