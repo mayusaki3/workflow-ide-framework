@@ -2,6 +2,7 @@ locale = "ja-JP"
 name = "日本語"
 
 [strings]
+"framework.product_name" = "ワークフローIDEフレームワーク"
 "logging.title" = "ログ設定"
 "logging.framework_panel" = "Framework 標準パネル"
 "logging.runtime_level" = "実行時ログレベル"
