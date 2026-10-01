@@ -107,7 +107,7 @@ impl ProjectController {
         let Some(project_file) = self.project_file.as_mut() else {
             return ProjectCommandResult::Failed("project metadata is unavailable".into());
         };
-        match save_project(session, &context, project_file, &self.framework_settings, application, save_id, saved_at) {
+        match save_project(session, &context, project_file, {
             Ok(()) => ProjectCommandResult::Completed,
             Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
         }
@@ -116,6 +116,7 @@ impl ProjectController {
     pub fn save_as(
         &mut self,
         destination: ProjectContext,
+        project_name: impl Into<String>,
         application: &mut dyn ErasedApplicationProjectAdapter,
         save_id: &str,
         saved_at: &str,
@@ -126,7 +127,10 @@ impl ProjectController {
         let Some(project_file) = self.project_file.as_mut() else {
             return ProjectCommandResult::Failed("project metadata is unavailable".into());
         };
-        match save_project_as(session, destination, project_file, &self.framework_settings, application, save_id, saved_at) {
+        let previous_name = std::mem::replace(&mut project_file.project.name, project_name.into());
+        let result = save_project_as(session, destination, project_file, &self.framework_settings, application, save_id, saved_at);
+        if result.is_err() { project_file.project.name = previous_name; }
+        match result { &self.framework_settings, application, save_id, saved_at) {
             Ok(()) => ProjectCommandResult::Completed,
             Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
         }
