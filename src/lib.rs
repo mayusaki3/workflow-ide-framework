@@ -572,6 +572,31 @@ fn project_folder_kind(path: &std::path::Path, application_id: &str) -> ProjectF
     }
 }
 
+fn project_browser_visible_directory(path: &std::path::Path) -> bool {
+    let Some(name) = path.file_name().and_then(|value| value.to_str()) else { return true; };
+    if name.starts_with('.') { return false; }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+        const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
+        if let Ok(metadata) = std::fs::metadata(path) {
+            let attributes = metadata.file_attributes();
+            if attributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM) != 0 { return false; }
+        }
+    }
+    true
+}
+
+fn project_browser_directories(path: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut children = std::fs::read_dir(path).ok().into_iter().flatten().flatten()
+        .filter_map(|entry| entry.file_type().ok().filter(|kind| kind.is_dir()).map(|_| entry.path()))
+        .filter(|path| project_browser_visible_directory(path))
+        .collect::<Vec<_>>();
+    children.sort_by_key(|child| child.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default());
+    children
+}
+
 fn project_browser_roots() -> Vec<std::path::PathBuf> {
     #[cfg(windows)]
     {
@@ -596,12 +621,9 @@ fn show_project_folder_tree(ui: &mut egui::Ui, path: &std::path::Path, selected:
         if ui.selectable_label(path == selected, format!("{name}{suffix}")).clicked() && kind == ProjectFolderKind::Project { *next = Some(path.to_path_buf()); }
         return;
     }
-    let response = egui::CollapsingHeader::new(format!("{name}{suffix}")).id_salt(path).show(ui, |ui| {
-        let mut children = std::fs::read_dir(path).ok().into_iter().flatten().flatten()
-            .filter_map(|entry| entry.file_type().ok().filter(|kind| kind.is_dir()).map(|_| entry.path()))
-            .collect::<Vec<_>>();
-        children.sort_by_key(|child| child.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default());
-        for child in children { show_project_folder_tree(ui, &child, selected, application_id, next); }
+    let should_open = selected.starts_with(path);
+    let response = egui::CollapsingHeader::new(format!("{name}{suffix}")).id_salt(path).default_open(should_open).show(ui, |ui| {
+        for child in project_browser_directories(path) { show_project_folder_tree(ui, &child, selected, application_id, next); }
     });
     if response.header_response.clicked() { *next = Some(path.to_path_buf()); }
 }
@@ -805,10 +827,7 @@ impl FrameworkHost {
                             show_project_folder_tree(ui, &root, &directory, &application_id, &mut navigate_to);
                         }
                     });
-                    let mut entries = std::fs::read_dir(&directory).ok().into_iter().flatten().flatten()
-                        .filter_map(|entry| entry.file_type().ok().filter(|kind| kind.is_dir()).map(|_| entry.path()))
-                        .collect::<Vec<_>>();
-                    entries.sort_by_key(|path| path.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default());
+                    let entries = project_browser_directories(&directory);
                     egui::ScrollArea::vertical().id_salt("project_browser_contents").max_height(280.0).show(&mut columns[1], |ui| {
                         for path in entries {
                             let kind = project_folder_kind(&path, &application_id);
