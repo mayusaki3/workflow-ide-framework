@@ -33,28 +33,27 @@ pub mod theme;
 pub use layout::{LayoutConfig, LayoutSplit, SplitDirection};
 pub use tracing;
 
-pub const FRAMEWORK_NAME_EN: &str = "Workflow IDE Framework";
-pub const FRAMEWORK_NAME_JA: &str = "ワークフローIDEフレームワーク";
 pub const FRAMEWORK_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct FrameworkInfo {
-    pub name_en: &'static str,
-    pub name_ja: &'static str,
+    /// Localized Framework product name for the current UI language.
+    pub name: String,
     pub version: &'static str,
 }
 
 impl FrameworkInfo {
-    pub const fn current() -> Self {
+    pub fn current() -> Self {
         Self {
-            name_en: FRAMEWORK_NAME_EN,
-            name_ja: FRAMEWORK_NAME_JA,
+            name: localization::text("framework.product_name"),
             version: FRAMEWORK_VERSION,
         }
     }
 }
 
-pub type AboutRenderer = Box<dyn FnMut(&mut egui::Ui, FrameworkInfo)>;
+/// Consumer-owned About UI. The Consumer decides the window, layout, labels,
+/// and close interaction. Set `open` to false when its About UI is closed.
+pub type AboutRenderer = Box<dyn FnMut(&egui::Context, FrameworkInfo, &mut bool)>;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -313,7 +312,7 @@ impl Application {
     /// Let the Consumer/Application render the About contents. Framework metadata is supplied on each render.
     pub fn about_renderer<F>(mut self, renderer: F) -> Self
     where
-        F: FnMut(&mut egui::Ui, FrameworkInfo) + 'static,
+        F: FnMut(&egui::Context, FrameworkInfo, &mut bool) + 'static,
     {
         self.about_renderer = Some(Box::new(renderer));
         self
@@ -733,11 +732,11 @@ impl FrameworkHost {
             });
         }
         if self.project_ui.show_about {
-            egui::Window::new(localization::text("about.title")).collapsible(false).resizable(false).show(ctx, |ui| {
-                if let Some(renderer) = self.about_renderer.as_mut() {
-                    renderer(ui, FrameworkInfo::current());
-                }
-            });
+            if let Some(renderer) = self.about_renderer.as_mut() {
+                renderer(ctx, FrameworkInfo::current(), &mut self.project_ui.show_about);
+            } else {
+                self.project_ui.show_about = false;
+            }
         }
         if let Some(message) = self.project_ui.message.clone() {
             egui::Window::new(localization::text("project.error.title")).collapsible(false).resizable(false).show(ctx, |ui| {
