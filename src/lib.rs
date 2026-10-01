@@ -539,6 +539,7 @@ enum ProjectFolderDialogMode { Open, SaveAs }
 struct ProjectFolderDialogState {
     mode: ProjectFolderDialogMode,
     directory: std::path::PathBuf,
+    project_name: String,
 }
 
 #[derive(Default)]
@@ -671,6 +672,7 @@ impl FrameworkHost {
         self.project_ui.folder_dialog = Some(ProjectFolderDialogState {
             mode: ProjectFolderDialogMode::Open,
             directory: self.initial_project_browser_directory(),
+            project_name: String::new(),
         });
     }
 
@@ -689,14 +691,17 @@ impl FrameworkHost {
     }
 
     fn project_save_as(&mut self) {
+        let project_name = self.project_controller.as_ref().and_then(|controller| controller.project_name()).unwrap_or_default().to_owned();
         self.project_ui.folder_dialog = Some(ProjectFolderDialogState {
             mode: ProjectFolderDialogMode::SaveAs,
             directory: self.initial_project_browser_directory(),
+            project_name,
         });
     }
 
-    fn save_project_as_at(&mut self, parent: std::path::PathBuf) {
-        let Some(project_name) = self.project_controller.as_ref().and_then(|controller| controller.project_name()).map(str::to_owned) else { return; };
+    fn save_project_as_at(&mut self, parent: std::path::PathBuf, project_name: String) {
+        let project_name = project_name.trim().to_owned();
+        if project_name.is_empty() { return; }
         let root = parent.join(&project_name);
         if root.exists() {
             self.project_ui.message = Some(localization::text("project.folder.project_exists"));
@@ -704,7 +709,7 @@ impl FrameworkHost {
         }
         let (save_id, saved_at) = project_save_stamp();
         let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
-        let result = controller.save_as(project::ProjectContext::new(root), adapter, &save_id, &saved_at);
+        let result = controller.save_as(project::ProjectContext::new(root), project_name, adapter, &save_id, &saved_at);
         self.handle_project_result(result, None);
     }
 
