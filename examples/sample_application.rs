@@ -131,6 +131,28 @@ fn main() -> eframe::Result<()> {
                 });
             *open = window_open;
         })
+        .project_properties_renderer(|ctx, mode, project, open, commit| {
+            let mut window_open = *open;
+            eframe::egui::Window::new("Sample Project Properties")
+                .open(&mut window_open)
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.label("Project name");
+                    ui.text_edit_singleline(&mut project.name);
+                    ui.label("Description");
+                    ui.text_edit_multiline(&mut project.description);
+                    ui.separator();
+                    ui.label("Sample Application settings");
+                    ui.weak("Application-specific properties are owned and rendered by the Application.");
+                    ui.horizontal(|ui| {
+                        let label = if mode == workflow_ide_framework::ProjectPropertiesMode::Create { "Create" } else { "OK" };
+                        if ui.add_enabled(!project.name.trim().is_empty(), eframe::egui::Button::new(label)).clicked() { *commit = true; }
+                        if ui.button("Cancel").clicked() { window_open = false; }
+                    });
+                });
+            *open = window_open;
+        })
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
         .localization_resources("examples/resources/locales")
         .log_level(LogLevel::Debug)
