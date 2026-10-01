@@ -560,6 +560,52 @@ fn project_save_stamp() -> (String, String) {
     (format!("save-{}-{}", now.as_nanos(), sequence), format!("unix:{}.{:09}", now.as_secs(), now.subsec_nanos()))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProjectFolderKind { Folder, Project, UnavailableProject }
+
+fn project_folder_kind(path: &std::path::Path, application_id: &str) -> ProjectFolderKind {
+    let file = path.join("project.toml");
+    if !file.is_file() { return ProjectFolderKind::Folder; }
+    match std::fs::read_to_string(file).ok().and_then(|content| project::ProjectFile::from_toml(&content, application_id).ok()) {
+        Some(_) => ProjectFolderKind::Project,
+        None => ProjectFolderKind::UnavailableProject,
+    }
+}
+
+fn project_browser_roots() -> Vec<std::path::PathBuf> {
+    #[cfg(windows)]
+    {
+        (b'A'..=b'Z').filter_map(|letter| {
+            let path = std::path::PathBuf::from(format!("{}:\\\\", letter as char));
+            path.is_dir().then_some(path)
+        }).collect()
+    }
+    #[cfg(not(windows))]
+    { vec![std::path::PathBuf::from("/")] }
+}
+
+fn show_project_folder_tree(ui: &mut egui::Ui, path: &std::path::Path, selected: &std::path::Path, application_id: &str, next: &mut Option<std::path::PathBuf>) {
+    let kind = project_folder_kind(path, application_id);
+    let name = path.file_name().map(|value| value.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string());
+    let suffix = match kind {
+        ProjectFolderKind::Folder => String::new(),
+        ProjectFolderKind::Project => format!(" [{}]", localization::text("project.folder.project")),
+        ProjectFolderKind::UnavailableProject => format!(" [{}]", localization::text("project.folder.unavailable_project")),
+    };
+    if kind != ProjectFolderKind::Folder {
+        if ui.selectable_label(path == selected, format!("{name}{suffix}")).clicked() && kind == ProjectFolderKind::Project { *next = Some(path.to_path_buf()); }
+        return;
+    }
+    egui::CollapsingHeader::new(format!("{name}{suffix}")).id_salt(path).show(ui, |ui| {
+        if ui.selectable_label(path == selected, localization::text("project.folder.location")).clicked() { *next = Some(path.to_path_buf()); }
+        let mut children = std::fs::read_dir(path).ok().into_iter().flatten().flatten()
+            .filter_map(|entry| entry.file_type().ok().filter(|kind| kind.is_dir()).map(|_| entry.path()))
+            .collect::<Vec<_>>();
+        children.sort_by_key(|child| child.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default());
+        for child in children { show_project_folder_tree(ui, &child, selected, application_id, next); }
+    });
+}
+
 impl FrameworkHost {
     fn handle_project_result(&mut self, result: project_controller::ProjectCommandResult, open_context: Option<project::ProjectContext>) {
         use project_controller::ProjectCommandResult;
