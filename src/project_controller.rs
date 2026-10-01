@@ -107,7 +107,7 @@ impl ProjectController {
         let Some(project_file) = self.project_file.as_mut() else {
             return ProjectCommandResult::Failed("project metadata is unavailable".into());
         };
-        match save_project(session, &context, project_file, {
+        match save_project(session, &context, project_file, &self.framework_settings, application, save_id, saved_at) {
             Ok(()) => ProjectCommandResult::Completed,
             Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
         }
