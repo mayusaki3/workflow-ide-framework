@@ -30,6 +30,11 @@ windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
 name = "sample_application"
 path = "examples/sample_application.rs"
 
+# Minimal Consumer using Framework fallback About and Project Properties UI.
+[[example]]
+name = "sample_minimum_application"
+path = "examples/sample_minimum_application.rs"
+
 # Development / regression examples. These are retained for v0.1.0
 # verification history and are not the primary Consumer-facing samples.
 [[example]]
