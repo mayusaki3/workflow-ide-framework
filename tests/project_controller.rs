@@ -56,7 +56,7 @@ fn new_project_keeps_name_description_and_language_metadata() {
 #[test]
 fn project_properties_update_framework_metadata_and_mark_dirty() {
     let mut controller = ProjectController::new("app.test", "Test App");
-    let mut adapter = TestAdapter::default();
+    let mut adapter = App;
     assert_eq!(
         controller.new_project("Before", "en-US", None, NewProjectStoragePolicy::Deferred, None, &mut adapter),
         ProjectCommandResult::Completed
