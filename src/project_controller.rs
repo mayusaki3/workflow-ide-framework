@@ -41,6 +41,7 @@ impl ProjectController {
         &mut self,
         name: impl Into<String>,
         language: impl Into<String>,
+        description: Option<String>,
         policy: NewProjectStoragePolicy,
         root: Option<ProjectContext>,
         application: &mut dyn ErasedApplicationProjectAdapter,
@@ -56,7 +57,7 @@ impl ProjectController {
                 return ProjectCommandResult::Failed(error);
             }
         }
-        self.project_file = Some(self.project_template(name, language));
+        self.project_file = Some(self.project_template(name, language, description));
         self.framework_settings = FrameworkSettings::default();
         self.session = Some(session);
         ProjectCommandResult::Completed
@@ -147,12 +148,12 @@ impl ProjectController {
         self.project_file.as_ref().map(|file| file.project.name.as_str())
     }
 
-    fn project_template(&self, name: String, language: String) -> ProjectFile {
+    fn project_template(&self, name: String, language: String, description: Option<String>) -> ProjectFile {
         ProjectFile {
             project: ProjectMetadata {
                 format_version: PROJECT_FORMAT_VERSION,
                 name,
-                description: None,
+                description,
                 language: language.clone(),
                 save_id: String::new(),
                 saved_at: String::new(),
