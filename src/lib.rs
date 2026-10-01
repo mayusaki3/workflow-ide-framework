@@ -1047,6 +1047,7 @@ impl FrameworkHost {
                 if let Some(renderer) = self.project_properties_renderer.as_mut() {
                     renderer(ctx, state.mode, &mut state.data, &mut open, &mut commit);
                 } else {
+                    let mut cancel_properties = false;
                     egui::Window::new(localization::text("project.properties.title")).open(&mut open).collapsible(false).resizable(false).show(ctx, |ui| {
                         ui.label(localization::text("project.new_dialog.name"));
                         ui.text_edit_singleline(&mut state.data.name);
@@ -1056,9 +1057,10 @@ impl FrameworkHost {
                         ui.horizontal(|ui| {
                             let action = if state.mode == ProjectPropertiesMode::Create { "project.new_dialog.create" } else { "common.ok" };
                             if ui.add_enabled(!state.data.name.trim().is_empty(), egui::Button::new(localization::text(action))).clicked() { commit = true; }
-                            if ui.button(localization::text("common.cancel")).clicked() { open = false; }
+                            if ui.button(localization::text("common.cancel")).clicked() { cancel_properties = true; }
                         });
                     });
+                    if cancel_properties { open = false; }
                 }
             }
             if commit {
