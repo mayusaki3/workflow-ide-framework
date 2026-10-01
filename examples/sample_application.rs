@@ -133,6 +133,7 @@ fn main() -> eframe::Result<()> {
         })
         .project_properties_renderer(|ctx, mode, project, open, commit| {
             let mut window_open = *open;
+            let mut cancel_properties = false;
             eframe::egui::Window::new("Sample Project Properties")
                 .open(&mut window_open)
                 .collapsible(false)
@@ -148,9 +149,10 @@ fn main() -> eframe::Result<()> {
                     ui.horizontal(|ui| {
                         let label = if mode == workflow_ide_framework::ProjectPropertiesMode::Create { "Create" } else { "OK" };
                         if ui.add_enabled(!project.name.trim().is_empty(), eframe::egui::Button::new(label)).clicked() { *commit = true; }
-                        if ui.button("Cancel").clicked() { window_open = false; }
+                        if ui.button("Cancel").clicked() { cancel_properties = true; }
                     });
                 });
+            if cancel_properties { window_open = false; }
             *open = window_open;
         })
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
