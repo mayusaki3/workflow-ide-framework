@@ -56,6 +56,20 @@ impl FrameworkInfo {
 /// and close interaction. Set `open` to false when its About UI is closed.
 pub type AboutRenderer = Box<dyn FnMut(&egui::Context, FrameworkInfo, &mut bool)>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectPropertiesMode { Create, Edit }
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProjectPropertiesData {
+    pub name: String,
+    pub description: String,
+}
+
+/// Consumer-owned Project Properties UI. When supplied, the Consumer owns the
+/// entire screen, including Framework fields such as project name/description.
+/// Set commit to true to accept the edited data. Set open to false to cancel.
+pub type ProjectPropertiesRenderer = Box<dyn FnMut(&egui::Context, ProjectPropertiesMode, &mut ProjectPropertiesData, &mut bool, &mut bool)>;
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelKind {
@@ -187,6 +201,7 @@ pub struct Application {
     controller_property_links: Vec<ControllerPropertyLink>,
     project_adapter: Option<Box<dyn project_adapter_erased::ErasedApplicationProjectAdapter>>,
     about_renderer: Option<AboutRenderer>,
+    project_properties_renderer: Option<ProjectPropertiesRenderer>,
 }
 
 impl Application {
@@ -208,6 +223,7 @@ impl Application {
             controller_property_links: Vec::new(),
             project_adapter: None,
             about_renderer: None,
+            project_properties_renderer: None,
         }
     }
 
@@ -319,6 +335,16 @@ impl Application {
         self
     }
 
+    /// Let the Consumer/Application own the complete Project Properties UI.
+    /// If omitted, Framework renders its standard name/description screen.
+    pub fn project_properties_renderer<F>(mut self, renderer: F) -> Self
+    where
+        F: FnMut(&egui::Context, ProjectPropertiesMode, &mut ProjectPropertiesData, &mut bool, &mut bool) + 'static,
+    {
+        self.project_properties_renderer = Some(Box::new(renderer));
+        self
+    }
+
     pub fn panel(mut self, panel: PanelDefinition) -> Self {
         self.config.panels.push(panel);
         self
@@ -381,6 +407,7 @@ impl Application {
         let controller_property_links = self.controller_property_links;
         let project_adapter = self.project_adapter;
         let about_renderer = self.about_renderer;
+        let project_properties_renderer = self.project_properties_renderer;
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
             config.panels.push(
                 PanelDefinition::new(probe::PANEL_ID, "WFIDE Probe", PanelKind::StandardUi)
@@ -480,6 +507,7 @@ impl Application {
                     project_controller,
                     project_adapter,
                     about_renderer,
+                    project_properties_renderer,
                     project_ui: ProjectUiState::default(),
                     theme_editor: None,
                     fonts_initialized: false,
@@ -524,6 +552,7 @@ struct FrameworkHost {
     project_adapter: Option<Box<dyn project_adapter_erased::ErasedApplicationProjectAdapter>>,
     project_controller: Option<project_controller::ProjectController>,
     about_renderer: Option<AboutRenderer>,
+    project_properties_renderer: Option<ProjectPropertiesRenderer>,
     project_ui: ProjectUiState,
     theme_editor: Option<theme::ThemeEditor>,
     fonts_initialized: bool,
@@ -533,6 +562,11 @@ struct FrameworkHost {
 struct NewProjectDialogState {
     name: String,
     description: String,
+}
+
+struct ProjectPropertiesDialogState {
+    mode: ProjectPropertiesMode,
+    data: ProjectPropertiesData,
 }
 
 enum ProjectFolderDialogMode { Open, SaveAs }
@@ -552,6 +586,7 @@ struct ProjectUiState {
     confirm_close: bool,
     exit_after_close: bool,
     show_about: bool,
+    project_properties: Option<ProjectPropertiesDialogState>,
 }
 
 fn project_save_stamp() -> (String, String) {
@@ -714,6 +749,42 @@ impl FrameworkHost {
         self.handle_project_result(result, None);
     }
 
+    fn project_properties_open(&mut self) {
+        let Some(controller) = self.project_controller.as_ref() else { return; };
+        let Some(name) = controller.project_name() else { return; };
+        self.project_ui.project_properties = Some(ProjectPropertiesDialogState {
+            mode: ProjectPropertiesMode::Edit,
+            data: ProjectPropertiesData {
+                name: name.to_owned(),
+                description: controller.project_description().unwrap_or_default().to_owned(),
+            },
+        });
+    }
+
+    fn project_properties_create_details(&mut self) {
+        let Some(new_project) = self.project_ui.new_project.as_ref() else { return; };
+        self.project_ui.project_properties = Some(ProjectPropertiesDialogState {
+            mode: ProjectPropertiesMode::Create,
+            data: ProjectPropertiesData { name: new_project.name.clone(), description: new_project.description.clone() },
+        });
+    }
+
+    fn apply_project_properties(&mut self, mode: ProjectPropertiesMode, data: ProjectPropertiesData) {
+        match mode {
+            ProjectPropertiesMode::Create => {
+                self.project_ui.new_project = None;
+                self.create_new_project(data.name, data.description);
+            }
+            ProjectPropertiesMode::Edit => {
+                if let Some(controller) = self.project_controller.as_mut() {
+                    let description = (!data.description.trim().is_empty()).then_some(data.description);
+                    let result = controller.update_project_metadata(data.name, description);
+                    self.handle_project_result(result, None);
+                }
+            }
+        }
+    }
+
     fn project_close(&mut self, confirmed: bool) {
         let Some(controller) = self.project_controller.as_mut() else { return; };
         let result = controller.close(confirmed);
@@ -786,6 +857,8 @@ impl FrameworkHost {
                     ui.separator();
                     if Self::project_menu_item(ui, localization::text("file.save"), "Ctrl+S", is_open) { ui.close(); self.project_save(); }
                     if Self::project_menu_item(ui, localization::text("file.save_as"), "Ctrl+Shift+S", is_open) { ui.close(); self.project_save_as(); }
+                    ui.separator();
+                    if Self::project_menu_item(ui, localization::text("file.project_properties"), "", is_open) { ui.close(); self.project_properties_open(); }
                     ui.separator();
                     if Self::project_menu_item(ui, localization::text("file.close_project"), "", is_open) { ui.close(); self.project_close(false); }
                     ui.separator();
@@ -890,8 +963,9 @@ impl FrameworkHost {
                 self.project_ui.folder_dialog = None;
             }
         }
-        if self.project_ui.new_project.is_some() {
+        if self.project_ui.new_project.is_some() && self.project_ui.project_properties.is_none() {
             let mut create = false;
+            let mut details = false;
             let mut cancel = false;
             egui::Window::new(localization::text("project.new_dialog.title"))
                 .collapsible(false)
@@ -900,20 +974,17 @@ impl FrameworkHost {
                     let state = self.project_ui.new_project.as_mut().expect("new project dialog state");
                     ui.label(localization::text("project.new_dialog.name"));
                     ui.text_edit_singleline(&mut state.name);
-                    ui.label(localization::text("project.new_dialog.description"));
-                    ui.text_edit_multiline(&mut state.description);
-                     if state.name.trim().is_empty() {
-                        ui.weak(localization::text("project.new_dialog.name_required"));
-                    }
+                    if state.name.trim().is_empty() { ui.weak(localization::text("project.new_dialog.name_required")); }
                     ui.horizontal(|ui| {
                         create = ui.add_enabled(!state.name.trim().is_empty(), egui::Button::new(localization::text("project.new_dialog.create"))).clicked();
+                        details = ui.add_enabled(!state.name.trim().is_empty(), egui::Button::new(localization::text("project.new_dialog.details"))).clicked();
                         cancel = ui.button(localization::text("common.cancel")).clicked();
                     });
                 });
             if create {
-                if let Some(state) = self.project_ui.new_project.take() {
-                    self.create_new_project(state.name, state.description);
-                }
+                if let Some(state) = self.project_ui.new_project.take() { self.create_new_project(state.name, String::new()); }
+            } else if details {
+                self.project_properties_create_details();
             } else if cancel {
                 self.project_ui.new_project = None;
             }
@@ -957,6 +1028,34 @@ impl FrameworkHost {
                 renderer(ctx, FrameworkInfo::current(), &mut self.project_ui.show_about);
             } else {
                 self.project_ui.show_about = false;
+            }
+        }
+        if self.project_ui.project_properties.is_some() {
+            let mut open = true;
+            let mut commit = false;
+            {
+                let state = self.project_ui.project_properties.as_mut().expect("project properties state");
+                if let Some(renderer) = self.project_properties_renderer.as_mut() {
+                    renderer(ctx, state.mode, &mut state.data, &mut open, &mut commit);
+                } else {
+                    egui::Window::new(localization::text("project.properties.title")).open(&mut open).collapsible(false).resizable(false).show(ctx, |ui| {
+                        ui.label(localization::text("project.new_dialog.name"));
+                        ui.text_edit_singleline(&mut state.data.name);
+                        ui.label(localization::text("project.new_dialog.description"));
+                        ui.text_edit_multiline(&mut state.data.description);
+                        if state.data.name.trim().is_empty() { ui.weak(localization::text("project.new_dialog.name_required")); }
+                        ui.horizontal(|ui| {
+                            let action = if state.mode == ProjectPropertiesMode::Create { "project.new_dialog.create" } else { "common.ok" };
+                            if ui.add_enabled(!state.data.name.trim().is_empty(), egui::Button::new(localization::text(action))).clicked() { commit = true; }
+                            if ui.button(localization::text("common.cancel")).clicked() { open = false; }
+                        });
+                    });
+                }
+            }
+            if commit {
+                if let Some(state) = self.project_ui.project_properties.take() { self.apply_project_properties(state.mode, state.data); }
+            } else if !open {
+                self.project_ui.project_properties = None;
             }
         }
         if let Some(message) = self.project_ui.message.clone() {
