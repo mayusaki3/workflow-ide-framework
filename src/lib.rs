@@ -713,6 +713,44 @@ impl FrameworkHost {
     }
 
     fn project_dialogs(&mut self, ctx: &egui::Context) {
+        if self.project_ui.new_project.is_some() {
+            let mut create = false;
+            let mut cancel = false;
+            egui::Window::new(localization::text("project.new_dialog.title"))
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    let state = self.project_ui.new_project.as_mut().expect("new project dialog state");
+                    ui.label(localization::text("project.new_dialog.name"));
+                    ui.text_edit_singleline(&mut state.name);
+                    ui.label(localization::text("project.new_dialog.description"));
+                    ui.text_edit_multiline(&mut state.description);
+                    ui.label(localization::text("project.new_dialog.language"));
+                    let locales = localization::locales();
+                    let selected_name = locales.iter().find(|(code, _)| code == &state.language).map(|(_, name)| name.as_str()).unwrap_or(&state.language);
+                    egui::ComboBox::from_id_salt("new_project_language")
+                        .selected_text(selected_name)
+                        .show_ui(ui, |ui| {
+                            for (code, name) in locales {
+                                ui.selectable_value(&mut state.language, code, name);
+                            }
+                        });
+                    if state.name.trim().is_empty() {
+                        ui.weak(localization::text("project.new_dialog.name_required"));
+                    }
+                    ui.horizontal(|ui| {
+                        create = ui.add_enabled(!state.name.trim().is_empty(), egui::Button::new(localization::text("project.new_dialog.create"))).clicked();
+                        cancel = ui.button(localization::text("common.cancel")).clicked();
+                    });
+                });
+            if create {
+                if let Some(state) = self.project_ui.new_project.take() {
+                    self.create_new_project(state.name, state.description, state.language);
+                }
+            } else if cancel {
+                self.project_ui.new_project = None;
+            }
+        }
         if self.project_ui.confirm_close {
             egui::Window::new(localization::text("project.unsaved.title")).collapsible(false).resizable(false).show(ctx, |ui| {
                 ui.label(localization::text("project.unsaved.message"));
