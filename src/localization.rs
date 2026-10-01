@@ -163,3 +163,26 @@ pub fn text(key: &str) -> String {
     }
     key.to_owned()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::select_initial_locale;
+
+    #[test]
+    fn os_locale_selects_matching_supported_locale() {
+        let available = ["en-US", "ja-JP"];
+        assert_eq!(select_initial_locale(available.into_iter(), Some("ja_JP"), "en-US"), "ja-JP");
+    }
+
+    #[test]
+    fn os_language_can_match_supported_region_variant() {
+        let available = ["en-US", "ja-JP"];
+        assert_eq!(select_initial_locale(available.into_iter(), Some("ja"), "en-US"), "ja-JP");
+    }
+
+    #[test]
+    fn unsupported_os_locale_uses_configured_fallback() {
+        let available = ["en-US", "ja-JP"];
+        assert_eq!(select_initial_locale(available.into_iter(), Some("fr-FR"), "ja-JP"), "ja-JP");
+    }
+}
