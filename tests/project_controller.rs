@@ -52,3 +52,22 @@ fn new_project_keeps_name_description_and_language_metadata() {
     assert_eq!(file.project.description.as_deref(), Some("説明"));
     assert_eq!(file.project.language, "ja-JP");
 }
+
+#[test]
+fn project_properties_update_framework_metadata_and_mark_dirty() {
+    let mut controller = ProjectController::new("app.test", "Test App");
+    let mut adapter = TestAdapter::default();
+    assert_eq!(
+        controller.new_project("Before", "en-US", None, NewProjectStoragePolicy::Deferred, None, &mut adapter),
+        ProjectCommandResult::Completed
+    );
+    controller.session.as_mut().unwrap().dirty = Default::default();
+
+    assert_eq!(
+        controller.update_project_metadata("After", Some(" Project description ".into())),
+        ProjectCommandResult::Completed
+    );
+    assert_eq!(controller.project_name(), Some("After"));
+    assert_eq!(controller.project_description(), Some("Project description"));
+    assert!(controller.session.as_ref().unwrap().dirty.metadata);
+}
