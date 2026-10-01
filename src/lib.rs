@@ -627,6 +627,10 @@ impl FrameworkHost {
 
     fn project_shortcuts(&mut self, ui: &egui::Ui) {
         let modifiers = ui.input(|input| input.modifiers);
+        if modifiers.alt && ui.input(|input| input.key_pressed(egui::Key::F4)) {
+            self.request_exit(ui.ctx());
+            return;
+        }
         let ctrl = modifiers.command;
         if !ctrl { return; }
         let is_open = self.project_controller.as_ref().is_some_and(|c| c.is_open());
@@ -671,7 +675,7 @@ impl FrameworkHost {
                     ui.separator();
                     if Self::project_menu_item(ui, localization::text("file.close_project"), "", is_open) { ui.close(); self.project_close(false); }
                     ui.separator();
-                    if Self::project_menu_item(ui, localization::text("file.exit"), "", true) { ui.close(); self.request_exit(ui.ctx()); }
+                    if Self::project_menu_item(ui, localization::text("file.exit"), "Alt+F4", true) { ui.close(); self.request_exit(ui.ctx()); }
                 });
 
                 let help_access_key = ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::H));
