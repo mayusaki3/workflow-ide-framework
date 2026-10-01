@@ -529,8 +529,15 @@ struct FrameworkHost {
 }
 
 #[derive(Default)]
+struct NewProjectDialogState {
+    name: String,
+    description: String,
+    language: String,
+}
+
 struct ProjectUiState {
     message: Option<String>,
+    new_project: Option<NewProjectDialogState>,
     pending_open: Option<(project::ProjectContext, project_open::ProjectOpenResult)>,
     confirm_close: bool,
     exit_after_close: bool,
@@ -560,8 +567,17 @@ impl FrameworkHost {
     }
 
     fn project_new(&mut self) {
+        self.project_ui.new_project = Some(NewProjectDialogState {
+            name: String::new(),
+            description: String::new(),
+            language: localization::current_locale(),
+        });
+    }
+
+    fn create_new_project(&mut self, name: String, description: String, language: String) {
+        let description = (!description.trim().is_empty()).then(|| description.trim().to_owned());
         let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
-        let result = controller.new_project("Untitled", localization::current_locale(), project_resource::NewProjectStoragePolicy::Deferred, None, adapter);
+        let result = controller.new_project(name.trim(), language, description, project_resource::NewProjectStoragePolicy::Deferred, None, adapter);
         self.handle_project_result(result, None);
     }
 
