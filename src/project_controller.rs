@@ -130,7 +130,7 @@ impl ProjectController {
         let previous_name = std::mem::replace(&mut project_file.project.name, project_name.into());
         let result = save_project_as(session, destination, project_file, &self.framework_settings, application, save_id, saved_at);
         if result.is_err() { project_file.project.name = previous_name; }
-        match result { &self.framework_settings, application, save_id, saved_at) {
+        match result {
             Ok(()) => ProjectCommandResult::Completed,
             Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
         }
