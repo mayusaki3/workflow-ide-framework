@@ -535,6 +535,7 @@ struct NewProjectDialogState {
     language: String,
 }
 
+#[derive(Default)]
 struct ProjectUiState {
     message: Option<String>,
     new_project: Option<NewProjectDialogState>,
