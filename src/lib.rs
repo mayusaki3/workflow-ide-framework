@@ -809,6 +809,7 @@ impl FrameworkHost {
             let mut navigate_to = None;
             let mut open_project = None;
             let mut save_parent = None;
+            let mut save_name = None;
             let mut cancel = false;
             let state = self.project_ui.folder_dialog.as_ref().expect("project folder dialog");
             let is_save = matches!(state.mode, ProjectFolderDialogMode::SaveAs);
@@ -855,12 +856,20 @@ impl FrameworkHost {
                     });
                 });
                 ui.separator();
+                if is_save {
+                    ui.horizontal(|ui| {
+                        ui.label(localization::text("project.new_dialog.name"));
+                        if let Some(state) = self.project_ui.folder_dialog.as_mut() { ui.text_edit_singleline(&mut state.project_name); }
+                    });
+                }
                 ui.horizontal(|ui| {
                     if is_save {
+                        let project_name = self.project_ui.folder_dialog.as_ref().map(|state| state.project_name.trim()).unwrap_or_default();
                         let inside_project = directory.ancestors().any(|ancestor| ancestor.join("project.toml").is_file());
-                        let target_exists = self.project_controller.as_ref().and_then(|controller| controller.project_name()).is_some_and(|name| directory.join(name).exists());
-                        if ui.add_enabled(!inside_project && !target_exists, egui::Button::new(localization::text("project.folder.save_here"))).clicked() {
+                        let target_exists = !project_name.is_empty() && directory.join(project_name).exists();
+                        if ui.add_enabled(!inside_project && !target_exists && !project_name.is_empty(), egui::Button::new(localization::text("project.folder.save_here"))).clicked() {
                             save_parent = Some(directory.clone());
+                            save_name = Some(project_name.to_owned());
                         }
                         if target_exists { ui.weak(localization::text("project.folder.project_exists")); }
                     }
@@ -873,9 +882,9 @@ impl FrameworkHost {
             if let Some(path) = open_project {
                 self.project_ui.folder_dialog = None;
                 self.open_project_at(path);
-            } else if let Some(parent) = save_parent {
+            } else if let (Some(parent), Some(project_name)) = (save_parent, save_name) {
                 self.project_ui.folder_dialog = None;
-                self.save_project_as_at(parent);
+                self.save_project_as_at(parent, project_name);
             } else if cancel {
                 self.project_ui.folder_dialog = None;
             }
