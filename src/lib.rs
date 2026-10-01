@@ -534,10 +534,18 @@ struct NewProjectDialogState {
     description: String,
 }
 
+enum ProjectFolderDialogMode { Open, SaveAs }
+
+struct ProjectFolderDialogState {
+    mode: ProjectFolderDialogMode,
+    directory: std::path::PathBuf,
+}
+
 #[derive(Default)]
 struct ProjectUiState {
     message: Option<String>,
     new_project: Option<NewProjectDialogState>,
+    folder_dialog: Option<ProjectFolderDialogState>,
     pending_open: Option<(project::ProjectContext, project_open::ProjectOpenResult)>,
     confirm_close: bool,
     exit_after_close: bool,
@@ -581,19 +589,24 @@ impl FrameworkHost {
         self.handle_project_result(result, None);
     }
 
-    fn project_folder_dialog(&self) -> rfd::FileDialog {
-        let parent = self.project_controller.as_ref()
+    fn initial_project_browser_directory(&self) -> std::path::PathBuf {
+        self.project_controller.as_ref()
             .and_then(|controller| controller.session.as_ref())
             .and_then(|session| session.context())
-            .and_then(|context| context.root().parent());
-        match parent {
-            Some(parent) => rfd::FileDialog::new().set_directory(parent),
-            None => rfd::FileDialog::new(),
-        }
+            .and_then(|context| context.root().parent())
+            .map(std::path::Path::to_path_buf)
+            .or_else(|| std::env::current_dir().ok())
+            .unwrap_or_default()
     }
 
     fn project_open(&mut self) {
-        let Some(root) = self.project_folder_dialog().pick_folder() else { return; };
+        self.project_ui.folder_dialog = Some(ProjectFolderDialogState {
+            mode: ProjectFolderDialogMode::Open,
+            directory: self.initial_project_browser_directory(),
+        });
+    }
+
+    fn open_project_at(&mut self, root: std::path::PathBuf) {
         let context = project::ProjectContext::new(root);
         let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
         let result = controller.open(context.clone(), adapter);
@@ -608,11 +621,17 @@ impl FrameworkHost {
     }
 
     fn project_save_as(&mut self) {
-        let Some(parent) = self.project_folder_dialog().pick_folder() else { return; };
+        self.project_ui.folder_dialog = Some(ProjectFolderDialogState {
+            mode: ProjectFolderDialogMode::SaveAs,
+            directory: self.initial_project_browser_directory(),
+        });
+    }
+
+    fn save_project_as_at(&mut self, parent: std::path::PathBuf) {
         let Some(project_name) = self.project_controller.as_ref().and_then(|controller| controller.project_name()).map(str::to_owned) else { return; };
         let root = parent.join(&project_name);
         if root.exists() {
-            self.project_ui.message = Some(format!("Project folder already exists: {}", root.display()));
+            self.project_ui.message = Some(localization::text("project.folder.project_exists"));
             return;
         }
         let (save_id, saved_at) = project_save_stamp();
