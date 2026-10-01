@@ -849,6 +849,18 @@ impl FrameworkHost {
     }
 
     fn application_menu(&mut self, ui: &mut egui::Ui) {
+        if self.modal_dialog_open() {
+            let frame = egui::Frame::new().fill(ui.visuals().faint_bg_color).inner_margin(egui::Margin::symmetric(6, 3));
+            frame.show(ui, |ui| {
+                ui.add_enabled_ui(false, |ui| {
+                    egui::MenuBar::new().ui(ui, |ui| {
+                        ui.button(localization::text("file.menu"));
+                        ui.button(localization::text("help.menu"));
+                    });
+                });
+            });
+            return;
+        }
         self.project_shortcuts(ui);
         let frame = egui::Frame::new()
             .fill(ui.visuals().faint_bg_color)
