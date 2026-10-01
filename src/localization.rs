@@ -45,18 +45,31 @@ pub fn init(config: &LocalizationConfig) {
     for directory in &config.application_resource_directories {
         merge_resources(&mut resources, load_resources(directory));
     }
-    let current = if resources.contains_key(&config.default_locale) {
-        config.default_locale.clone()
-    } else if resources.contains_key(EN_US) {
-        EN_US.to_owned()
-    } else {
-        resources.keys().next().cloned().unwrap_or_else(|| EN_US.to_owned())
-    };
+    let os_locale = sys_locale::get_locale();
+    let current = select_initial_locale(resources.keys().map(String::as_str), os_locale.as_deref(), &config.default_locale);
     let _ = STATE.set(RwLock::new(LocalizationState {
         current,
         resources,
         application: HashMap::new(),
     }));
+}
+
+fn select_initial_locale<'a>(available: impl Iterator<Item = &'a str>, os_locale: Option<&str>, fallback: &str) -> String {
+    let available = available.map(str::to_owned).collect::<Vec<_>>();
+    if let Some(os) = os_locale {
+        let normalized = os.replace('_', "-");
+        if let Some(found) = available.iter().find(|locale| locale.eq_ignore_ascii_case(&normalized)) {
+            return found.clone();
+        }
+        if let Some(language) = normalized.split('-').next() {
+            if let Some(found) = available.iter().find(|locale| locale.split('-').next().is_some_and(|part| part.eq_ignore_ascii_case(language))) {
+                return found.clone();
+            }
+        }
+    }
+    if let Some(found) = available.iter().find(|locale| locale.as_str() == fallback) { return found.clone(); }
+    if let Some(found) = available.iter().find(|locale| locale.as_str() == EN_US) { return found.clone(); }
+    available.into_iter().next().unwrap_or_else(|| EN_US.to_owned())
 }
 
 fn load_resources(directory: &Path) -> HashMap<String, LocaleResource> {
