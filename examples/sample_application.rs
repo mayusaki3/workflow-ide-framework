@@ -3,6 +3,7 @@ use workflow_ide_framework::{
     controller_panel::{ControllerElement, ControllerElementKind, ControllerModel, ControllerMode, LineShape},
     flow_editor::{FlowEdge, FlowModel, FlowNode, FlowPort, PortDirection},
     logging::LogLevel,
+    localization,
     project::ProjectContext,
     project_adapter::ApplicationProjectAdapter,
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
@@ -108,12 +109,12 @@ fn main() -> eframe::Result<()> {
     Application::new("org.workflow-ide-framework.sample", "Workflow IDE Framework Sample Application")
         .version(env!("CARGO_PKG_VERSION"))
         .about_renderer(|ui, framework| {
-            ui.heading("Workflow IDE Framework Sample Application");
-            ui.label(format!("Application version: {}", env!("CARGO_PKG_VERSION")));
-            ui.label("Consumer-defined About content");
+            ui.heading(localization::text("sample.about.title"));
+            ui.label(format!("{}: {}", localization::text("sample.about.application_version"), env!("CARGO_PKG_VERSION")));
+            ui.label(localization::text("sample.about.description"));
             ui.separator();
-            ui.label(format!("Framework: {}", framework.name));
-            ui.label(format!("Framework version: {}", framework.version));
+            ui.label(format!("{}: {}", localization::text("sample.about.framework"), framework.name));
+            ui.label(format!("{}: {}", localization::text("sample.about.framework_version"), framework.version));
         })
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
         .localization_resources("examples/resources/locales")
