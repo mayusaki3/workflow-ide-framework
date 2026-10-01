@@ -666,6 +666,16 @@ fn show_project_folder_tree(ui: &mut egui::Ui, path: &std::path::Path, selected:
 }
 
 impl FrameworkHost {
+    fn modal_dialog_open(&self) -> bool {
+        self.project_ui.new_project.is_some()
+            || self.project_ui.folder_dialog.is_some()
+            || self.project_ui.pending_open.is_some()
+            || self.project_ui.confirm_close
+            || self.project_ui.show_about
+            || self.project_ui.project_properties.is_some()
+            || self.project_ui.message.is_some()
+    }
+
     fn handle_project_result(&mut self, result: project_controller::ProjectCommandResult, open_context: Option<project::ProjectContext>) {
         use project_controller::ProjectCommandResult;
         match result {
