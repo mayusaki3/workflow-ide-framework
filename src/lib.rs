@@ -575,6 +575,7 @@ struct ProjectFolderDialogState {
     mode: ProjectFolderDialogMode,
     directory: std::path::PathBuf,
     project_name: String,
+    reveal_tree_selection: bool,
 }
 
 #[derive(Default)]
@@ -648,7 +649,7 @@ fn project_browser_roots() -> Vec<std::path::PathBuf> {
     { vec![std::path::PathBuf::from("/")] }
 }
 
-fn show_project_folder_tree(ui: &mut egui::Ui, path: &std::path::Path, selected: &std::path::Path, application_id: &str, next: &mut Option<std::path::PathBuf>) {
+fn show_project_folder_tree(ui: &mut egui::Ui, path: &std::path::Path, selected: &std::path::Path, application_id: &str, next: &mut Option<std::path::PathBuf>, reveal_selection: bool) {
     let kind = project_folder_kind(path, application_id);
     let name = path.file_name().map(|value| value.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string());
     let suffix = match &kind {
@@ -658,13 +659,16 @@ fn show_project_folder_tree(ui: &mut egui::Ui, path: &std::path::Path, selected:
         ProjectFolderKind::UnavailableProject => format!(" [{}]", localization::text("project.folder.unavailable_project")),
     };
     if kind != ProjectFolderKind::Folder {
-        if ui.selectable_label(path == selected, format!("{name}{suffix}")).clicked() && kind == ProjectFolderKind::Project { *next = Some(path.to_path_buf()); }
+        let response = ui.selectable_label(path == selected, format!("{name}{suffix}"));
+        if reveal_selection && path == selected { response.scroll_to_me(Some(egui::Align::Center)); }
+        if response.clicked() && kind == ProjectFolderKind::Project { *next = Some(path.to_path_buf()); }
         return;
     }
     let should_open = selected.starts_with(path);
-    let response = egui::CollapsingHeader::new(format!("{name}{suffix}")).id_salt(path).default_open(should_open).show(ui, |ui| {
-        for child in project_browser_directories(path) { show_project_folder_tree(ui, &child, selected, application_id, next); }
+    let response = egui::CollapsingHeader::new(format!("{name}{suffix}")).id_salt(path).default_open(should_open).open(should_open.then_some(true)).show(ui, |ui| {
+        for child in project_browser_directories(path) { show_project_folder_tree(ui, &child, selected, application_id, next, reveal_selection); }
     });
+    if reveal_selection && path == selected { response.header_response.scroll_to_me(Some(egui::Align::Center)); }
     if response.header_response.clicked() { *next = Some(path.to_path_buf()); }
 }
 
@@ -722,6 +726,7 @@ impl FrameworkHost {
             mode: ProjectFolderDialogMode::Open,
             directory: self.initial_project_browser_directory(),
             project_name: String::new(),
+            reveal_tree_selection: true,
         });
     }
 
@@ -929,7 +934,7 @@ impl FrameworkHost {
                     egui::ScrollArea::vertical().id_salt("project_browser_tree").max_height(280.0).show(&mut columns[0], |ui| {
                         ui.strong(localization::text("project.folder.computer"));
                         for root in project_browser_roots() {
-                            show_project_folder_tree(ui, &root, &directory, &application_id, &mut navigate_to);
+                            show_project_folder_tree(ui, &root, &directory, &application_id, &mut navigate_to, state.reveal_tree_selection);
                         }
                     });
                     let entries = project_browser_directories(&directory);
@@ -977,7 +982,9 @@ impl FrameworkHost {
                 });
             });
             if let Some(path) = navigate_to {
-                if let Some(state) = self.project_ui.folder_dialog.as_mut() { state.directory = path; }
+                if let Some(state) = self.project_ui.folder_dialog.as_mut() { state.directory = path; state.reveal_tree_selection = true; }
+            } else if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                state.reveal_tree_selection = false;
             }
             if let Some(path) = open_project {
                 self.project_ui.folder_dialog = None;
