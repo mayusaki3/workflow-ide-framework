@@ -863,8 +863,8 @@ impl FrameworkHost {
             frame.show(ui, |ui| {
                 ui.add_enabled_ui(false, |ui| {
                     egui::MenuBar::new().ui(ui, |ui| {
-                        ui.button(localization::text("file.menu"));
-                        ui.button(localization::text("help.menu"));
+                        let _ = ui.button(localization::text("file.menu"));
+                        let _ = ui.button(localization::text("help.menu"));
                     });
                 });
             });
