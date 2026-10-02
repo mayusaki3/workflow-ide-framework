@@ -40,7 +40,7 @@ fn main() -> eframe::Result<()> {
         "Workflow IDE Framework Minimum Sample",
     )
     .version(env!("CARGO_PKG_VERSION"))
-    .layout(LayoutConfig::tabs(["__wfide_language_settings"]))
+    .layout(LayoutConfig::new(["__wfide_language_settings"]))
     .language_settings_panel()
     .project_adapter(MinimumProjectAdapter)
     // Intentionally no About or Project Properties renderer:
