@@ -651,7 +651,7 @@ fn project_browser_roots() -> Vec<std::path::PathBuf> {
 fn show_project_folder_tree(ui: &mut egui::Ui, path: &std::path::Path, selected: &std::path::Path, application_id: &str, next: &mut Option<std::path::PathBuf>) {
     let kind = project_folder_kind(path, application_id);
     let name = path.file_name().map(|value| value.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string());
-    let suffix = match kind {
+    let suffix = match &kind {
         ProjectFolderKind::Folder => String::new(),
         ProjectFolderKind::Project => format!(" [{}]", localization::text("project.folder.project")),
         ProjectFolderKind::OtherApplicationProject(application_name) => format!(" [{application_name} {}]", localization::text("project.folder.project")),
@@ -937,9 +937,10 @@ impl FrameworkHost {
                         for path in entries {
                             let kind = project_folder_kind(&path, &application_id);
                             let name = path.file_name().map(|name| name.to_string_lossy()).unwrap_or_default();
-                            let label = match kind {
+                            let label = match &kind {
                                 ProjectFolderKind::Folder => name.into_owned(),
                                 ProjectFolderKind::Project => format!("{name}    [{}]", localization::text("project.folder.project")),
+                                ProjectFolderKind::OtherApplicationProject(application_name) => format!("{name}    [{application_name} {}]", localization::text("project.folder.project")),
                                 ProjectFolderKind::UnavailableProject => format!("{name}    [{}]", localization::text("project.folder.unavailable_project")),
                             };
                             let enabled = !is_save || kind == ProjectFolderKind::Folder;
