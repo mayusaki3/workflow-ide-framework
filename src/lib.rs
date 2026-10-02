@@ -750,6 +750,7 @@ impl FrameworkHost {
             mode: ProjectFolderDialogMode::SaveAs,
             directory: self.initial_project_browser_directory(),
             project_name,
+            reveal_tree_selection: true,
         });
     }
 
@@ -919,6 +920,7 @@ impl FrameworkHost {
             let is_save = matches!(state.mode, ProjectFolderDialogMode::SaveAs);
             let title = localization::text(if is_save { "project.folder.save_title" } else { "project.folder.open_title" });
             let directory = state.directory.clone();
+            let reveal_tree_selection = state.reveal_tree_selection;
             egui::Window::new(title).collapsible(false).resizable(true).default_size([620.0, 420.0]).show(ctx, |ui| {
                 ui.label(localization::text("project.folder.location"));
                 ui.horizontal(|ui| {
@@ -934,7 +936,7 @@ impl FrameworkHost {
                     egui::ScrollArea::vertical().id_salt("project_browser_tree").max_height(280.0).show(&mut columns[0], |ui| {
                         ui.strong(localization::text("project.folder.computer"));
                         for root in project_browser_roots() {
-                            show_project_folder_tree(ui, &root, &directory, &application_id, &mut navigate_to, state.reveal_tree_selection);
+                            show_project_folder_tree(ui, &root, &directory, &application_id, &mut navigate_to, reveal_tree_selection);
                         }
                     });
                     let entries = project_browser_directories(&directory);
