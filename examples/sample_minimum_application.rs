@@ -1,5 +1,5 @@
 use workflow_ide_framework::{
-    Application, LayoutConfig,
+    Application,
     project::ProjectContext,
     project_adapter::ApplicationProjectAdapter,
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
@@ -40,7 +40,6 @@ fn main() -> eframe::Result<()> {
         "Workflow IDE Framework Minimum Sample",
     )
     .version(env!("CARGO_PKG_VERSION"))
-    .layout(LayoutConfig::new(["__wfide_language_settings"]))
     .language_settings_panel()
     .project_adapter(MinimumProjectAdapter)
     // Intentionally no About or Project Properties renderer:
