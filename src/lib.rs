@@ -440,6 +440,18 @@ impl Application {
                 layout.root_panel_ids.push("__wfide_theme_settings".to_owned());
             }
         }
+        // A Consumer that only enables Framework-provided panels should still
+        // get a usable dock. Without this fallback, declared panels were shown
+        // only as diagnostic text because no DockState was constructed.
+        if config.layout.is_none() {
+            let visible = config.panels.iter()
+                .filter(|panel| panel.initially_visible)
+                .map(|panel| panel.id.clone())
+                .collect::<Vec<_>>();
+            if !visible.is_empty() {
+                config.layout = Some(LayoutConfig::new(visible));
+            }
+        }
         localization::init(&config.localization);
         let _logging_guard = logging::init(&config.id, &config.logging)
             .map_err(eframe::Error::AppCreation)?;
