@@ -12,7 +12,6 @@ use workflow_ide_framework::{
     project_save::ApplicationSaveResult,
     property_panel::PropertyModel,
     text_editor::TextDocument,
-    tree_viewer::TreeModel,
 };
 
 #[derive(Default)]
