@@ -40,6 +40,7 @@ fn main() -> eframe::Result<()> {
         "Workflow IDE Framework Minimum Sample",
     )
     .version(env!("CARGO_PKG_VERSION"))
+    .language_settings_panel()
     .project_adapter(MinimumProjectAdapter)
     // Intentionally no About or Project Properties renderer:
     // Framework fallback screens are the behavior under test.
