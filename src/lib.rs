@@ -597,15 +597,17 @@ fn project_save_stamp() -> (String, String) {
     (format!("save-{}-{}", now.as_nanos(), sequence), format!("unix:{}.{:09}", now.as_secs(), now.subsec_nanos()))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ProjectFolderKind { Folder, Project, UnavailableProject }
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ProjectFolderKind { Folder, Project, OtherApplicationProject(String), UnavailableProject }
 
 fn project_folder_kind(path: &std::path::Path, application_id: &str) -> ProjectFolderKind {
     let file = path.join("project.toml");
     if !file.is_file() { return ProjectFolderKind::Folder; }
-    match std::fs::read_to_string(file).ok().and_then(|content| project::ProjectFile::from_toml(&content, application_id).ok()) {
-        Some(_) => ProjectFolderKind::Project,
-        None => ProjectFolderKind::UnavailableProject,
+    let Some(content) = std::fs::read_to_string(file).ok() else { return ProjectFolderKind::UnavailableProject; };
+    if project::ProjectFile::from_toml(&content, application_id).is_ok() { return ProjectFolderKind::Project; }
+    match toml::from_str::<project::ProjectFile>(&content) {
+        Ok(file) if file.application.id != application_id => ProjectFolderKind::OtherApplicationProject(file.application.name),
+        _ => ProjectFolderKind::UnavailableProject,
     }
 }
 
@@ -652,6 +654,7 @@ fn show_project_folder_tree(ui: &mut egui::Ui, path: &std::path::Path, selected:
     let suffix = match kind {
         ProjectFolderKind::Folder => String::new(),
         ProjectFolderKind::Project => format!(" [{}]", localization::text("project.folder.project")),
+        ProjectFolderKind::OtherApplicationProject(application_name) => format!(" [{application_name} {}]", localization::text("project.folder.project")),
         ProjectFolderKind::UnavailableProject => format!(" [{}]", localization::text("project.folder.unavailable_project")),
     };
     if kind != ProjectFolderKind::Folder {
