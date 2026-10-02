@@ -1,9 +1,16 @@
 [日本語](./README.md) | [English](./README_en-US.md)
 
-# Workflow IDE Framework
+# Workflow IDE Framework “Kairi” （ワークフローIDEフレームワーク「海狸」）とは
 
-Workflow IDE Framework は、Rust で IDE 型アプリケーションを構築するためのアプリケーション組み込み型 Framework です。
-Consumer Application が Framework の Panel、Layout、Project、Resource、Command 等の共通機能を利用し、domain 固有機能を追加する構成を想定しています。
+Workflow IDE Framework “Kairi” は、Rust で IDE（統合開発環境）型アプリケーションを構築するための、アプリケーション組み込み型フレームワークライブラリです。
+
+アプリケーションは “Kairi” を利用することで、Windows / Linux / macOS への対応や、プロジェクト、リソース、ワークスペース、パネルなど、IDE型アプリケーションに共通して必要となる基盤機能をフレームワークに任せ、アプリケーション固有の機能の作り込みに専念できます。
+
+“Kairi” の語源は、日本語でビーバーを意味する「海狸（かいり）」です。
+
+ビーバーは、木や枝などさまざまな材料を集め、それらを組み合わせてダムや巣を築き、自らが活動するための環境を作ります。
+
+“Kairi” も同じように、アプリケーションに必要なさまざまな機能を組み合わせ、IDE型アプリケーションを構築するための便利な土台となることを目指しています。
 
 > **Status: v0.1.0 development**
 >
@@ -20,8 +27,8 @@ Consumer Application が Framework の Panel、Layout、Project、Resource、Com
 
 現在の実装と v0.1.0 仕様では、次の共通基盤を整備しています。
 
-- Application / Panel 構成
-- Dock / Layout 基盤
+- Application / Workspace / Panel 構成
+- Workspace / Dock / Layout 基盤
 - Text Editor / Log Viewer / Tree Viewer
 - Flow / Graph Editor
 - Property Panel
@@ -35,7 +42,7 @@ Consumer Application が Framework の Panel、Layout、Project、Resource、Com
 - Notification
 - Consumer Application 向け拡張境界
 
-Project、Resource、Panel Container、Notification の一部は v0.1.0 向け設計・実装・検証中です。README上の項目だけを完成済み機能とはみなさず、検証状態はドキュメントの検証表を参照してください。
+Project、Resource、Workspace、Panel Container、Notification の一部は v0.1.0 向け設計・実装・検証中です。README上の項目だけを完成済み機能とはみなさず、検証状態はドキュメントの検証表を参照してください。
 
 ## 責務境界
 
