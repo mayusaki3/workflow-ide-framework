@@ -821,7 +821,9 @@ impl FrameworkHost {
         let context = project::ProjectContext::new(root);
         let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
         let result = controller.open(context.clone(), adapter);
+        let completed = matches!(result, project_controller::ProjectCommandResult::Completed);
         self.handle_project_result(result, Some(context));
+        if completed { self.emit_project_event(project_event::ProjectEventKind::Opened); }
     }
 
     fn project_save(&mut self) {
@@ -1177,7 +1179,10 @@ impl FrameworkHost {
                         self.project_ui.confirm_close = false;
                         let exit = self.project_ui.exit_after_close;
                         self.project_close(true);
-                        if exit { ctx.send_viewport_cmd(egui::ViewportCommand::Close); }
+                        if exit {
+                            self.application_events.emit(application_event::ApplicationEvent::Closing);
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                        }
                     }
                     if ui.button(localization::text("common.cancel")).clicked() {
                         self.project_ui.confirm_close = false;
@@ -1195,7 +1200,9 @@ impl FrameworkHost {
                         if let Some((context, result)) = self.project_ui.pending_open.take() {
                             if let Some(controller) = self.project_controller.as_mut() {
                                 let outcome = controller.accept_open(context, result);
+                                let completed = matches!(outcome, project_controller::ProjectCommandResult::Completed);
                                 self.handle_project_result(outcome, None);
+                                if completed { self.emit_project_event(project_event::ProjectEventKind::Opened); }
                             }
                         }
                     }
