@@ -1,6 +1,9 @@
 //! Lightweight application-level status items.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatusItem {
@@ -22,6 +25,7 @@ impl StatusItem {
 pub enum StatusRegistryError {
     DuplicateId(String),
     NotFound(String),
+    Unavailable,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -48,5 +52,33 @@ impl StatusRegistry {
     pub fn get(&self, id: &str) -> Option<&StatusItem> { self.items.get(id) }
     pub fn iter(&self) -> impl Iterator<Item=&StatusItem> {
         self.order.iter().filter_map(|id| self.items.get(id))
+    }
+}
+
+/// Cloneable Consumer handle. The Framework and Consumer share the same
+/// registry so status can be updated after `Application::run()` starts.
+#[derive(Debug, Clone, Default)]
+pub struct StatusHandle {
+    registry: Arc<Mutex<StatusRegistry>>,
+}
+
+impl StatusHandle {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn register(&self, item: StatusItem) -> Result<(), StatusRegistryError> {
+        self.registry.lock().map_err(|_| StatusRegistryError::Unavailable)?.register(item)
+    }
+
+    pub fn set_value(&self, id: &str, value: impl Into<String>) -> Result<(), StatusRegistryError> {
+        self.registry.lock().map_err(|_| StatusRegistryError::Unavailable)?.set_value(id, value)
+    }
+
+    pub fn set_visible(&self, id: &str, visible: bool) -> Result<(), StatusRegistryError> {
+        self.registry.lock().map_err(|_| StatusRegistryError::Unavailable)?.set_visible(id, visible)
+    }
+
+    pub fn snapshot(&self) -> Result<Vec<StatusItem>, StatusRegistryError> {
+        let registry = self.registry.lock().map_err(|_| StatusRegistryError::Unavailable)?;
+        Ok(registry.iter().cloned().collect())
     }
 }
