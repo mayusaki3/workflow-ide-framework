@@ -203,6 +203,12 @@ Application 固有設定を同じ画面で扱う必要がある場合、Applicat
 - `Application::with_config()`
 - `Application::version()`
 - `Application::project_adapter()`
+- `Application::command()`
+- `Application::menu_item()`
+- `Application::status_item()`
+- `Application::status_handle()`
+- `Application::on_application_event()`
+- `Application::on_project_event()`
 - `Application::about_renderer()`
 - `Application::project_properties_renderer()`
 - `Application::run()`
@@ -216,16 +222,22 @@ Application 固有設定を同じ画面で扱う必要がある場合、Applicat
 
 型・method・戻り値の詳細は [Application / Project API Reference](Reference/01_Application_Project_API.md) に集約する。
 
-## 2.16 本章時点の未確定 I/F
+## 2.16 第2章 Public I/F の確定範囲
 
-次は Application level の概念として必要だが、現行 v0.1.0 develop で汎用 Public I/F が確定していない。
+Application level の次の I/F は develop で実装済みとする。
 
-- Consumer Application 固有 Menu / Command 登録 API
-- Consumer Application 固有 Status item 登録 API
+- Consumer Application 固有 Menu / Command
+- Consumer Application Status
 - Application lifecycle Event
-- Project lifecycle Event の Consumer 向け通知 I/F
+- Project lifecycle Event
 
-これらは既存実装から架空の API 名を作らず、実装設計時に Reference を更新して確定する。
+Project `Opened` は Open が実際に完了した場合だけ通知する。`NeedsOpenDecision` 中は通知せず、`accept_open()` 成功後に通知する。
+
+Project Close は `CloseRequested` と `Closed` を分離し、dirty confirmation 中は `Closed` を通知しない。
+
+Application `Closing` は Project dirty confirmation 等を通過して終了を確定した時点で通知する。
+
+詳細は [Application / Project API Reference](Reference/01_Application_Project_API.md) を参照する。
 
 ---
 
