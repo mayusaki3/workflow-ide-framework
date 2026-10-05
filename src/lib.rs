@@ -951,6 +951,7 @@ impl FrameworkHost {
         self.project_ui.exit_after_close = true;
         self.project_close(false);
         if !self.project_ui.confirm_close && self.project_controller.as_ref().is_none_or(|controller| !controller.is_open()) {
+            self.application_events.emit(application_event::ApplicationEvent::Closing);
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
     }
