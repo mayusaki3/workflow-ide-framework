@@ -4,7 +4,7 @@
 
 Kairi 機能仕様 第2章 Application / Project から使用する Public API の詳細参照先である。
 
-本書では develop の現行実装に存在する名前を記載する。未実装の lifecycle event 等には仮の API 名を付けない。
+本書では develop の現行実装に存在する Public I/F を記載する。
 
 ## 2. Application
 
@@ -49,6 +49,26 @@ Application 独自 About UI を登録する。renderer には `FrameworkInfo` �
 ### Application::project_properties_renderer
 
 Application 独自 Project Properties UI を登録する。未指定時は Framework 標準 UI を使用する。
+
+### Application::command / menu_item
+
+`command(CommandDefinition)` で Consumer Command を登録し、`menu_item(MenuItemDefinition)` で File / Help / Consumer 独自 top-level Menu に配置する。
+
+Command は stable ID、label、optional shortcut、enabled state、callback を持つ。Command ID の重複は登録時に拒否する。
+
+### Application::status_item / status_handle
+
+`status_item(StatusItem)` で初期 Status を登録する。
+
+`status_handle()` は clone 可能な `StatusHandle` を返す。Consumer と Framework は同じ Registry を共有するため、Application 実行中も `set_value()` / `set_visible()` で更新できる。
+
+### Application::on_application_event
+
+`FnMut(ApplicationEvent)` handler を登録する。
+
+### Application::on_project_event
+
+`FnMut(&ProjectEvent)` handler を登録する。
 
 ### Application::run
 
@@ -158,8 +178,50 @@ Project Root を保持し、次の標準 path を提供する。
 
 Application ID は Project Open 時の compatibility gate として使用する。
 
-## 10. Event
+## 10. Application Event
 
-Application startup / started / closing、Project opened / closing / closed 等を Consumerへ通知する独立 Public Event API は現行 develop では未定義である。
+`ApplicationEvent`:
 
-Event名、payload、発火順序を確定する際は本Referenceへ追加し、第2章のsequenceから参照する。
+- `Starting`: `run()` による Framework 初期化開始時
+- `Started`: FrameworkHost の最初の UI frame で一度だけ
+- `CloseRequested`: Application 終了要求を処理するとき
+- `Closing`: Project dirty confirmation 等を通過し、Application 終了を確定するとき
+
+## 11. Project Event
+
+`ProjectEventKind`:
+
+- `Created`
+- `Opened`
+- `Saved`
+- `SavedAs`
+- `CloseRequested`
+- `Closed`
+
+`ProjectEvent` payload:
+
+- `kind`
+- `root: Option<PathBuf>`
+- `name: Option<String>`
+
+`Opened` は通常 Open が `Completed` になった場合、または `NeedsOpenDecision` 後の `accept_open()` が `Completed` になった場合だけ発火する。decision pending / failure では発火しない。
+
+`Closed` は実際に Project session が破棄された後だけ発火する。dirty confirmation が必要な段階では `CloseRequested` のみ発火する。
+
+## 12. Status
+
+`StatusItem`:
+
+- `id`
+- `label`
+- `value`
+- `visible`
+
+`StatusHandle`:
+
+- `register()`
+- `set_value()`
+- `set_visible()`
+- `snapshot()`
+
+Status は Application 全体の軽量な状態表示であり、Notification / Logging の代替ではない。
