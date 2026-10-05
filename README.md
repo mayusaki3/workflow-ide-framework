@@ -10,6 +10,12 @@ Workflow IDE Framework “Kairi” は、Rust で IDE（統合開発環境）型
 
 - [目次](./docs/ja-JP/目次.md)
 
+## ドキュメント仕様
+
+ドキュメントは HLDocS を採用します。
+
+- https://github.com/mayusaki3/HLDocS
+
 ## ライセンス
 
 MIT License。詳細は [LICENSE](./LICENSE) を参照してください。
