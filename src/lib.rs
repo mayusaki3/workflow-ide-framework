@@ -206,6 +206,11 @@ pub struct Application {
     project_adapter: Option<Box<dyn project_adapter_erased::ErasedApplicationProjectAdapter>>,
     about_renderer: Option<AboutRenderer>,
     project_properties_renderer: Option<ProjectPropertiesRenderer>,
+    commands: command::CommandRegistry,
+    menu_items: Vec<command::MenuItemDefinition>,
+    status: status::StatusHandle,
+    application_events: application_event::ApplicationEventDispatcher,
+    project_events: project_event::ProjectEventDispatcher,
 }
 
 impl Application {
@@ -228,6 +233,11 @@ impl Application {
             project_adapter: None,
             about_renderer: None,
             project_properties_renderer: None,
+            commands: command::CommandRegistry::default(),
+            menu_items: Vec::new(),
+            status: status::StatusHandle::new(),
+            application_events: application_event::ApplicationEventDispatcher::default(),
+            project_events: project_event::ProjectEventDispatcher::default(),
         }
     }
 
@@ -349,6 +359,47 @@ impl Application {
         self
     }
 
+    /// Register a Consumer command. Duplicate IDs are rejected immediately.
+    pub fn command(mut self, command: command::CommandDefinition) -> Self {
+        self.commands.register(command).expect("duplicate Kairi command id");
+        self
+    }
+
+    /// Place a registered Consumer command in File, Help, or a custom top-level menu.
+    pub fn menu_item(mut self, item: command::MenuItemDefinition) -> Self {
+        self.menu_items.push(item);
+        self
+    }
+
+    /// Return a cloneable status handle that remains usable while the application is running.
+    pub fn status_handle(&self) -> status::StatusHandle {
+        self.status.clone()
+    }
+
+    /// Register an initial application-level status item.
+    pub fn status_item(self, item: status::StatusItem) -> Self {
+        self.status.register(item).expect("duplicate Kairi status id");
+        self
+    }
+
+    /// Subscribe to Consumer-visible application lifecycle events.
+    pub fn on_application_event<F>(mut self, handler: F) -> Self
+    where
+        F: FnMut(application_event::ApplicationEvent) + 'static,
+    {
+        self.application_events.subscribe(handler);
+        self
+    }
+
+    /// Subscribe to Consumer-visible project lifecycle events.
+    pub fn on_project_event<F>(mut self, handler: F) -> Self
+    where
+        F: FnMut(&project_event::ProjectEvent) + 'static,
+    {
+        self.project_events.subscribe(handler);
+        self
+    }
+
     pub fn panel(mut self, panel: PanelDefinition) -> Self {
         self.config.panels.push(panel);
         self
@@ -412,6 +463,12 @@ impl Application {
         let project_adapter = self.project_adapter;
         let about_renderer = self.about_renderer;
         let project_properties_renderer = self.project_properties_renderer;
+        let commands = self.commands;
+        let menu_items = self.menu_items;
+        let status = self.status;
+        let mut application_events = self.application_events;
+        let project_events = self.project_events;
+        application_events.emit(application_event::ApplicationEvent::Starting);
         if config.probe_panel && !config.panels.iter().any(|panel| panel.id == probe::PANEL_ID) {
             config.panels.push(
                 PanelDefinition::new(probe::PANEL_ID, "WFIDE Probe", PanelKind::StandardUi)
@@ -524,9 +581,15 @@ impl Application {
                     project_adapter,
                     about_renderer,
                     project_properties_renderer,
+                    commands,
+                    menu_items,
+                    status,
+                    application_events,
+                    project_events,
                     project_ui: ProjectUiState::default(),
                     theme_editor: None,
                     fonts_initialized: false,
+                    started_emitted: false,
                 }))
             }),
         )
@@ -569,9 +632,15 @@ struct FrameworkHost {
     project_controller: Option<project_controller::ProjectController>,
     about_renderer: Option<AboutRenderer>,
     project_properties_renderer: Option<ProjectPropertiesRenderer>,
+    commands: command::CommandRegistry,
+    menu_items: Vec<command::MenuItemDefinition>,
+    status: status::StatusHandle,
+    application_events: application_event::ApplicationEventDispatcher,
+    project_events: project_event::ProjectEventDispatcher,
     project_ui: ProjectUiState,
     theme_editor: Option<theme::ThemeEditor>,
     fonts_initialized: bool,
+    started_emitted: bool,
 }
 
 #[derive(Default)]
