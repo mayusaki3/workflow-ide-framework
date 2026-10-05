@@ -793,7 +793,9 @@ impl FrameworkHost {
         let description = (!description.trim().is_empty()).then(|| description.trim().to_owned());
         let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
         let result = controller.new_project(name.trim(), language, description, project_resource::NewProjectStoragePolicy::Deferred, None, adapter);
+        let completed = matches!(result, project_controller::ProjectCommandResult::Completed);
         self.handle_project_result(result, None);
+        if completed { self.emit_project_event(project_event::ProjectEventKind::Created); }
     }
 
     fn initial_project_browser_directory(&self) -> std::path::PathBuf {
@@ -826,7 +828,9 @@ impl FrameworkHost {
         let (save_id, saved_at) = project_save_stamp();
         let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
         let result = controller.save(adapter, &save_id, &saved_at);
+        let completed = matches!(result, project_controller::ProjectCommandResult::Completed);
         self.handle_project_result(result, None);
+        if completed { self.emit_project_event(project_event::ProjectEventKind::Saved); }
     }
 
     fn project_save_as(&mut self) {
@@ -850,7 +854,9 @@ impl FrameworkHost {
         let (save_id, saved_at) = project_save_stamp();
         let (Some(controller), Some(adapter)) = (self.project_controller.as_mut(), self.project_adapter.as_deref_mut()) else { return; };
         let result = controller.save_as(project::ProjectContext::new(root), project_name, adapter, &save_id, &saved_at);
+        let completed = matches!(result, project_controller::ProjectCommandResult::Completed);
         self.handle_project_result(result, None);
+        if completed { self.emit_project_event(project_event::ProjectEventKind::SavedAs); }
     }
 
     fn project_properties_open(&mut self) {
@@ -890,9 +896,12 @@ impl FrameworkHost {
     }
 
     fn project_close(&mut self, confirmed: bool) {
+        self.emit_project_event(project_event::ProjectEventKind::CloseRequested);
         let Some(controller) = self.project_controller.as_mut() else { return; };
         let result = controller.close(confirmed);
+        let completed = matches!(result, project_controller::ProjectCommandResult::Completed);
         self.handle_project_result(result, None);
+        if completed { self.emit_project_event(project_event::ProjectEventKind::Closed); }
     }
 
     fn project_menu_item(ui: &mut egui::Ui, label: String, shortcut: &str, enabled: bool) -> bool {
@@ -930,8 +939,10 @@ impl FrameworkHost {
     }
 
     fn request_exit(&mut self, ctx: &egui::Context) {
+        self.application_events.emit(application_event::ApplicationEvent::CloseRequested);
         let is_open = self.project_controller.as_ref().is_some_and(|controller| controller.is_open());
         if !is_open {
+            self.application_events.emit(application_event::ApplicationEvent::Closing);
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             return;
         }
@@ -940,6 +951,44 @@ impl FrameworkHost {
         if !self.project_ui.confirm_close && self.project_controller.as_ref().is_none_or(|controller| !controller.is_open()) {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
+    }
+
+    fn consumer_menu_items(&mut self, ui: &mut egui::Ui, location: command::MenuLocation, menu_id: Option<&str>) {
+        let items = self.menu_items.iter()
+            .filter(|item| item.location == location && menu_id.is_none_or(|id| item.menu_id == id))
+            .cloned().collect::<Vec<_>>();
+        for item in items {
+            let Some(command) = self.commands.get(&item.command_id) else { continue; };
+            let label = command.label.clone();
+            let shortcut = command.shortcut.clone().unwrap_or_default();
+            let enabled = command.enabled;
+            if Self::project_menu_item(ui, label, &shortcut, enabled) {
+                ui.close();
+                let _ = self.commands.dispatch(&item.command_id);
+            }
+        }
+    }
+
+    fn application_status(&self, ui: &mut egui::Ui) {
+        let Ok(items) = self.status.snapshot() else { return; };
+        let visible = items.into_iter().filter(|item| item.visible).collect::<Vec<_>>();
+        if visible.is_empty() { return; }
+        ui.separator();
+        ui.horizontal_wrapped(|ui| {
+            for (index, item) in visible.iter().enumerate() {
+                if index > 0 { ui.separator(); }
+                ui.label(format!("{}: {}", item.label, item.value));
+            }
+        });
+    }
+
+    fn emit_project_event(&mut self, kind: project_event::ProjectEventKind) {
+        let root = self.project_controller.as_ref()
+            .and_then(|controller| controller.session.as_ref())
+            .and_then(|session| session.context())
+            .map(|context| context.root().to_path_buf());
+        let name = self.project_controller.as_ref().and_then(|controller| controller.project_name()).map(str::to_owned);
+        self.project_events.emit(project_event::ProjectEvent::new(kind, root, name));
     }
 
     fn application_menu(&mut self, ui: &mut egui::Ui) {
@@ -979,6 +1028,7 @@ impl FrameworkHost {
                     if Self::project_menu_item(ui, localization::text("file.close_project"), "", is_open) { ui.close(); self.project_close(false); }
                     ui.separator();
                     if Self::project_menu_item(ui, localization::text("file.exit"), "Alt+F4", true) { ui.close(); self.request_exit(ui.ctx()); }
+                    self.consumer_menu_items(ui, command::MenuLocation::File, None);
                 });
 
                 let help_access_key = ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::H));
@@ -989,7 +1039,17 @@ impl FrameworkHost {
                         ui.close();
                         self.project_ui.show_about = true;
                     }
+                    self.consumer_menu_items(ui, command::MenuLocation::Help, None);
                 });
+
+                let custom_menus = self.menu_items.iter()
+                    .filter(|item| item.location == command::MenuLocation::Custom)
+                    .map(|item| (item.menu_id.clone(), item.menu_label.clone()))
+                    .fold(Vec::<(String, String)>::new(), |mut acc, item| { if !acc.iter().any(|x| x.0 == item.0) { acc.push(item); } acc });
+                for (menu_id, menu_label) in custom_menus {
+                    let response = ui.add(egui::Button::new(menu_label));
+                    egui::Popup::menu(&response).show(|ui| self.consumer_menu_items(ui, command::MenuLocation::Custom, Some(&menu_id)));
+                }
             });
         });
     }
@@ -1200,6 +1260,10 @@ impl FrameworkHost {
 
 impl eframe::App for FrameworkHost {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        if !self.started_emitted {
+            self.application_events.emit(application_event::ApplicationEvent::Started);
+            self.started_emitted = true;
+        }
         if !self.fonts_initialized {
             let locale = localization::current_locale();
             match locale_font::install_for_locale(
@@ -1239,6 +1303,7 @@ impl eframe::App for FrameworkHost {
 
         self.application_menu(ui);
         self.project_dialogs(ui.ctx());
+        self.application_status(ui);
 
         let application_title = self.config.window.title.as_deref().unwrap_or(&self.config.name);
         let window_title = self.project_controller.as_ref()
