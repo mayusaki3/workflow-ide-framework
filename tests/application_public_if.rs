@@ -55,3 +55,17 @@ fn project_event_preserves_kind_and_context() {
     assert_eq!(events[0].kind, ProjectEventKind::Saved);
     assert_eq!(events[0].name.as_deref(), Some("Example"));
 }
+
+
+#[test]
+fn shared_status_handle_updates_registered_item() {
+    use workflow_ide_framework::status::StatusHandle;
+    let handle = StatusHandle::new();
+    handle.register(StatusItem::new("app.connection", "Connection", "Offline")).unwrap();
+    let consumer = handle.clone();
+    consumer.set_value("app.connection", "Online").unwrap();
+    consumer.set_visible("app.connection", true).unwrap();
+    let items = handle.snapshot().unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].value, "Online");
+}
