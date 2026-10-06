@@ -1,3 +1,14 @@
+<!--
+HLDocS:LLM-MANAGED
+doc_id: doc-20261006-kairi-application-public-if-tests
+lang: ja-JP
+canonical_title: Application-level Public I/F テスト仕様
+document_type: testspec
+canonical_document: true
+-->
+
+[目次](../目次.md) > テスト仕様 > Application-level Public I/F
+
 # Application-level Public I/F テスト仕様
 
 ## 対象
@@ -53,3 +64,7 @@ Kairi 機能仕様 第2章 Application / Project のうち、Menu / Command、St
 - 新規自動テストがすべて成功すること。
 - 既存 Project / Resource 系テストに regression がないこと。
 - `sample_minimum_application` が第2章の機能だけで構成可能であること。
+
+---
+
+[目次](../目次.md) > テスト仕様 > Application-level Public I/F
