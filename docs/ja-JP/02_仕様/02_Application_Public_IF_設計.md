@@ -1,3 +1,14 @@
+<!--
+HLDocS:LLM-MANAGED
+doc_id: doc-20261006-kairi-application-public-if-design
+lang: ja-JP
+canonical_title: Application-level Public I/F 設計
+document_type: spec
+canonical_document: true
+-->
+
+[目次](../目次.md) > 仕様 > Application / Project > Application-level Public I/F設計
+
 # 第2章 Application-level Public I/F 設計
 
 ## 1. 目的
@@ -13,18 +24,9 @@ Kairi 機能仕様 第2章を Consumer Application から単独で利用可能�
 
 Workspace / Panel 固有 I/F は第3章以降で扱う。
 
-## 2. 設計原則
+## 2. Menu / Command
 
-- Kairi 標準 Menu / Project lifecycle を Consumer が再実装しなくてよいこと。
-- Consumer 固有機能は Kairi の内部 `FrameworkHost` を直接操作せず登録できること。
-- 表示定義と処理を分離すること。
-- Event は「状態が変わった事実」の通知とし、処理を横取りする interceptor としないこと。
-- dirty confirmation や Project compatibility 等、既存 Project lifecycle の判断規則を Event で迂回できないこと。
-- 第3章 Workspace に依存しないこと。
-
-## 3. Menu / Command
-
-### 3.1 Command
+### 2.1 Command
 
 Consumer が実行可能な操作を Command として登録する。
 
@@ -38,7 +40,7 @@ Consumer が実行可能な操作を Command として登録する。
 
 Command ID は Application 内で一意とする。
 
-### 3.2 Menu
+### 2.2 Menu
 
 Menu は Command の表示場所を定義する。
 
@@ -49,7 +51,7 @@ Menu は Command の表示場所を定義する。
 
 Kairi 標準 Project Command 自体の置換は第2章の初期 I/F では許可しない。
 
-### 3.3 責務
+### 2.3 責務
 
 Kairi:
 - Menu rendering
@@ -60,7 +62,7 @@ Consumer:
 - Command の意味
 - Command callback 内の Application 固有処理
 
-## 4. Status
+## 3. Status
 
 Status は Application 全体から確認できる軽量な状態表示とする。
 
@@ -75,7 +77,7 @@ Status は通知履歴やログの代替ではない。長時間保持する App
 
 Consumer は登録済み Status item の value / visibility を更新できる必要がある。
 
-## 5. Application lifecycle Event
+## 4. Application lifecycle Event
 
 初期 Event は次とする。
 
@@ -95,7 +97,7 @@ Event は通知であり、Consumer が Kairi の終了判定を上書きする 
 
 eframe lifecycle 上、厳密な発火位置は実装時に Reference へ記録する。
 
-## 6. Project lifecycle Event
+## 5. Project lifecycle Event
 
 初期 Event は次とする。
 
@@ -112,7 +114,7 @@ Open で User decision / recovery が必要な場合、`Opened` は `accept_open
 
 CloseRequested は dirty confirmation 前に通知できるが、Closed は実際に Project session が破棄された後だけ発火する。
 
-## 7. Event payload
+## 6. Event payload
 
 Project Event は少なくとも次の情報を Application が識別できる形にする。
 
@@ -124,7 +126,7 @@ Project Event は少なくとも次の情報を Application が識別できる�
 
 Application Event / Project Event とも callback 実行中に Kairi の内部可変 state を直接公開しない。
 
-## 8. API配置
+## 7. API配置
 
 Public I/F は責務別 module に分離する。
 
@@ -138,43 +140,6 @@ src/
 
 `lib.rs` は Application builder からこれらを登録する入口を提供する。
 
-## 9. テスト方針
+---
 
-最低限次を自動テストする。
-
-### Command
-- Command ID を保持できる
-- enabled=false の Command は dispatch されない
-- ID 重複を検出できる
-
-### Status
-- Status item 登録
-- value 更新
-- visibility 更新
-- ID 重複を検出できる
-
-### Application Event
-- callback に Event kind が渡る
-- Started は一度だけ発火する
-
-### Project Event
-- New 成功時 Created
-- Open 成功時 Opened
-- decision pending 中は Opened を発火しない
-- Save 成功時 Saved
-- Save As 成功時 SavedAs
-- dirty confirmation 前後で CloseRequested / Closed を区別
-- failure 時に成功 Event を発火しない
-
-## 10. 実装順序
-
-1. Command model / registry
-2. Status model / registry
-3. Event model
-4. Application builder API
-5. FrameworkHost 統合
-6. Project lifecycle 統合
-7. sample_minimum_application で第2章のみの利用例を確認
-8. Reference を実装済み I/F に更新
-
-この完了をもって、第2章 Application / Project を Consumer Application に対して「利用可能」と扱える状態とする。
+[目次](../目次.md) > 仕様 > Application / Project > Application-level Public I/F設計
