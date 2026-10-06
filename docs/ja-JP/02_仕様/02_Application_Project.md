@@ -17,8 +17,6 @@ canonical_document: true
 
 利用アプリケーションはKairiを組み込み、アプリケーション固有機能とKairiの共通機能を組み合わせる。`Project`はKairiと利用アプリケーションが責務を分担して管理するデータ単位とする。
 
-`Workspace`（ワークスペース）と`Panel`（パネル）は第3章以降で扱う。
-
 ## 2.2 Application
 
 利用アプリケーションはKairiの`Application`を生成し、アプリケーション情報、必要な公開機能、`ApplicationProjectAdapter`を登録して`run()`を呼び出す。
@@ -232,7 +230,11 @@ v0.1.0では、Kairi自身のProject lifecycleに必要な標準Project dialog�
 
 Project dialogはProject Rootを選択するためのKairi内部UIであり、利用アプリケーションへ汎用file/resource selectorとして公開するPublic I/Fとは区別する。
 
-利用アプリケーションへ提供する汎用dialog Public I/Fはv0.1.0の必須範囲に含めず、v0.2.0以降の対象とする。
+Project dialogでは、Dialog内にWorkspaceとPanelを配置する共通機構を使用する仮実装を行い、Default Dialog Workspaceの構成を検証する。
+
+この仮実装で使用するDefault Dialog Workspaceの公開API、Workspace ID、Layout capability、永続化方式はPublic I/Fとして固定しない。
+
+利用アプリケーションへ提供する汎用dialog Public I/Fはv0.1.0の必須範囲に含めない。
 
 ## 2.18 Project Properties
 
