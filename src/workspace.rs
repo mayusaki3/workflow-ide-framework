@@ -102,6 +102,10 @@ impl WorkspaceRegistry {
 
     pub fn selected_id(&self) -> &str { &self.selected }
     pub fn get(&self, id: &str) -> Option<&Workspace> { self.workspaces.get(id) }
+    /// Internal mutable access for validated dock-state reconciliation.
+    pub(crate) fn get_mut_workspace_for_dock(&mut self, id: &str) -> Result<&mut Workspace, WorkspaceError> {
+        self.workspaces.get_mut(id).ok_or_else(|| WorkspaceError::WorkspaceNotFound(id.into()))
+    }
     pub fn iter(&self) -> impl Iterator<Item = &Workspace> { self.workspaces.values() }
 
     pub fn register(&mut self, id: impl Into<String>, name: impl Into<String>) -> Result<(), WorkspaceError> {
