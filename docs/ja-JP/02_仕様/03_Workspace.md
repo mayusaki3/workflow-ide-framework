@@ -170,7 +170,21 @@ Dialogの終了はWorkspaceの表示終了として扱い、Workspaceの破棄�
 
 Workspaceの生成および破棄はWorkspaceの所有者が管理し、Main WindowまたはDialogの表示lifetimeとは分離する。
 
-## 3.12 将来拡張
+## 3.12 Floating Container
+
+Floating Containerは、Panelを通常Containerから独立した位置に表示するために、KairiがPanelごとに自動生成する単一Panel専用のContainerである。
+
+Floating Containerは最大1つのPanelのみを保持し、Panelの大きさに対応した表示領域を持つ。
+
+**Floating Containerは、ドラッグ操作による他のPanelの受け入れ先にはならない。** Floating Container上へ別のPanelをドロップしても、当該Floating ContainerへのPanel追加、タブ化、分割配置、既存Panelとの置換を行わない。
+
+通常ContainerからPanelをFloating化する場合は、そのPanel専用のFloating Containerを新たに生成する。
+
+Floating Panelを通常Containerへ移動した場合、空になったFloating Containerは破棄する。Floating Panelを非表示にした場合も空Containerは破棄するが、Panel instance自体は破棄しない。
+
+Floating ContainerはWorkspace内の配置状態として管理する。位置・サイズおよび再表示に必要な情報はWorkspace Layoutの保存対象とする。
+
+## 3.13 将来拡張
 
 よく使用するWorkspace構成を再利用するためのWorkspace Templateは将来拡張として扱い、v0.1.0では仕様化しない。
 
