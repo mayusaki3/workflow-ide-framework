@@ -1429,7 +1429,15 @@ impl eframe::App for FrameworkHost {
                 }
                 if let Some(workspace) = self.workspace_registry.get(&selected_workspace) {
                     match workspace_dock::project_workspace(workspace) {
-                        Ok(projection) => self.workspace_docks = projection,
+                        Ok(projection) => {
+                            // Floating window updates must not flatten live normal
+                            // dock trees, which may contain user-created splits.
+                            if self.workspace_docks.normal.keys().eq(projection.normal.keys()) {
+                                self.workspace_docks.floating = projection.floating;
+                            } else {
+                                tracing::warn!(target: "wfide::workspace", "normal container set changed during floating update");
+                            }
+                        },
                         Err(error) => tracing::error!(target: "wfide::workspace", ?error, "workspace projection failed"),
                     }
                 }
