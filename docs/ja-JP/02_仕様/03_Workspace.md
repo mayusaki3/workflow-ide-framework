@@ -184,6 +184,8 @@ Floating Panelを通常Containerへ移動した場合、空になったFloating 
 
 Floating ContainerはWorkspace内の配置状態として管理する。位置・サイズおよび再表示に必要な情報はWorkspace Layoutの保存対象とする。
 
+Floating Panelを非表示にした場合、直前のFloating位置・サイズをWorkspaceの配置状態として保持する。再表示時に配置先が明示されていなければ、元のFloating位置・サイズで専用Floating Containerを再生成する。再表示先として通常Containerが明示された場合は、その指定を優先する。
+
 ## 3.13 将来拡張
 
 よく使用するWorkspace構成を再利用するためのWorkspace Templateは将来拡張として扱い、v0.1.0では仕様化しない。
