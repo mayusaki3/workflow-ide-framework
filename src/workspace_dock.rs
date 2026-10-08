@@ -50,6 +50,66 @@ pub fn project_workspace(workspace: &Workspace) -> Result<WorkspaceDockProjectio
 
 
 
+
+/// Build the default Container's initial split tree from the application layout.
+/// The registry owns panel placement; this only chooses their visual arrangement.
+pub fn apply_initial_layout(
+    projection: &mut WorkspaceDockProjection,
+    layout: &crate::layout::LayoutConfig,
+) -> Result<(), WorkspaceError> {
+    use crate::workspace::DEFAULT_CONTAINER_ID;
+    let Some(slot) = projection.normal.get_mut(DEFAULT_CONTAINER_ID) else {
+        return Err(WorkspaceError::ContainerNotFound(DEFAULT_CONTAINER_ID.into()));
+    };
+    let all = slot.as_ref().map(|dock| {
+        // The registry has already validated ownership; the layout is validated below.
+        dock.main_surface().iter().flat_map(|node| {
+            match node {
+                egui_dock::Node::Leaf { tabs, .. } => tabs.iter().cloned().collect::<Vec<_>>(),
+                _ => Vec::new(),
+            }
+        }).collect::<Vec<_>>()
+    }).unwrap_or_default();
+    let mut keys = BTreeMap::new();
+    for key in all {
+        keys.insert(key.definition_id.clone(), key);
+    }
+    let mut used = std::collections::BTreeSet::new();
+    let mut lookup = |id: &str| -> Result<DockPanelKey, WorkspaceError> {
+        let key = keys.get(id).ok_or_else(|| WorkspaceError::PanelNotRegistered(id.into()))?;
+        if !used.insert(id.to_owned()) { return Err(WorkspaceError::PanelAlreadyPlaced(id.into())); }
+        Ok(key.clone())
+    };
+    let roots = layout.root_panel_ids.iter().map(|id| lookup(id)).collect::<Result<Vec<_>, _>>()?;
+    if roots.is_empty() { return Ok(()); }
+    let mut dock = DockState::new(roots);
+    for split in &layout.splits {
+        if !split.fraction.is_finite() || !(0.0..=1.0).contains(&split.fraction) || split.panel_ids.is_empty() {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        }
+        let anchor = keys.get(&split.anchor_panel_id)
+            .ok_or_else(|| WorkspaceError::PanelNotRegistered(split.anchor_panel_id.clone()))?;
+        let (node, _) = dock.main_surface().find_tab(anchor)
+            .ok_or(WorkspaceError::InvalidContainerTarget)?;
+        let tabs = split.panel_ids.iter().map(|id| lookup(id)).collect::<Result<Vec<_>, _>>()?;
+        let tree = dock.main_surface_mut();
+        match split.direction {
+            crate::layout::SplitDirection::Left => { tree.split_left(node, split.fraction, tabs); }
+            crate::layout::SplitDirection::Right => { tree.split_right(node, split.fraction, tabs); }
+            crate::layout::SplitDirection::Above => { tree.split_above(node, split.fraction, tabs); }
+            crate::layout::SplitDirection::Below => { tree.split_below(node, split.fraction, tabs); }
+        }
+    }
+    if used.len() != keys.len() { return Err(WorkspaceError::InvalidContainerTarget); }
+    if let Some(selected) = &layout.selected_panel_id {
+        let key = keys.get(selected).ok_or_else(|| WorkspaceError::PanelNotRegistered(selected.clone()))?;
+        let (node, tab) = dock.main_surface().find_tab(key).ok_or(WorkspaceError::InvalidContainerTarget)?;
+        dock.main_surface_mut().set_active_tab(node, tab).map_err(|_| WorkspaceError::InvalidContainerTarget)?;
+    }
+    *slot = Some(dock);
+    Ok(())
+}
+
 /// Resolve the initial legacy application layout into the default Workspace.
 /// This is an additive bridge: the existing DockState<String> remains active
 /// until the host can render multiple containers.
