@@ -469,6 +469,48 @@ mod tests {
         assert_eq!(ws.floating_geometry.values().next(), Some(&geometry));
     }
 
+    // WS-015: a user tab reorder is reflected in the authoritative registry.
+    #[test]
+    fn sync_updates_tab_order_without_replacing_live_tree() {
+        let mut registry = WorkspaceRegistry::new();
+        let a = PanelInstanceId::new("editor", "a");
+        let b = PanelInstanceId::new("editor", "b");
+        for panel in [&a, &b] {
+            registry.register_panel(panel.clone());
+            registry.place_panel(DEFAULT_WORKSPACE_ID, panel, DEFAULT_CONTAINER_ID).unwrap();
+        }
+        let mut projection = project_workspace(registry.get(DEFAULT_WORKSPACE_ID).unwrap()).unwrap();
+        let tree = projection.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        for node in tree.main_surface_mut().iter_mut() {
+            if let egui_dock::Node::Leaf(leaf) = node {
+                leaf.tabs.reverse();
+            }
+        }
+        sync_normal_tab_order(&mut registry, DEFAULT_WORKSPACE_ID, &projection).unwrap();
+        assert_eq!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers[DEFAULT_CONTAINER_ID].panels, vec![b, a]);
+    }
+
+    // WS-021: an invalid dock tree cannot partially mutate panel placement.
+    #[test]
+    fn sync_rejects_duplicate_tab_atomically() {
+        let mut registry = WorkspaceRegistry::new();
+        let a = PanelInstanceId::new("editor", "a");
+        let b = PanelInstanceId::new("editor", "b");
+        for panel in [&a, &b] {
+            registry.register_panel(panel.clone());
+            registry.place_panel(DEFAULT_WORKSPACE_ID, panel, DEFAULT_CONTAINER_ID).unwrap();
+        }
+        let mut projection = project_workspace(registry.get(DEFAULT_WORKSPACE_ID).unwrap()).unwrap();
+        let tree = projection.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        for node in tree.main_surface_mut().iter_mut() {
+            if let egui_dock::Node::Leaf(leaf) = node {
+                leaf.tabs[1] = leaf.tabs[0].clone();
+            }
+        }
+        assert_eq!(sync_normal_tab_order(&mut registry, DEFAULT_WORKSPACE_ID, &projection), Err(WorkspaceError::InvalidContainerTarget));
+        assert_eq!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers[DEFAULT_CONTAINER_ID].panels, vec![a, b]);
+    }
+
     #[test]
     fn legacy_panel_import_preserves_ids() {
         let mut registry = WorkspaceRegistry::new();
