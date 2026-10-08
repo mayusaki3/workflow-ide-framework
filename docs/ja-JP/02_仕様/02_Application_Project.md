@@ -230,9 +230,9 @@ v0.1.0では、Kairi自身のProject lifecycleに必要な標準Project dialog�
 
 Project dialogはProject Rootを選択するためのKairi内部UIであり、利用アプリケーションへ汎用file/resource selectorとして公開するPublic I/Fとは区別する。
 
-Project dialogでは、Dialog内にWorkspaceとPanelを配置する共通機構を使用する仮実装を行い、Default Dialog Workspaceの構成を検証する。
+Project dialogでは、Main Windowと共通のWorkspaceおよびPanel Container機構を使用する仮実装を行い、Dialog内でのWorkspace構成を検証する。
 
-この仮実装で使用するDefault Dialog Workspaceの公開API、Workspace ID、Layout capability、永続化方式はPublic I/Fとして固定しない。
+この仮実装に固有のDialog公開APIは固定しない。Workspaceの識別、Layoutおよび所有・表示lifetimeの基本契約は第3章Workspace仕様に従う。
 
 利用アプリケーションへ提供する汎用dialog Public I/Fはv0.1.0の必須範囲に含めない。
 
