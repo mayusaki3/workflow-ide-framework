@@ -29,7 +29,11 @@ pub struct TextDocument {
 }
 
 impl TextDocument {
-    pub fn new(id: impl Into<String>, display_name: impl Into<String>, text: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        display_name: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             display_name: display_name.into(),
@@ -73,7 +77,10 @@ pub struct TextEditorOptions {
 
 impl Default for TextEditorOptions {
     fn default() -> Self {
-        Self { word_wrap: false, ime_debug: false }
+        Self {
+            word_wrap: false,
+            ime_debug: false,
+        }
     }
 }
 

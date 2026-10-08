@@ -1,16 +1,18 @@
 use workflow_ide_framework::{
     Application, LayoutConfig, PanelDefinition, PanelKind,
-    controller_panel::{ControllerElement, ControllerElementKind, ControllerModel, ControllerMode, LineShape},
+    controller_panel::{
+        ControllerElement, ControllerElementKind, ControllerMode, ControllerModel, LineShape,
+    },
     flow_editor::{FlowEdge, FlowModel, FlowNode, FlowPort, PortDirection},
-    logging::LogLevel,
     localization,
+    logging::LogLevel,
     project::ProjectContext,
     project_adapter::ApplicationProjectAdapter,
-    project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
     project_panel::{ProjectPanelModel, ProjectPanelNode, ProvidedResource, ResourceProviderKind},
-    resource_registry::ResourceRegistry,
+    project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
     project_save::ApplicationSaveResult,
     property_panel::PropertyModel,
+    resource_registry::ResourceRegistry,
     text_editor::TextDocument,
 };
 
@@ -24,21 +26,42 @@ impl ApplicationProjectAdapter for SampleProjectAdapter {
         std::fs::create_dir_all(context.application_directory())
     }
 
-    fn inspect_project_data(&mut self, _context: &ProjectContext, _stored_data_version: Option<&str>) -> Result<ProjectDataCompatibility, Self::Error> {
+    fn inspect_project_data(
+        &mut self,
+        _context: &ProjectContext,
+        _stored_data_version: Option<&str>,
+    ) -> Result<ProjectDataCompatibility, Self::Error> {
         Ok(ProjectDataCompatibility::Compatible)
     }
 
-    fn check_project_consistency(&mut self, _context: &ProjectContext) -> Result<ProjectDataConsistency, Self::Error> {
+    fn check_project_consistency(
+        &mut self,
+        _context: &ProjectContext,
+    ) -> Result<ProjectDataConsistency, Self::Error> {
         Ok(ProjectDataConsistency::Consistent)
     }
 
-    fn save_project_data(&mut self, context: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
+    fn save_project_data(
+        &mut self,
+        context: &ProjectContext,
+        save_id: &str,
+    ) -> Result<ApplicationSaveResult, Self::Error> {
         std::fs::create_dir_all(context.application_directory())?;
-        std::fs::write(context.application_directory().join("sample.txt"), format!("sample project data\\nsave_id={save_id}\\n"))?;
-        Ok(ApplicationSaveResult { data_version: Some("1".into()) })
+        std::fs::write(
+            context.application_directory().join("sample.txt"),
+            format!("sample project data\\nsave_id={save_id}\\n"),
+        )?;
+        Ok(ApplicationSaveResult {
+            data_version: Some("1".into()),
+        })
     }
 
-    fn save_project_data_as(&mut self, _source: Option<&ProjectContext>, destination: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
+    fn save_project_data_as(
+        &mut self,
+        _source: Option<&ProjectContext>,
+        destination: &ProjectContext,
+        save_id: &str,
+    ) -> Result<ApplicationSaveResult, Self::Error> {
         self.save_project_data(destination, save_id)
     }
 }
@@ -51,25 +74,41 @@ fn main() -> eframe::Result<()> {
                 .child(ProjectPanelNode::resources(
                     "resources",
                     "Resources",
-                    [ResourceProviderKind::Framework, ResourceProviderKind::Application, ResourceProviderKind::Project],
+                    [
+                        ResourceProviderKind::Framework,
+                        ResourceProviderKind::Application,
+                        ResourceProviderKind::Project,
+                    ],
                 )),
         ],
         framework_resources: vec![ProvidedResource::new(
-            "framework-theme-sakura", "Sakura Theme", "themes/sakura.toml", ResourceProviderKind::Framework,
+            "framework-theme-sakura",
+            "Sakura Theme",
+            "themes/sakura.toml",
+            ResourceProviderKind::Framework,
         )],
         application_resources: vec![ProvidedResource::new(
-            "sample-controller-image", "Controller Image", "images/controller.png", ResourceProviderKind::Application,
+            "sample-controller-image",
+            "Controller Image",
+            "images/controller.png",
+            ResourceProviderKind::Application,
         )],
     };
     let project = project_panel.tree(&ResourceRegistry::default());
 
-    let base = FlowNode::new("base", "ベース / base_link", [70.0, 100.0])
-        .port(FlowPort::new("child", "child", PortDirection::Output));
+    let base = FlowNode::new("base", "ベース / base_link", [70.0, 100.0]).port(FlowPort::new(
+        "child",
+        "child",
+        PortDirection::Output,
+    ));
     let joint = FlowNode::new("joint", "肩関節 / shoulder_joint", [330.0, 100.0])
         .port(FlowPort::new("parent", "parent", PortDirection::Input))
         .port(FlowPort::new("child", "child", PortDirection::Output));
-    let arm = FlowNode::new("arm", "アーム / arm_link", [590.0, 100.0])
-        .port(FlowPort::new("parent", "parent", PortDirection::Input));
+    let arm = FlowNode::new("arm", "アーム / arm_link", [590.0, 100.0]).port(FlowPort::new(
+        "parent",
+        "parent",
+        PortDirection::Input,
+    ));
 
     let flow = FlowModel {
         nodes: vec![base, joint, arm],
@@ -91,24 +130,55 @@ fn main() -> eframe::Result<()> {
         selected_id: None,
         elements: vec![
             ControllerElement::new(
-                "title", "タイトル", [30.0, 25.0], [260.0, 32.0],
-                ControllerElementKind::Label { text: "ロボット操作パネル".into() },
+                "title",
+                "タイトル",
+                [30.0, 25.0],
+                [260.0, 32.0],
+                ControllerElementKind::Label {
+                    text: "ロボット操作パネル".into(),
+                },
             ),
             ControllerElement::new(
-                "separator", "区切り線", [30.0, 70.0], [500.0, 2.0],
-                ControllerElementKind::Line { to: [530.0, 70.0], width: 2.0, shape: LineShape::Line },
+                "separator",
+                "区切り線",
+                [30.0, 70.0],
+                [500.0, 2.0],
+                ControllerElementKind::Line {
+                    to: [530.0, 70.0],
+                    width: 2.0,
+                    shape: LineShape::Line,
+                },
             ),
             ControllerElement::new(
-                "forward", "前進", [40.0, 105.0], [110.0, 40.0],
-                ControllerElementKind::Button { text: "前進".into(), image_source: None },
+                "forward",
+                "前進",
+                [40.0, 105.0],
+                [110.0, 40.0],
+                ControllerElementKind::Button {
+                    text: "前進".into(),
+                    image_source: None,
+                },
             ),
             ControllerElement::new(
-                "speed", "速度", [40.0, 170.0], [240.0, 36.0],
-                ControllerElementKind::Slider { value: 0.5, min: 0.0, max: 1.0 },
+                "speed",
+                "速度",
+                [40.0, 170.0],
+                [240.0, 36.0],
+                ControllerElementKind::Slider {
+                    value: 0.5,
+                    min: 0.0,
+                    max: 1.0,
+                },
             ),
             ControllerElement::new(
-                "stick", "移動", [330.0, 105.0], [150.0, 150.0],
-                ControllerElementKind::Joystick { value: [0.0, 0.0], return_to_center: true },
+                "stick",
+                "移動",
+                [330.0, 105.0],
+                [150.0, 150.0],
+                ControllerElementKind::Joystick {
+                    value: [0.0, 0.0],
+                    return_to_center: true,
+                },
             ),
         ],
     };

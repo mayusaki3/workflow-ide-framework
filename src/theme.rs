@@ -30,7 +30,11 @@ impl Theme {
     pub fn apply_with_system_dark(self, ctx: &egui::Context, system_dark: bool) {
         match self {
             Self::System => {
-                ctx.set_visuals(if system_dark { egui::Visuals::dark() } else { egui::Visuals::light() });
+                ctx.set_visuals(if system_dark {
+                    egui::Visuals::dark()
+                } else {
+                    egui::Visuals::light()
+                });
             }
             Self::Dark => ctx.set_visuals(egui::Visuals::dark()),
             Self::Light => ctx.set_visuals(egui::Visuals::light()),
@@ -48,7 +52,11 @@ impl Theme {
     }
 }
 
-fn light_palette(background: egui::Color32, panel: egui::Color32, accent: egui::Color32) -> egui::Visuals {
+fn light_palette(
+    background: egui::Color32,
+    panel: egui::Color32,
+    accent: egui::Color32,
+) -> egui::Visuals {
     let mut visuals = egui::Visuals::light();
     visuals.panel_fill = panel;
     visuals.window_fill = panel;
@@ -92,8 +100,11 @@ fn ao_light() -> egui::Visuals {
     visuals
 }
 
-
-fn dark_palette(background: egui::Color32, panel: egui::Color32, accent: egui::Color32) -> egui::Visuals {
+fn dark_palette(
+    background: egui::Color32,
+    panel: egui::Color32,
+    accent: egui::Color32,
+) -> egui::Visuals {
     let mut visuals = egui::Visuals::dark();
     visuals.panel_fill = panel;
     visuals.window_fill = panel;
@@ -250,7 +261,10 @@ pub fn show_settings(
             if edited {
                 edit.apply(ui.ctx());
             }
-            if ui.button(crate::localization::text("theme.editor_reset")).clicked() {
+            if ui
+                .button(crate::localization::text("theme.editor_reset"))
+                .clicked()
+            {
                 current.apply(ui.ctx());
                 *edit = ThemeEditor::from_context(ui.ctx());
             }

@@ -1,16 +1,33 @@
 use std::path::PathBuf;
 
 use workflow_ide_framework::project_resource::{
-    FileTypeFilter, ProjectDirtyState, ResourceReference, ResourceReferenceError,
-    ResourceScope,
+    FileTypeFilter, ProjectDirtyState, ResourceReference, ResourceReferenceError, ResourceScope,
 };
 
 #[test]
 fn project_dirty_is_or_of_owner_flags() {
     assert!(!ProjectDirtyState::default().is_dirty());
-    assert!(ProjectDirtyState { metadata: true, ..Default::default() }.is_dirty());
-    assert!(ProjectDirtyState { framework: true, ..Default::default() }.is_dirty());
-    assert!(ProjectDirtyState { application: true, ..Default::default() }.is_dirty());
+    assert!(
+        ProjectDirtyState {
+            metadata: true,
+            ..Default::default()
+        }
+        .is_dirty()
+    );
+    assert!(
+        ProjectDirtyState {
+            framework: true,
+            ..Default::default()
+        }
+        .is_dirty()
+    );
+    assert!(
+        ProjectDirtyState {
+            application: true,
+            ..Default::default()
+        }
+        .is_dirty()
+    );
 }
 
 #[test]
@@ -18,7 +35,8 @@ fn project_resource_reference_is_relative_and_normalized() {
     let reference = ResourceReference::new(
         ResourceScope::Project,
         PathBuf::from("textures").join(".").join("robot.PNG"),
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(reference.path, PathBuf::from("textures").join("robot.PNG"));
 }
 

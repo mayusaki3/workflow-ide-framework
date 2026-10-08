@@ -16,20 +16,36 @@ impl ApplicationProjectAdapter for MinimumProjectAdapter {
         std::fs::create_dir_all(context.application_directory())
     }
 
-    fn inspect_project_data(&mut self, _context: &ProjectContext, _stored_data_version: Option<&str>) -> Result<ProjectDataCompatibility, Self::Error> {
+    fn inspect_project_data(
+        &mut self,
+        _context: &ProjectContext,
+        _stored_data_version: Option<&str>,
+    ) -> Result<ProjectDataCompatibility, Self::Error> {
         Ok(ProjectDataCompatibility::Compatible)
     }
 
-    fn check_project_consistency(&mut self, _context: &ProjectContext) -> Result<ProjectDataConsistency, Self::Error> {
+    fn check_project_consistency(
+        &mut self,
+        _context: &ProjectContext,
+    ) -> Result<ProjectDataConsistency, Self::Error> {
         Ok(ProjectDataConsistency::Consistent)
     }
 
-    fn save_project_data(&mut self, context: &ProjectContext, _save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
+    fn save_project_data(
+        &mut self,
+        context: &ProjectContext,
+        _save_id: &str,
+    ) -> Result<ApplicationSaveResult, Self::Error> {
         std::fs::create_dir_all(context.application_directory())?;
         Ok(ApplicationSaveResult { data_version: None })
     }
 
-    fn save_project_data_as(&mut self, _source: Option<&ProjectContext>, destination: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
+    fn save_project_data_as(
+        &mut self,
+        _source: Option<&ProjectContext>,
+        destination: &ProjectContext,
+        save_id: &str,
+    ) -> Result<ApplicationSaveResult, Self::Error> {
         self.save_project_data(destination, save_id)
     }
 }

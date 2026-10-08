@@ -1,6 +1,4 @@
-use workflow_ide_framework::{
-    Application, ApplicationConfig, PanelDefinition, PanelKind,
-};
+use workflow_ide_framework::{Application, ApplicationConfig, PanelDefinition, PanelKind};
 
 fn main() {
     let mut config = ApplicationConfig::new(
@@ -22,11 +20,7 @@ fn main() {
             "Viewport",
             PanelKind::GpuViewport,
         ))
-        .panel(PanelDefinition::new(
-            "help",
-            "Help",
-            PanelKind::Browser,
-        ).initially_visible(false))
+        .panel(PanelDefinition::new("help", "Help", PanelKind::Browser).initially_visible(false))
         .run()
         .expect("failed to start workflow IDE framework Step 3 sample");
 }

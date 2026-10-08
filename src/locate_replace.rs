@@ -33,13 +33,14 @@ pub fn locate_replace<F>(
 where
     F: FnOnce() -> String,
 {
-    let (new_registry_entry, new_registry_entry_added) = match registry.find_by_reference(&new).cloned() {
-        Some(entry) => (entry, false),
-        None => match registry.register(new_id(), new.clone()) {
-            RegisterResult::Added(entry) => (entry, true),
-            RegisterResult::Existing(entry) => (entry, false),
-        },
-    };
+    let (new_registry_entry, new_registry_entry_added) =
+        match registry.find_by_reference(&new).cloned() {
+            Some(entry) => (entry, false),
+            None => match registry.register(new_id(), new.clone()) {
+                RegisterResult::Added(entry) => (entry, true),
+                RegisterResult::Existing(entry) => (entry, false),
+            },
+        };
 
     let mut affected_owner_ids = Vec::new();
     for usage in framework_uses {
@@ -50,13 +51,15 @@ where
     }
 
     LocateReplacePlan {
-        change: ResourceChange { before: old.clone(), after: new },
+        change: ResourceChange {
+            before: old.clone(),
+            after: new,
+        },
         affected_owner_ids,
         new_registry_entry,
         new_registry_entry_added,
     }
 }
-
 
 pub trait ApplicationResourceChangeAdapter {
     type Error: std::fmt::Display;
@@ -68,8 +71,13 @@ pub trait ApplicationResourceChangeAdapter {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LocateReplaceDecision {
-    Accepted { journal_data: Option<crate::project_resource::ApplicationJournalData> },
-    Rejected { reason: Option<String>, handled: bool },
+    Accepted {
+        journal_data: Option<crate::project_resource::ApplicationJournalData>,
+    },
+    Rejected {
+        reason: Option<String>,
+        handled: bool,
+    },
 }
 
 pub fn prepare_locate_replace<A: ApplicationResourceChangeAdapter>(
@@ -77,8 +85,14 @@ pub fn prepare_locate_replace<A: ApplicationResourceChangeAdapter>(
     old: &ResourceReference,
     new: &ResourceReference,
 ) -> Result<LocateReplaceDecision, String> {
-    let change = ResourceChange { before: old.clone(), after: new.clone() };
-    match application.prepare_resource_change(&change).map_err(|error| error.to_string())? {
+    let change = ResourceChange {
+        before: old.clone(),
+        after: new.clone(),
+    };
+    match application
+        .prepare_resource_change(&change)
+        .map_err(|error| error.to_string())?
+    {
         crate::project_resource::ResourceOperationDecision::Accept { journal_data } => {
             Ok(LocateReplaceDecision::Accepted { journal_data })
         }

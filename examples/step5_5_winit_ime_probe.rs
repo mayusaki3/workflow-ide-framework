@@ -4,8 +4,8 @@
 //! cursor position while composing text. This intentionally bypasses egui,
 //! eframe, Dock and TextEditor.
 
-use std::{num::NonZeroU32, sync::Arc};
 use softbuffer::{Context, Surface};
+use std::{num::NonZeroU32, sync::Arc};
 use winit::window::WindowLevel;
 use winit::{
     application::ApplicationHandler,
@@ -42,7 +42,8 @@ impl ApplicationHandler for App {
             window.set_ime_cursor_area(self.ime_pos, PhysicalSize::new(2, 24));
             println!("IME AREA x={:.1} y={:.1}", self.ime_pos.x, self.ime_pos.y);
             let context = Context::new(window.clone()).expect("create softbuffer context");
-            let surface = Surface::new(&context, window.clone()).expect("create softbuffer surface");
+            let surface =
+                Surface::new(&context, window.clone()).expect("create softbuffer surface");
             self.surface = Some(surface);
             window.request_redraw();
             self.window = Some(window);
@@ -55,7 +56,9 @@ impl ApplicationHandler for App {
         _window_id: WindowId,
         event: WindowEvent,
     ) {
-        let Some(window) = self.window.as_ref() else { return };
+        let Some(window) = self.window.as_ref() else {
+            return;
+        };
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {

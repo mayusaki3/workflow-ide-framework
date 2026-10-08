@@ -1,9 +1,14 @@
 use crate::{
     framework_settings::FrameworkSettings,
-    project::{ApplicationMetadata, ProjectContext, ProjectFile, ProjectMetadata, PROJECT_FORMAT_VERSION},
+    project::{
+        ApplicationMetadata, PROJECT_FORMAT_VERSION, ProjectContext, ProjectFile, ProjectMetadata,
+    },
     project_adapter_erased::ErasedApplicationProjectAdapter,
     project_lifecycle::ProjectSession,
-    project_open::{open_project, open_requires_user_decision, open_session, FrameworkSettingsOpen, ProjectOpenResult},
+    project_open::{
+        FrameworkSettingsOpen, ProjectOpenResult, open_project, open_requires_user_decision,
+        open_session,
+    },
     project_resource::NewProjectStoragePolicy,
     project_save::save_project,
     project_save_as::save_project_as,
@@ -78,7 +83,11 @@ impl ProjectController {
         self.accept_open(context, result)
     }
 
-    pub fn accept_open(&mut self, context: ProjectContext, result: ProjectOpenResult) -> ProjectCommandResult {
+    pub fn accept_open(
+        &mut self,
+        context: ProjectContext,
+        result: ProjectOpenResult,
+    ) -> ProjectCommandResult {
         let session = match open_session(context, &result) {
             Ok(session) => session,
             Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
@@ -107,7 +116,15 @@ impl ProjectController {
         let Some(project_file) = self.project_file.as_mut() else {
             return ProjectCommandResult::Failed("project metadata is unavailable".into());
         };
-        match save_project(session, &context, project_file, &self.framework_settings, application, save_id, saved_at) {
+        match save_project(
+            session,
+            &context,
+            project_file,
+            &self.framework_settings,
+            application,
+            save_id,
+            saved_at,
+        ) {
             Ok(()) => ProjectCommandResult::Completed,
             Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
         }
@@ -128,8 +145,18 @@ impl ProjectController {
             return ProjectCommandResult::Failed("project metadata is unavailable".into());
         };
         let previous_name = std::mem::replace(&mut project_file.project.name, project_name.into());
-        let result = save_project_as(session, destination, project_file, &self.framework_settings, application, save_id, saved_at);
-        if result.is_err() { project_file.project.name = previous_name; }
+        let result = save_project_as(
+            session,
+            destination,
+            project_file,
+            &self.framework_settings,
+            application,
+            save_id,
+            saved_at,
+        );
+        if result.is_err() {
+            project_file.project.name = previous_name;
+        }
         match result {
             Ok(()) => ProjectCommandResult::Completed,
             Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
@@ -137,7 +164,12 @@ impl ProjectController {
     }
 
     pub fn close(&mut self, confirmed_dirty: bool) -> ProjectCommandResult {
-        if self.session.as_ref().is_some_and(|session| session.dirty.is_dirty()) && !confirmed_dirty {
+        if self
+            .session
+            .as_ref()
+            .is_some_and(|session| session.dirty.is_dirty())
+            && !confirmed_dirty
+        {
             return ProjectCommandResult::NeedsDirtyConfirmation;
         }
         self.session = None;
@@ -146,17 +178,27 @@ impl ProjectController {
         ProjectCommandResult::Completed
     }
 
-    pub fn is_open(&self) -> bool { self.session.is_some() }
+    pub fn is_open(&self) -> bool {
+        self.session.is_some()
+    }
 
     pub fn project_name(&self) -> Option<&str> {
-        self.project_file.as_ref().map(|file| file.project.name.as_str())
+        self.project_file
+            .as_ref()
+            .map(|file| file.project.name.as_str())
     }
 
     pub fn project_description(&self) -> Option<&str> {
-        self.project_file.as_ref().and_then(|file| file.project.description.as_deref())
+        self.project_file
+            .as_ref()
+            .and_then(|file| file.project.description.as_deref())
     }
 
-    pub fn update_project_metadata(&mut self, name: impl Into<String>, description: Option<String>) -> ProjectCommandResult {
+    pub fn update_project_metadata(
+        &mut self,
+        name: impl Into<String>,
+        description: Option<String>,
+    ) -> ProjectCommandResult {
         let Some(project_file) = self.project_file.as_mut() else {
             return ProjectCommandResult::Failed("no project is open".into());
         };
@@ -169,11 +211,18 @@ impl ProjectController {
             let value = value.trim().to_owned();
             (!value.is_empty()).then_some(value)
         });
-        if let Some(session) = self.session.as_mut() { session.mark_metadata_dirty(); }
+        if let Some(session) = self.session.as_mut() {
+            session.mark_metadata_dirty();
+        }
         ProjectCommandResult::Completed
     }
 
-    fn project_template(&self, name: String, language: String, description: Option<String>) -> ProjectFile {
+    fn project_template(
+        &self,
+        name: String,
+        language: String,
+        description: Option<String>,
+    ) -> ProjectFile {
         ProjectFile {
             project: ProjectMetadata {
                 format_version: PROJECT_FORMAT_VERSION,

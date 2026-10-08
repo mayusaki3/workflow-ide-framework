@@ -1,7 +1,7 @@
 use workflow_ide_framework::{
     flow_editor::{FlowEdge, FlowModel, FlowNode, FlowPort, PortDirection},
     property_panel::{self, PropertyAction, PropertyValue},
-    text_editor::{TextDocument, TextEncoding, TextEditorOptions},
+    text_editor::{TextDocument, TextEditorOptions, TextEncoding},
     tree_viewer::{TreeModel, TreeNode},
 };
 
@@ -23,10 +23,16 @@ fn tree_model_preserves_japanese_labels_and_hierarchy() {
     let root = TreeNode::new("root", "サンプルプロジェクト")
         .node_type("project")
         .child(TreeNode::new("robot", "ロボット.rs").node_type("file"));
-    let model = TreeModel { roots: vec![root], selected_id: None };
+    let model = TreeModel {
+        roots: vec![root],
+        selected_id: None,
+    };
     assert_eq!(model.roots[0].label, "サンプルプロジェクト");
     assert_eq!(model.roots[0].children[0].label, "ロボット.rs");
-    assert_eq!(model.roots[0].children[0].node_type.as_deref(), Some("file"));
+    assert_eq!(
+        model.roots[0].children[0].node_type.as_deref(),
+        Some("file")
+    );
 }
 
 #[test]

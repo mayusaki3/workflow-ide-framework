@@ -1,274 +1,633 @@
 use crate::{
-    project::ProjectContext,
     locate_replace::FrameworkResourceUse,
-    project_resource::{ResourceReference,ResourceScope},
-    resource_journal::{ResourceOperationJournal,StoredExecutionRoute,StoredJournalItem,StoredOperationKind,StoredReference},
+    project::ProjectContext,
+    project_resource::{ResourceReference, ResourceScope},
+    resource_journal::{
+        ResourceOperationJournal, StoredExecutionRoute, StoredJournalItem, StoredOperationKind,
+        StoredReference,
+    },
     resource_registry::ResourceRegistry,
     resource_state::ResourceRoots,
 };
-use std::{fs,io};
+use std::{fs, io};
 
-#[derive(Debug,Clone,Copy,PartialEq,Eq)]
-pub enum ApplicationRecoveryState { NotApplicable, NotStarted, Applied, Conflict, Indeterminate }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplicationRecoveryState {
+    NotApplicable,
+    NotStarted,
+    Applied,
+    Conflict,
+    Indeterminate,
+}
 
 pub trait ApplicationResourceRecoveryAdapter {
     type Error: std::fmt::Display;
-    fn assess_resource_recovery(&mut self, journal:&ResourceOperationJournal)->Result<ApplicationRecoveryState,Self::Error>;
-    fn recover_resource_operation(&mut self, journal:&ResourceOperationJournal)->Result<(),Self::Error>;
+    fn assess_resource_recovery(
+        &mut self,
+        journal: &ResourceOperationJournal,
+    ) -> Result<ApplicationRecoveryState, Self::Error>;
+    fn recover_resource_operation(
+        &mut self,
+        journal: &ResourceOperationJournal,
+    ) -> Result<(), Self::Error>;
 }
 
-#[derive(Debug,Clone,Copy,PartialEq,Eq)]
-pub enum FrameworkPersistentRecoveryState { Before, Applied, Mixed, NotApplicable, Indeterminate }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameworkPersistentRecoveryState {
+    Before,
+    Applied,
+    Mixed,
+    NotApplicable,
+    Indeterminate,
+}
 
-#[derive(Debug,Clone,Copy,PartialEq,Eq)]
-pub enum CombinedRecoveryState { NotStarted, FilesystemApplied, ApplicationApplied, Applied, Conflict, Indeterminate }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombinedRecoveryState {
+    NotStarted,
+    FilesystemApplied,
+    ApplicationApplied,
+    Applied,
+    Conflict,
+    Indeterminate,
+}
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JournalItemRecoveryState {
+    NotStarted,
+    FilesystemApplied,
+    AlreadyComplete,
+    Conflict,
+    Indeterminate,
+}
 
-#[derive(Debug,Clone,Copy,PartialEq,Eq)]
-pub enum JournalItemRecoveryState { NotStarted, FilesystemApplied, AlreadyComplete, Conflict, Indeterminate }
-
-#[derive(Debug,Clone,PartialEq,Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JournalRecoveryAssessment {
-    pub journal:ResourceOperationJournal,
-    pub item_states:Vec<JournalItemRecoveryState>,
+    pub journal: ResourceOperationJournal,
+    pub item_states: Vec<JournalItemRecoveryState>,
 }
 
-#[derive(Debug,Clone,PartialEq,Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombinedRecoveryAssessment {
-    pub filesystem:JournalRecoveryAssessment,
-    pub framework:FrameworkPersistentRecoveryState,
-    pub application:ApplicationRecoveryState,
-    pub state:CombinedRecoveryState,
+    pub filesystem: JournalRecoveryAssessment,
+    pub framework: FrameworkPersistentRecoveryState,
+    pub application: ApplicationRecoveryState,
+    pub state: CombinedRecoveryState,
 }
 impl JournalRecoveryAssessment {
-    pub fn has_conflict(&self)->bool{self.item_states.iter().any(|s|matches!(s,JournalItemRecoveryState::Conflict|JournalItemRecoveryState::Indeterminate))}
-    pub fn all_not_started(&self)->bool{self.item_states.iter().all(|s|*s==JournalItemRecoveryState::NotStarted)}
+    pub fn has_conflict(&self) -> bool {
+        self.item_states.iter().any(|s| {
+            matches!(
+                s,
+                JournalItemRecoveryState::Conflict | JournalItemRecoveryState::Indeterminate
+            )
+        })
+    }
+    pub fn all_not_started(&self) -> bool {
+        self.item_states
+            .iter()
+            .all(|s| *s == JournalItemRecoveryState::NotStarted)
+    }
 }
 
-pub fn assess_pending_journal(context:&ProjectContext,roots:&ResourceRoots)->io::Result<Option<JournalRecoveryAssessment>>{
-    let Some(journal)=ResourceOperationJournal::load(context)? else{return Ok(None)};
-    let states=journal.items.iter().map(|item|assess_item(journal.kind,item,roots)).collect();
-    Ok(Some(JournalRecoveryAssessment{journal,item_states:states}))
+pub fn assess_pending_journal(
+    context: &ProjectContext,
+    roots: &ResourceRoots,
+) -> io::Result<Option<JournalRecoveryAssessment>> {
+    let Some(journal) = ResourceOperationJournal::load(context)? else {
+        return Ok(None);
+    };
+    let states = journal
+        .items
+        .iter()
+        .map(|item| assess_item(journal.kind, item, roots))
+        .collect();
+    Ok(Some(JournalRecoveryAssessment {
+        journal,
+        item_states: states,
+    }))
 }
 
-fn assess_item(kind:StoredOperationKind,item:&StoredJournalItem,roots:&ResourceRoots)->JournalItemRecoveryState{
-    let before=item.before.as_ref().and_then(to_reference).map(|r|exists_file(roots,&r));
-    let after=item.after.as_ref().and_then(to_reference).map(|r|exists_file(roots,&r));
+fn assess_item(
+    kind: StoredOperationKind,
+    item: &StoredJournalItem,
+    roots: &ResourceRoots,
+) -> JournalItemRecoveryState {
+    let before = item
+        .before
+        .as_ref()
+        .and_then(to_reference)
+        .map(|r| exists_file(roots, &r));
+    let after = item
+        .after
+        .as_ref()
+        .and_then(to_reference)
+        .map(|r| exists_file(roots, &r));
     match kind {
-        StoredOperationKind::Rename|StoredOperationKind::Move => match (before,after) {
-            (Some(true),Some(false))=>JournalItemRecoveryState::NotStarted,
-            (Some(false),Some(true))=>JournalItemRecoveryState::FilesystemApplied,
-            (Some(true),Some(true))=>JournalItemRecoveryState::Conflict,
-            (Some(false),Some(false))=>JournalItemRecoveryState::Indeterminate,
-            _=>JournalItemRecoveryState::Indeterminate,
+        StoredOperationKind::Rename | StoredOperationKind::Move => match (before, after) {
+            (Some(true), Some(false)) => JournalItemRecoveryState::NotStarted,
+            (Some(false), Some(true)) => JournalItemRecoveryState::FilesystemApplied,
+            (Some(true), Some(true)) => JournalItemRecoveryState::Conflict,
+            (Some(false), Some(false)) => JournalItemRecoveryState::Indeterminate,
+            _ => JournalItemRecoveryState::Indeterminate,
         },
-        StoredOperationKind::Import|StoredOperationKind::Export => match (before,after) {
-            (Some(true),Some(false))=>JournalItemRecoveryState::NotStarted,
-            (Some(true),Some(true))=>JournalItemRecoveryState::FilesystemApplied,
-            (Some(false),Some(true))=>JournalItemRecoveryState::FilesystemApplied,
-            (Some(false),Some(false))=>JournalItemRecoveryState::Indeterminate,
-            _=>JournalItemRecoveryState::Indeterminate,
+        StoredOperationKind::Import | StoredOperationKind::Export => match (before, after) {
+            (Some(true), Some(false)) => JournalItemRecoveryState::NotStarted,
+            (Some(true), Some(true)) => JournalItemRecoveryState::FilesystemApplied,
+            (Some(false), Some(true)) => JournalItemRecoveryState::FilesystemApplied,
+            (Some(false), Some(false)) => JournalItemRecoveryState::Indeterminate,
+            _ => JournalItemRecoveryState::Indeterminate,
         },
         StoredOperationKind::Delete => match before {
-            Some(true)=>JournalItemRecoveryState::NotStarted,
-            Some(false)=>JournalItemRecoveryState::FilesystemApplied,
-            None=>JournalItemRecoveryState::Indeterminate,
+            Some(true) => JournalItemRecoveryState::NotStarted,
+            Some(false) => JournalItemRecoveryState::FilesystemApplied,
+            None => JournalItemRecoveryState::Indeterminate,
         },
         StoredOperationKind::Replace => JournalItemRecoveryState::AlreadyComplete,
     }
 }
-fn exists_file(roots:&ResourceRoots,r:&ResourceReference)->bool{fs::metadata(roots.resolve(r)).map(|m|m.is_file()).unwrap_or(false)}
-fn to_reference(stored:&StoredReference)->Option<ResourceReference>{
-    let scope=match stored.scope.as_str(){"application"=>ResourceScope::Application,"project"=>ResourceScope::Project,"external"=>ResourceScope::External,_=>return None};
-    ResourceReference::new(scope,stored.path.clone()).ok()
+fn exists_file(roots: &ResourceRoots, r: &ResourceReference) -> bool {
+    fs::metadata(roots.resolve(r))
+        .map(|m| m.is_file())
+        .unwrap_or(false)
+}
+fn to_reference(stored: &StoredReference) -> Option<ResourceReference> {
+    let scope = match stored.scope.as_str() {
+        "application" => ResourceScope::Application,
+        "project" => ResourceScope::Project,
+        "external" => ResourceScope::External,
+        _ => return None,
+    };
+    ResourceReference::new(scope, stored.path.clone()).ok()
 }
 
-
-pub fn assess_pending_journal_with_application<A:ApplicationResourceRecoveryAdapter>(
-    application:&mut A,context:&ProjectContext,roots:&ResourceRoots,
-)->Result<Option<CombinedRecoveryAssessment>,String>{
-    let Some(filesystem)=assess_pending_journal(context,roots).map_err(|e|e.to_string())? else{return Ok(None)};
-    let application_state=if filesystem.journal.execution_route==StoredExecutionRoute::Framework{ApplicationRecoveryState::NotApplicable}else{application.assess_resource_recovery(&filesystem.journal).map_err(|e|e.to_string())?};
-    let state=combine_recovery(&filesystem,application_state);
-    Ok(Some(CombinedRecoveryAssessment{filesystem,framework:FrameworkPersistentRecoveryState::NotApplicable,application:application_state,state}))
+pub fn assess_pending_journal_with_application<A: ApplicationResourceRecoveryAdapter>(
+    application: &mut A,
+    context: &ProjectContext,
+    roots: &ResourceRoots,
+) -> Result<Option<CombinedRecoveryAssessment>, String> {
+    let Some(filesystem) = assess_pending_journal(context, roots).map_err(|e| e.to_string())?
+    else {
+        return Ok(None);
+    };
+    let application_state = if filesystem.journal.execution_route == StoredExecutionRoute::Framework
+    {
+        ApplicationRecoveryState::NotApplicable
+    } else {
+        application
+            .assess_resource_recovery(&filesystem.journal)
+            .map_err(|e| e.to_string())?
+    };
+    let state = combine_recovery(&filesystem, application_state);
+    Ok(Some(CombinedRecoveryAssessment {
+        filesystem,
+        framework: FrameworkPersistentRecoveryState::NotApplicable,
+        application: application_state,
+        state,
+    }))
 }
 
-pub fn assess_pending_journal_full<A:ApplicationResourceRecoveryAdapter>(
-    application:&mut A,context:&ProjectContext,roots:&ResourceRoots,registry:&ResourceRegistry,framework_uses:&[FrameworkResourceUse],
-)->Result<Option<CombinedRecoveryAssessment>,String>{
-    let Some(filesystem)=assess_pending_journal(context,roots).map_err(|e|e.to_string())? else{return Ok(None)};
-    let framework=assess_framework_state(&filesystem.journal,registry,framework_uses);
-    let application_state=if filesystem.journal.execution_route==StoredExecutionRoute::Framework{ApplicationRecoveryState::NotApplicable}else{application.assess_resource_recovery(&filesystem.journal).map_err(|e|e.to_string())?};
-    let state=combine_recovery_full(&filesystem,framework,application_state);
-    Ok(Some(CombinedRecoveryAssessment{filesystem,framework,application:application_state,state}))
+pub fn assess_pending_journal_full<A: ApplicationResourceRecoveryAdapter>(
+    application: &mut A,
+    context: &ProjectContext,
+    roots: &ResourceRoots,
+    registry: &ResourceRegistry,
+    framework_uses: &[FrameworkResourceUse],
+) -> Result<Option<CombinedRecoveryAssessment>, String> {
+    let Some(filesystem) = assess_pending_journal(context, roots).map_err(|e| e.to_string())?
+    else {
+        return Ok(None);
+    };
+    let framework = assess_framework_state(&filesystem.journal, registry, framework_uses);
+    let application_state = if filesystem.journal.execution_route == StoredExecutionRoute::Framework
+    {
+        ApplicationRecoveryState::NotApplicable
+    } else {
+        application
+            .assess_resource_recovery(&filesystem.journal)
+            .map_err(|e| e.to_string())?
+    };
+    let state = combine_recovery_full(&filesystem, framework, application_state);
+    Ok(Some(CombinedRecoveryAssessment {
+        filesystem,
+        framework,
+        application: application_state,
+        state,
+    }))
 }
 
-fn combine_recovery(fs:&JournalRecoveryAssessment,app:ApplicationRecoveryState)->CombinedRecoveryState{
-    if fs.item_states.iter().any(|s|*s==JournalItemRecoveryState::Conflict) || app==ApplicationRecoveryState::Conflict{return CombinedRecoveryState::Conflict;}
-    if fs.item_states.iter().any(|s|*s==JournalItemRecoveryState::Indeterminate) || app==ApplicationRecoveryState::Indeterminate{return CombinedRecoveryState::Indeterminate;}
-    let fs_not_started=fs.item_states.iter().all(|s|*s==JournalItemRecoveryState::NotStarted);
-    let fs_applied=fs.item_states.iter().all(|s|matches!(s,JournalItemRecoveryState::FilesystemApplied|JournalItemRecoveryState::AlreadyComplete));
-    match (fs_not_started,fs_applied,app) {
-        (true,_,ApplicationRecoveryState::NotApplicable|ApplicationRecoveryState::NotStarted)=>CombinedRecoveryState::NotStarted,
-        (true,_,ApplicationRecoveryState::Applied)=>CombinedRecoveryState::ApplicationApplied,
-        (_,true,ApplicationRecoveryState::NotApplicable|ApplicationRecoveryState::Applied)=>CombinedRecoveryState::Applied,
-        (_,true,ApplicationRecoveryState::NotStarted)=>CombinedRecoveryState::FilesystemApplied,
-        _=>CombinedRecoveryState::Indeterminate,
+fn combine_recovery(
+    fs: &JournalRecoveryAssessment,
+    app: ApplicationRecoveryState,
+) -> CombinedRecoveryState {
+    if fs
+        .item_states
+        .iter()
+        .any(|s| *s == JournalItemRecoveryState::Conflict)
+        || app == ApplicationRecoveryState::Conflict
+    {
+        return CombinedRecoveryState::Conflict;
+    }
+    if fs
+        .item_states
+        .iter()
+        .any(|s| *s == JournalItemRecoveryState::Indeterminate)
+        || app == ApplicationRecoveryState::Indeterminate
+    {
+        return CombinedRecoveryState::Indeterminate;
+    }
+    let fs_not_started = fs
+        .item_states
+        .iter()
+        .all(|s| *s == JournalItemRecoveryState::NotStarted);
+    let fs_applied = fs.item_states.iter().all(|s| {
+        matches!(
+            s,
+            JournalItemRecoveryState::FilesystemApplied | JournalItemRecoveryState::AlreadyComplete
+        )
+    });
+    match (fs_not_started, fs_applied, app) {
+        (
+            true,
+            _,
+            ApplicationRecoveryState::NotApplicable | ApplicationRecoveryState::NotStarted,
+        ) => CombinedRecoveryState::NotStarted,
+        (true, _, ApplicationRecoveryState::Applied) => CombinedRecoveryState::ApplicationApplied,
+        (_, true, ApplicationRecoveryState::NotApplicable | ApplicationRecoveryState::Applied) => {
+            CombinedRecoveryState::Applied
+        }
+        (_, true, ApplicationRecoveryState::NotStarted) => CombinedRecoveryState::FilesystemApplied,
+        _ => CombinedRecoveryState::Indeterminate,
     }
 }
 
-fn assess_framework_state(journal:&ResourceOperationJournal,registry:&ResourceRegistry,uses:&[FrameworkResourceUse])->FrameworkPersistentRecoveryState{
-    if journal.kind==StoredOperationKind::Export{return FrameworkPersistentRecoveryState::NotApplicable;}
-    let mut before_count=0usize;let mut after_count=0usize;let mut mixed=false;
+fn assess_framework_state(
+    journal: &ResourceOperationJournal,
+    registry: &ResourceRegistry,
+    uses: &[FrameworkResourceUse],
+) -> FrameworkPersistentRecoveryState {
+    if journal.kind == StoredOperationKind::Export {
+        return FrameworkPersistentRecoveryState::NotApplicable;
+    }
+    let mut before_count = 0usize;
+    let mut after_count = 0usize;
+    let mut mixed = false;
     for item in &journal.items {
-        let before=item.before.as_ref().and_then(to_reference);let after=item.after.as_ref().and_then(to_reference);
+        let before = item.before.as_ref().and_then(to_reference);
+        let after = item.after.as_ref().and_then(to_reference);
         match journal.kind {
-            StoredOperationKind::Import|StoredOperationKind::Replace=>{
-                let (Some(b),Some(a))=(before,after) else{return FrameworkPersistentRecoveryState::Indeterminate};
-                let a_entry=registry.find_by_reference(&a);let b_use=uses.iter().any(|u|u.reference==b);let a_use=uses.iter().any(|u|u.reference==a);
-                if let (Some(expected_id),Some(entry))=(item.after_resource_id.as_deref(),a_entry){if entry.resource_id!=expected_id{mixed=true;}}
-                if a_entry.is_some()||a_use{after_count+=1;}if b_use&&!a_use{before_count+=1;}if b_use&&a_use{mixed=true;}
-            },
-            StoredOperationKind::Rename|StoredOperationKind::Move=>{
-                let (Some(b),Some(a))=(before,after) else{return FrameworkPersistentRecoveryState::Indeterminate};
-                let b_entry=registry.find_by_reference(&b);let a_entry=registry.find_by_reference(&a);
-                let b_use=uses.iter().any(|u|u.reference==b);let a_use=uses.iter().any(|u|u.reference==a);
-                if let Some(expected_id)=item.before_resource_id.as_deref(){
-                    if b_entry.is_some_and(|e|e.resource_id!=expected_id)||a_entry.is_some_and(|e|e.resource_id!=expected_id){mixed=true;}
+            StoredOperationKind::Import | StoredOperationKind::Replace => {
+                let (Some(b), Some(a)) = (before, after) else {
+                    return FrameworkPersistentRecoveryState::Indeterminate;
+                };
+                let a_entry = registry.find_by_reference(&a);
+                let b_use = uses.iter().any(|u| u.reference == b);
+                let a_use = uses.iter().any(|u| u.reference == a);
+                if let (Some(expected_id), Some(entry)) =
+                    (item.after_resource_id.as_deref(), a_entry)
+                {
+                    if entry.resource_id != expected_id {
+                        mixed = true;
+                    }
                 }
-                if b_entry.is_some()||b_use{before_count+=1;}
-                if a_entry.is_some()||a_use{after_count+=1;}
-                if (b_entry.is_some()&&a_entry.is_some())||(b_use&&a_use){mixed=true;}
-            },
-            StoredOperationKind::Delete=>{
-                let Some(b)=before else{return FrameworkPersistentRecoveryState::Indeterminate};
-                if let Some(entry)=registry.find_by_reference(&b){
-                    if item.before_resource_id.as_deref().is_some_and(|id|entry.resource_id!=id){mixed=true;}
-                    before_count+=1;
-                }else{after_count+=1;}
-            },
-            StoredOperationKind::Export=>{},
+                if a_entry.is_some() || a_use {
+                    after_count += 1;
+                }
+                if b_use && !a_use {
+                    before_count += 1;
+                }
+                if b_use && a_use {
+                    mixed = true;
+                }
+            }
+            StoredOperationKind::Rename | StoredOperationKind::Move => {
+                let (Some(b), Some(a)) = (before, after) else {
+                    return FrameworkPersistentRecoveryState::Indeterminate;
+                };
+                let b_entry = registry.find_by_reference(&b);
+                let a_entry = registry.find_by_reference(&a);
+                let b_use = uses.iter().any(|u| u.reference == b);
+                let a_use = uses.iter().any(|u| u.reference == a);
+                if let Some(expected_id) = item.before_resource_id.as_deref() {
+                    if b_entry.is_some_and(|e| e.resource_id != expected_id)
+                        || a_entry.is_some_and(|e| e.resource_id != expected_id)
+                    {
+                        mixed = true;
+                    }
+                }
+                if b_entry.is_some() || b_use {
+                    before_count += 1;
+                }
+                if a_entry.is_some() || a_use {
+                    after_count += 1;
+                }
+                if (b_entry.is_some() && a_entry.is_some()) || (b_use && a_use) {
+                    mixed = true;
+                }
+            }
+            StoredOperationKind::Delete => {
+                let Some(b) = before else {
+                    return FrameworkPersistentRecoveryState::Indeterminate;
+                };
+                if let Some(entry) = registry.find_by_reference(&b) {
+                    if item
+                        .before_resource_id
+                        .as_deref()
+                        .is_some_and(|id| entry.resource_id != id)
+                    {
+                        mixed = true;
+                    }
+                    before_count += 1;
+                } else {
+                    after_count += 1;
+                }
+            }
+            StoredOperationKind::Export => {}
         }
     }
-    if mixed||(before_count>0&&after_count>0){FrameworkPersistentRecoveryState::Mixed}else if after_count>0{FrameworkPersistentRecoveryState::Applied}else{FrameworkPersistentRecoveryState::Before}
-}
-
-fn combine_recovery_full(fs:&JournalRecoveryAssessment,framework:FrameworkPersistentRecoveryState,app:ApplicationRecoveryState)->CombinedRecoveryState{
-    if matches!(framework,FrameworkPersistentRecoveryState::Mixed|FrameworkPersistentRecoveryState::Indeterminate){return CombinedRecoveryState::Conflict;}
-    let base=combine_recovery(fs,app);match (base,framework){
-        (CombinedRecoveryState::Applied,FrameworkPersistentRecoveryState::Applied|FrameworkPersistentRecoveryState::NotApplicable)=>CombinedRecoveryState::Applied,
-        (CombinedRecoveryState::Applied,FrameworkPersistentRecoveryState::Before)=>CombinedRecoveryState::FilesystemApplied,
-        (other,_)=>other,
+    if mixed || (before_count > 0 && after_count > 0) {
+        FrameworkPersistentRecoveryState::Mixed
+    } else if after_count > 0 {
+        FrameworkPersistentRecoveryState::Applied
+    } else {
+        FrameworkPersistentRecoveryState::Before
     }
 }
 
-pub fn complete_application_recovery<A:ApplicationResourceRecoveryAdapter>(
-    application:&mut A,assessment:&CombinedRecoveryAssessment,
-)->Result<ApplicationRecoveryState,String>{
-    if assessment.filesystem.journal.execution_route!=StoredExecutionRoute::Application{return Ok(ApplicationRecoveryState::NotApplicable);}
+fn combine_recovery_full(
+    fs: &JournalRecoveryAssessment,
+    framework: FrameworkPersistentRecoveryState,
+    app: ApplicationRecoveryState,
+) -> CombinedRecoveryState {
+    if matches!(
+        framework,
+        FrameworkPersistentRecoveryState::Mixed | FrameworkPersistentRecoveryState::Indeterminate
+    ) {
+        return CombinedRecoveryState::Conflict;
+    }
+    let base = combine_recovery(fs, app);
+    match (base, framework) {
+        (
+            CombinedRecoveryState::Applied,
+            FrameworkPersistentRecoveryState::Applied
+            | FrameworkPersistentRecoveryState::NotApplicable,
+        ) => CombinedRecoveryState::Applied,
+        (CombinedRecoveryState::Applied, FrameworkPersistentRecoveryState::Before) => {
+            CombinedRecoveryState::FilesystemApplied
+        }
+        (other, _) => other,
+    }
+}
+
+pub fn complete_application_recovery<A: ApplicationResourceRecoveryAdapter>(
+    application: &mut A,
+    assessment: &CombinedRecoveryAssessment,
+) -> Result<ApplicationRecoveryState, String> {
+    if assessment.filesystem.journal.execution_route != StoredExecutionRoute::Application {
+        return Ok(ApplicationRecoveryState::NotApplicable);
+    }
     match assessment.application {
-        ApplicationRecoveryState::Applied=>Ok(ApplicationRecoveryState::Applied),
-        ApplicationRecoveryState::NotStarted=>{
-            application.recover_resource_operation(&assessment.filesystem.journal).map_err(|e|e.to_string())?;
-            match application.assess_resource_recovery(&assessment.filesystem.journal).map_err(|e|e.to_string())? {
-                ApplicationRecoveryState::Applied=>Ok(ApplicationRecoveryState::Applied),
-                other=>Err(format!("application recovery did not reach Applied state: {other:?}")),
+        ApplicationRecoveryState::Applied => Ok(ApplicationRecoveryState::Applied),
+        ApplicationRecoveryState::NotStarted => {
+            application
+                .recover_resource_operation(&assessment.filesystem.journal)
+                .map_err(|e| e.to_string())?;
+            match application
+                .assess_resource_recovery(&assessment.filesystem.journal)
+                .map_err(|e| e.to_string())?
+            {
+                ApplicationRecoveryState::Applied => Ok(ApplicationRecoveryState::Applied),
+                other => Err(format!(
+                    "application recovery did not reach Applied state: {other:?}"
+                )),
             }
         }
-        ApplicationRecoveryState::NotApplicable=>Err("Application route cannot have NotApplicable recovery state".into()),
-        ApplicationRecoveryState::Conflict=>Err("application recovery is in Conflict state".into()),
-        ApplicationRecoveryState::Indeterminate=>Err("application recovery is Indeterminate".into()),
+        ApplicationRecoveryState::NotApplicable => {
+            Err("Application route cannot have NotApplicable recovery state".into())
+        }
+        ApplicationRecoveryState::Conflict => {
+            Err("application recovery is in Conflict state".into())
+        }
+        ApplicationRecoveryState::Indeterminate => {
+            Err("application recovery is Indeterminate".into())
+        }
     }
 }
 
-#[derive(Debug,Clone,Copy,PartialEq,Eq)]
-pub enum FrameworkRecoveryResult { Completed, NoChange }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameworkRecoveryResult {
+    Completed,
+    NoChange,
+}
 
-pub fn complete_framework_recovery<F:FnMut()->String>(
-    assessment:&CombinedRecoveryAssessment,
-    registry:&mut ResourceRegistry,
-    framework_uses:&mut [FrameworkResourceUse],
-    mut new_id:F,
-)->Result<FrameworkRecoveryResult,String>{
-    if matches!(assessment.state,CombinedRecoveryState::Conflict|CombinedRecoveryState::Indeterminate|CombinedRecoveryState::NotStarted|CombinedRecoveryState::ApplicationApplied){
-        return Err(format!("recovery state {:?} is not safe for framework completion",assessment.state));
+pub fn complete_framework_recovery<F: FnMut() -> String>(
+    assessment: &CombinedRecoveryAssessment,
+    registry: &mut ResourceRegistry,
+    framework_uses: &mut [FrameworkResourceUse],
+    mut new_id: F,
+) -> Result<FrameworkRecoveryResult, String> {
+    if matches!(
+        assessment.state,
+        CombinedRecoveryState::Conflict
+            | CombinedRecoveryState::Indeterminate
+            | CombinedRecoveryState::NotStarted
+            | CombinedRecoveryState::ApplicationApplied
+    ) {
+        return Err(format!(
+            "recovery state {:?} is not safe for framework completion",
+            assessment.state
+        ));
     }
-    let mut changed=false;
+    let mut changed = false;
     for item in &assessment.filesystem.journal.items {
-        let before=item.before.as_ref().and_then(to_reference);
-        let after=item.after.as_ref().and_then(to_reference);
+        let before = item.before.as_ref().and_then(to_reference);
+        let after = item.after.as_ref().and_then(to_reference);
         match assessment.filesystem.journal.kind {
-            StoredOperationKind::Import=>{
-                let before=before.ok_or("invalid import before reference")?;let after=after.ok_or("invalid import after reference")?;
-                if let Some(entry)=registry.find_by_reference(&after){if item.after_resource_id.as_deref().is_some_and(|id|entry.resource_id!=id){return Err("import destination registry resource ID does not match journal".into());}}else{let id=item.after_resource_id.clone().unwrap_or_else(&mut new_id);let _=registry.register(id,after.clone());changed=true;}
-                changed|=replace_framework_uses(framework_uses,&before,&after)>0;
-            }
-            StoredOperationKind::Export=>{}
-            StoredOperationKind::Rename|StoredOperationKind::Move=>{
-                let before=before.ok_or("invalid move before reference")?;let after=after.ok_or("invalid move after reference")?;
-                if let Some(expected_id)=item.before_resource_id.as_deref(){
-                    if let Some(entry)=registry.find_by_reference(&before){if entry.resource_id!=expected_id{return Err("move source registry resource ID does not match journal".into());}}
-                    if let Some(entry)=registry.find_by_reference(&after){if entry.resource_id!=expected_id{return Err("move destination registry resource ID does not match journal".into());}}
+            StoredOperationKind::Import => {
+                let before = before.ok_or("invalid import before reference")?;
+                let after = after.ok_or("invalid import after reference")?;
+                if let Some(entry) = registry.find_by_reference(&after) {
+                    if item
+                        .after_resource_id
+                        .as_deref()
+                        .is_some_and(|id| entry.resource_id != id)
+                    {
+                        return Err(
+                            "import destination registry resource ID does not match journal".into(),
+                        );
+                    }
+                } else {
+                    let id = item.after_resource_id.clone().unwrap_or_else(&mut new_id);
+                    let _ = registry.register(id, after.clone());
+                    changed = true;
                 }
-                if let Some(entry)=registry.find_by_reference(&before).cloned(){let _=registry.remove(&entry.resource_id);let _=registry.register(entry.resource_id,after.clone());changed=true;}else if registry.find_by_reference(&after).is_none(){if let Some(resource_id)=item.before_resource_id.clone(){let _=registry.register(resource_id,after.clone());changed=true;}}
-                changed|=replace_framework_uses(framework_uses,&before,&after)>0;
+                changed |= replace_framework_uses(framework_uses, &before, &after) > 0;
             }
-            StoredOperationKind::Delete=>{
-                let before=before.ok_or("invalid delete before reference")?;
-                if let Some(entry)=registry.find_by_reference(&before).cloned(){
-                    if item.before_resource_id.as_deref().is_some_and(|id|entry.resource_id!=id){return Err("delete source registry resource ID does not match journal".into());}
-                    let _=registry.remove(&entry.resource_id);changed=true;
+            StoredOperationKind::Export => {}
+            StoredOperationKind::Rename | StoredOperationKind::Move => {
+                let before = before.ok_or("invalid move before reference")?;
+                let after = after.ok_or("invalid move after reference")?;
+                if let Some(expected_id) = item.before_resource_id.as_deref() {
+                    if let Some(entry) = registry.find_by_reference(&before) {
+                        if entry.resource_id != expected_id {
+                            return Err(
+                                "move source registry resource ID does not match journal".into()
+                            );
+                        }
+                    }
+                    if let Some(entry) = registry.find_by_reference(&after) {
+                        if entry.resource_id != expected_id {
+                            return Err(
+                                "move destination registry resource ID does not match journal"
+                                    .into(),
+                            );
+                        }
+                    }
+                }
+                if let Some(entry) = registry.find_by_reference(&before).cloned() {
+                    let _ = registry.remove(&entry.resource_id);
+                    let _ = registry.register(entry.resource_id, after.clone());
+                    changed = true;
+                } else if registry.find_by_reference(&after).is_none() {
+                    if let Some(resource_id) = item.before_resource_id.clone() {
+                        let _ = registry.register(resource_id, after.clone());
+                        changed = true;
+                    }
+                }
+                changed |= replace_framework_uses(framework_uses, &before, &after) > 0;
+            }
+            StoredOperationKind::Delete => {
+                let before = before.ok_or("invalid delete before reference")?;
+                if let Some(entry) = registry.find_by_reference(&before).cloned() {
+                    if item
+                        .before_resource_id
+                        .as_deref()
+                        .is_some_and(|id| entry.resource_id != id)
+                    {
+                        return Err(
+                            "delete source registry resource ID does not match journal".into()
+                        );
+                    }
+                    let _ = registry.remove(&entry.resource_id);
+                    changed = true;
                 }
             }
-            StoredOperationKind::Replace=>{
-                let before=before.ok_or("invalid replace before reference")?;let after=after.ok_or("invalid replace after reference")?;
-                if let Some(entry)=registry.find_by_reference(&after){if item.after_resource_id.as_deref().is_some_and(|id|entry.resource_id!=id){return Err("replace destination registry resource ID does not match journal".into());}}else{let id=item.after_resource_id.clone().unwrap_or_else(&mut new_id);let _=registry.register(id,after.clone());changed=true;}
-                changed|=replace_framework_uses(framework_uses,&before,&after)>0;
+            StoredOperationKind::Replace => {
+                let before = before.ok_or("invalid replace before reference")?;
+                let after = after.ok_or("invalid replace after reference")?;
+                if let Some(entry) = registry.find_by_reference(&after) {
+                    if item
+                        .after_resource_id
+                        .as_deref()
+                        .is_some_and(|id| entry.resource_id != id)
+                    {
+                        return Err(
+                            "replace destination registry resource ID does not match journal"
+                                .into(),
+                        );
+                    }
+                } else {
+                    let id = item.after_resource_id.clone().unwrap_or_else(&mut new_id);
+                    let _ = registry.register(id, after.clone());
+                    changed = true;
+                }
+                changed |= replace_framework_uses(framework_uses, &before, &after) > 0;
             }
         }
     }
-    Ok(if changed{FrameworkRecoveryResult::Completed}else{FrameworkRecoveryResult::NoChange})
+    Ok(if changed {
+        FrameworkRecoveryResult::Completed
+    } else {
+        FrameworkRecoveryResult::NoChange
+    })
 }
 
-pub fn finalize_recovered_journal(context:&ProjectContext,assessment:&CombinedRecoveryAssessment)->Result<(),String>{
-    if assessment.state!=CombinedRecoveryState::Applied{return Err("journal can only be finalized when recovery is fully applied".into());}
-    ResourceOperationJournal::remove(context).map_err(|e|e.to_string())
-}
-
-#[derive(Debug,Clone,Copy,PartialEq,Eq)]
-pub enum RecoveryCompletionResult { NoJournal, Completed }
-
-pub fn recover_pending_resource_operation<A,F>(
-    application:&mut A,
-    context:&ProjectContext,
-    roots:&ResourceRoots,
-    registry:&mut ResourceRegistry,
-    framework_uses:&mut [FrameworkResourceUse],
-    new_id:F,
-)->Result<RecoveryCompletionResult,String>
-where A:ApplicationResourceRecoveryAdapter,F:FnMut()->String {
-    let Some(initial)=assess_pending_journal_full(application,context,roots,registry,framework_uses)? else{return Ok(RecoveryCompletionResult::NoJournal)};
-    if matches!(initial.state,CombinedRecoveryState::Conflict|CombinedRecoveryState::Indeterminate){
-        return Err(format!("recovery state {:?} requires manual resolution",initial.state));
+pub fn finalize_recovered_journal(
+    context: &ProjectContext,
+    assessment: &CombinedRecoveryAssessment,
+) -> Result<(), String> {
+    if assessment.state != CombinedRecoveryState::Applied {
+        return Err("journal can only be finalized when recovery is fully applied".into());
     }
-    complete_application_recovery(application,&initial)?;
-    let Some(after_application)=assess_pending_journal_full(application,context,roots,registry,framework_uses)? else{
+    ResourceOperationJournal::remove(context).map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecoveryCompletionResult {
+    NoJournal,
+    Completed,
+}
+
+pub fn recover_pending_resource_operation<A, F>(
+    application: &mut A,
+    context: &ProjectContext,
+    roots: &ResourceRoots,
+    registry: &mut ResourceRegistry,
+    framework_uses: &mut [FrameworkResourceUse],
+    new_id: F,
+) -> Result<RecoveryCompletionResult, String>
+where
+    A: ApplicationResourceRecoveryAdapter,
+    F: FnMut() -> String,
+{
+    let Some(initial) =
+        assess_pending_journal_full(application, context, roots, registry, framework_uses)?
+    else {
+        return Ok(RecoveryCompletionResult::NoJournal);
+    };
+    if matches!(
+        initial.state,
+        CombinedRecoveryState::Conflict | CombinedRecoveryState::Indeterminate
+    ) {
+        return Err(format!(
+            "recovery state {:?} requires manual resolution",
+            initial.state
+        ));
+    }
+    complete_application_recovery(application, &initial)?;
+    let Some(after_application) =
+        assess_pending_journal_full(application, context, roots, registry, framework_uses)?
+    else {
         return Err("resource operation journal disappeared during recovery".into());
     };
-    if matches!(after_application.state,CombinedRecoveryState::Conflict|CombinedRecoveryState::Indeterminate|CombinedRecoveryState::NotStarted|CombinedRecoveryState::ApplicationApplied){
-        return Err(format!("recovery state {:?} is not safe for framework completion",after_application.state));
+    if matches!(
+        after_application.state,
+        CombinedRecoveryState::Conflict
+            | CombinedRecoveryState::Indeterminate
+            | CombinedRecoveryState::NotStarted
+            | CombinedRecoveryState::ApplicationApplied
+    ) {
+        return Err(format!(
+            "recovery state {:?} is not safe for framework completion",
+            after_application.state
+        ));
     }
-    complete_framework_recovery(&after_application,registry,framework_uses,new_id)?;
-    let Some(final_assessment)=assess_pending_journal_full(application,context,roots,registry,framework_uses)? else{
+    complete_framework_recovery(&after_application, registry, framework_uses, new_id)?;
+    let Some(final_assessment) =
+        assess_pending_journal_full(application, context, roots, registry, framework_uses)?
+    else {
         return Err("resource operation journal disappeared before finalization".into());
     };
-    if final_assessment.state!=CombinedRecoveryState::Applied{
-        return Err(format!("recovery did not reach Applied state: {:?}",final_assessment.state));
+    if final_assessment.state != CombinedRecoveryState::Applied {
+        return Err(format!(
+            "recovery did not reach Applied state: {:?}",
+            final_assessment.state
+        ));
     }
-    finalize_recovered_journal(context,&final_assessment)?;
+    finalize_recovered_journal(context, &final_assessment)?;
     Ok(RecoveryCompletionResult::Completed)
 }
 
-fn replace_framework_uses(uses:&mut [FrameworkResourceUse],before:&ResourceReference,after:&ResourceReference)->usize{
-    let mut count=0;for usage in uses{if usage.reference==*before{usage.reference=after.clone();count+=1;}}count
+fn replace_framework_uses(
+    uses: &mut [FrameworkResourceUse],
+    before: &ResourceReference,
+    after: &ResourceReference,
+) -> usize {
+    let mut count = 0;
+    for usage in uses {
+        if usage.reference == *before {
+            usage.reference = after.clone();
+            count += 1;
+        }
+    }
+    count
 }

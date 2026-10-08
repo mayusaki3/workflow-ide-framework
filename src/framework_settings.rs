@@ -18,7 +18,11 @@ pub struct FrameworkSettings {
 
 impl Default for FrameworkSettings {
     fn default() -> Self {
-        Self { format_version: FRAMEWORK_SETTINGS_FORMAT_VERSION, save_id: None, resources: Vec::new() }
+        Self {
+            format_version: FRAMEWORK_SETTINGS_FORMAT_VERSION,
+            save_id: None,
+            resources: Vec::new(),
+        }
     }
 }
 
@@ -56,7 +60,9 @@ impl StoredResourceEntry {
         }
     }
 
-    pub fn to_resource(&self) -> Result<ResourceEntry, crate::project_resource::ResourceReferenceError> {
+    pub fn to_resource(
+        &self,
+    ) -> Result<ResourceEntry, crate::project_resource::ResourceReferenceError> {
         let scope = match self.scope {
             StoredResourceScope::Application => ResourceScope::Application,
             StoredResourceScope::Project => ResourceScope::Project,
@@ -73,37 +79,51 @@ impl StoredResourceEntry {
 pub enum FrameworkSettingsError {
     Serialize(String),
     Parse(String),
-    UnsupportedNewerFormat { found: u32, supported: u32 },
+    UnsupportedNewerFormat {
+        found: u32,
+        supported: u32,
+    },
     InvalidFormatVersion(u32),
-    InvalidResourceReference { resource_id: String, error: ResourceReferenceError },
+    InvalidResourceReference {
+        resource_id: String,
+        error: ResourceReferenceError,
+    },
 }
 
 impl FrameworkSettings {
     pub fn to_toml(&self) -> Result<String, FrameworkSettingsError> {
-        toml::to_string_pretty(self).map_err(|error| FrameworkSettingsError::Serialize(error.to_string()))
+        toml::to_string_pretty(self)
+            .map_err(|error| FrameworkSettingsError::Serialize(error.to_string()))
     }
 
     pub fn from_registry(registry: &ResourceRegistry) -> Self {
         Self {
             format_version: FRAMEWORK_SETTINGS_FORMAT_VERSION,
             save_id: None,
-            resources: registry.entries().iter().map(StoredResourceEntry::from_resource).collect(),
+            resources: registry
+                .entries()
+                .iter()
+                .map(StoredResourceEntry::from_resource)
+                .collect(),
         }
     }
 
     pub fn to_registry(&self) -> Result<ResourceRegistry, FrameworkSettingsError> {
         let mut entries = Vec::with_capacity(self.resources.len());
         for stored in &self.resources {
-            entries.push(stored.to_resource().map_err(|error| FrameworkSettingsError::InvalidResourceReference {
-                resource_id: stored.resource_id.clone(),
-                error,
+            entries.push(stored.to_resource().map_err(|error| {
+                FrameworkSettingsError::InvalidResourceReference {
+                    resource_id: stored.resource_id.clone(),
+                    error,
+                }
             })?);
         }
         Ok(ResourceRegistry::new(entries))
     }
 
     pub fn from_toml(input: &str) -> Result<Self, FrameworkSettingsError> {
-        let settings: Self = toml::from_str(input).map_err(|error| FrameworkSettingsError::Parse(error.to_string()))?;
+        let settings: Self = toml::from_str(input)
+            .map_err(|error| FrameworkSettingsError::Parse(error.to_string()))?;
         if settings.format_version == 0 {
             return Err(FrameworkSettingsError::InvalidFormatVersion(0));
         }

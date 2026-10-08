@@ -46,7 +46,8 @@ impl ProjectFile {
     }
 
     pub fn from_toml(input: &str, expected_application_id: &str) -> Result<Self, ProjectFileError> {
-        let file: Self = toml::from_str(input).map_err(|error| ProjectFileError::Parse(error.to_string()))?;
+        let file: Self =
+            toml::from_str(input).map_err(|error| ProjectFileError::Parse(error.to_string()))?;
         if file.project.format_version == 0 {
             return Err(ProjectFileError::InvalidFormatVersion(0));
         }

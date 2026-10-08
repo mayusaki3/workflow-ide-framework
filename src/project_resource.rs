@@ -9,8 +9,14 @@ pub enum NewProjectStoragePolicy {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProjectDataCompatibility {
     Compatible,
-    Converted { reason: Option<String>, handled: bool },
-    Incompatible { reason: Option<String>, handled: bool },
+    Converted {
+        reason: Option<String>,
+        handled: bool,
+    },
+    Incompatible {
+        reason: Option<String>,
+        handled: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,7 +66,10 @@ pub enum ResourceReferenceError {
 }
 
 impl ResourceReference {
-    pub fn new(scope: ResourceScope, path: impl Into<PathBuf>) -> Result<Self, ResourceReferenceError> {
+    pub fn new(
+        scope: ResourceScope,
+        path: impl Into<PathBuf>,
+    ) -> Result<Self, ResourceReferenceError> {
         let path = normalize_path(path.into())?;
         match scope {
             ResourceScope::Application if path.is_absolute() => {
@@ -138,12 +147,21 @@ pub struct FileTypeFilter {
 }
 
 impl FileTypeFilter {
-    pub fn new(label: impl Into<String>, extensions: impl IntoIterator<Item = impl Into<String>>) -> Self {
+    pub fn new(
+        label: impl Into<String>,
+        extensions: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
         Self {
             label: label.into(),
             extensions: extensions
                 .into_iter()
-                .map(|extension| extension.into().trim().trim_start_matches('.').to_ascii_lowercase())
+                .map(|extension| {
+                    extension
+                        .into()
+                        .trim()
+                        .trim_start_matches('.')
+                        .to_ascii_lowercase()
+                })
                 .filter(|extension| !extension.is_empty())
                 .collect(),
         }
@@ -152,7 +170,11 @@ impl FileTypeFilter {
     pub fn accepts(&self, path: &Path) -> bool {
         path.extension()
             .and_then(|extension| extension.to_str())
-            .map(|extension| self.extensions.iter().any(|allowed| allowed.eq_ignore_ascii_case(extension)))
+            .map(|extension| {
+                self.extensions
+                    .iter()
+                    .any(|allowed| allowed.eq_ignore_ascii_case(extension))
+            })
             .unwrap_or(false)
     }
 }
@@ -165,7 +187,14 @@ pub struct ApplicationJournalData {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResourceOperationDecision {
-    Accept { journal_data: Option<ApplicationJournalData> },
-    Handled { journal_data: Option<ApplicationJournalData> },
-    Reject { reason: Option<String>, handled: bool },
+    Accept {
+        journal_data: Option<ApplicationJournalData>,
+    },
+    Handled {
+        journal_data: Option<ApplicationJournalData>,
+    },
+    Reject {
+        reason: Option<String>,
+        handled: bool,
+    },
 }

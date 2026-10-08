@@ -47,7 +47,9 @@ impl ApplicationProjectAdapter for App {
         _save_id: &str,
     ) -> Result<ApplicationSaveResult, Self::Error> {
         self.saved = true;
-        Ok(ApplicationSaveResult { data_version: Some("1".into()) })
+        Ok(ApplicationSaveResult {
+            data_version: Some("1".into()),
+        })
     }
 
     fn save_project_data_as(
@@ -57,7 +59,9 @@ impl ApplicationProjectAdapter for App {
         _save_id: &str,
     ) -> Result<ApplicationSaveResult, Self::Error> {
         self.saved_as = true;
-        Ok(ApplicationSaveResult { data_version: Some("1".into()) })
+        Ok(ApplicationSaveResult {
+            data_version: Some("1".into()),
+        })
     }
 }
 

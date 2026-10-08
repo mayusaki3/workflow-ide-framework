@@ -26,25 +26,39 @@ impl ResourceRegistry {
         &self.entries
     }
 
-    pub fn register(&mut self, resource_id: impl Into<String>, reference: ResourceReference) -> RegisterResult {
+    pub fn register(
+        &mut self,
+        resource_id: impl Into<String>,
+        reference: ResourceReference,
+    ) -> RegisterResult {
         if let Some(existing) = self.find_by_reference(&reference) {
             return RegisterResult::Existing(existing.clone());
         }
-        let entry = ResourceEntry { resource_id: resource_id.into(), reference };
+        let entry = ResourceEntry {
+            resource_id: resource_id.into(),
+            reference,
+        };
         self.entries.push(entry.clone());
         RegisterResult::Added(entry)
     }
 
     pub fn find_by_reference(&self, reference: &ResourceReference) -> Option<&ResourceEntry> {
-        self.entries.iter().find(|entry| entry.reference == *reference)
+        self.entries
+            .iter()
+            .find(|entry| entry.reference == *reference)
     }
 
     pub fn find_by_id(&self, resource_id: &str) -> Option<&ResourceEntry> {
-        self.entries.iter().find(|entry| entry.resource_id == resource_id)
+        self.entries
+            .iter()
+            .find(|entry| entry.resource_id == resource_id)
     }
 
     pub fn remove(&mut self, resource_id: &str) -> Option<ResourceEntry> {
-        let index = self.entries.iter().position(|entry| entry.resource_id == resource_id)?;
+        let index = self
+            .entries
+            .iter()
+            .position(|entry| entry.resource_id == resource_id)?;
         Some(self.entries.remove(index))
     }
 

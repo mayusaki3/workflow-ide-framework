@@ -36,7 +36,10 @@ where
             RegisterResult::Existing(entry) => entries.push(entry),
         }
     }
-    FileSelectionRegistration::Registered(RegistrationBatch { entries, added_count })
+    FileSelectionRegistration::Registered(RegistrationBatch {
+        entries,
+        added_count,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

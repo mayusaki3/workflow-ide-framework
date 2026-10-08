@@ -2,7 +2,7 @@ use crate::{
     framework_settings::FrameworkSettings,
     project::{ProjectContext, ProjectFile},
     project_lifecycle::{ProjectSession, ProjectStorageState},
-    project_save::{save_project, ApplicationSaveResult, ProjectSaveError},
+    project_save::{ApplicationSaveResult, ProjectSaveError, save_project},
 };
 use std::fs;
 
@@ -20,10 +20,17 @@ pub struct SaveAsAdapter<'a, A: ?Sized> {
     application: &'a mut A,
     source: Option<&'a ProjectContext>,
 }
-impl<A: ApplicationProjectSaveAs + ?Sized> crate::project_save::ApplicationProjectSaver for SaveAsAdapter<'_, A> {
+impl<A: ApplicationProjectSaveAs + ?Sized> crate::project_save::ApplicationProjectSaver
+    for SaveAsAdapter<'_, A>
+{
     type Error = A::Error;
-    fn save_project_data(&mut self, destination: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
-        self.application.save_project_data_as(self.source, destination, save_id)
+    fn save_project_data(
+        &mut self,
+        destination: &ProjectContext,
+        save_id: &str,
+    ) -> Result<ApplicationSaveResult, Self::Error> {
+        self.application
+            .save_project_data_as(self.source, destination, save_id)
     }
 }
 
@@ -43,9 +50,13 @@ pub fn save_project_as<A: ApplicationProjectSaveAs + ?Sized>(
         current_save_id: session.current_save_id.clone(),
         storage: ProjectStorageState::Stored(destination.clone()),
     };
-    let adapter = SaveAsAdapter { application, source: source.as_ref() };
+    let adapter = SaveAsAdapter {
+        application,
+        source: source.as_ref(),
+    };
 
-    let app = adapter.application
+    let app = adapter
+        .application
         .save_project_data_as(adapter.source, &destination, save_id)
         .map_err(|error| ProjectSaveError::Application(error.to_string()))?;
 
@@ -60,12 +71,24 @@ pub fn save_project_as<A: ApplicationProjectSaveAs + ?Sized>(
     struct CompletedSaveAs(ApplicationSaveResult);
     impl crate::project_save::ApplicationProjectSaver for CompletedSaveAs {
         type Error = std::convert::Infallible;
-        fn save_project_data(&mut self, _context: &ProjectContext, _save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
+        fn save_project_data(
+            &mut self,
+            _context: &ProjectContext,
+            _save_id: &str,
+        ) -> Result<ApplicationSaveResult, Self::Error> {
             Ok(self.0.clone())
         }
     }
     let mut completed = CompletedSaveAs(app);
-    save_project(&mut candidate, &destination, project_file, framework_settings, &mut completed, save_id, saved_at)?;
+    save_project(
+        &mut candidate,
+        &destination,
+        project_file,
+        framework_settings,
+        &mut completed,
+        save_id,
+        saved_at,
+    )?;
     *session = candidate;
     Ok(())
 }

@@ -51,20 +51,30 @@ pub fn save_project<A: ApplicationProjectSaver + ?Sized>(
     let framework_text = framework_candidate
         .to_toml()
         .map_err(|error| ProjectSaveError::FrameworkSerialize(format!("{error:?}")))?;
-    atomic_write(context.framework_settings_path().as_path(), framework_text.as_bytes())
-        .map_err(ProjectSaveError::FrameworkWrite)?;
+    atomic_write(
+        context.framework_settings_path().as_path(),
+        framework_text.as_bytes(),
+    )
+    .map_err(ProjectSaveError::FrameworkWrite)?;
     pending = pending.framework_saved();
 
     let mut project_candidate = project_file.clone();
     project_candidate.project.save_id = save_id.to_owned();
     project_candidate.project.saved_at = saved_at.to_owned();
     project_candidate.application.data_version = app.data_version;
-    let project_text = project_candidate.to_toml().map_err(ProjectSaveError::ProjectSerialize)?;
-    atomic_write(context.project_file_path().as_path(), project_text.as_bytes())
-        .map_err(ProjectSaveError::ProjectWrite)?;
+    let project_text = project_candidate
+        .to_toml()
+        .map_err(ProjectSaveError::ProjectSerialize)?;
+    atomic_write(
+        context.project_file_path().as_path(),
+        project_text.as_bytes(),
+    )
+    .map_err(ProjectSaveError::ProjectWrite)?;
     pending = pending.project_file_saved();
 
-    session.complete_save(pending).expect("all save stages were completed");
+    session
+        .complete_save(pending)
+        .expect("all save stages were completed");
     *project_file = project_candidate;
     Ok(())
 }

@@ -6,21 +6,22 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 
+use tracing::{Event, Subscriber};
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_appender::rolling::{Builder, Rotation};
-use tracing::{Event, Subscriber};
 use tracing_subscriber::{
     filter::LevelFilter,
     layer::{Context, Layer, SubscriberExt},
-    reload,
     registry::LookupSpan,
+    reload,
     util::SubscriberInitExt,
 };
 
 const DEFAULT_MEMORY_LINES: usize = 2_000;
 
 static MEMORY: OnceLock<Arc<Mutex<VecDeque<LogEntry>>>> = OnceLock::new();
-static LEVEL_RELOAD: OnceLock<reload::Handle<LevelFilter, tracing_subscriber::Registry>> = OnceLock::new();
+static LEVEL_RELOAD: OnceLock<reload::Handle<LevelFilter, tracing_subscriber::Registry>> =
+    OnceLock::new();
 static CURRENT_LEVEL: OnceLock<Mutex<LogLevel>> = OnceLock::new();
 static LEVEL_CHANGE_LOCK: Mutex<()> = Mutex::new(());
 
@@ -115,10 +116,7 @@ where
         for (name, value) in visitor.fields {
             if name == "log.target" {
                 target = value.trim_matches('"').to_owned();
-            } else if !matches!(
-                name.as_str(),
-                "log.module_path" | "log.file" | "log.line"
-            ) {
+            } else if !matches!(name.as_str(), "log.module_path" | "log.file" | "log.line") {
                 fields.push((name, value));
             }
         }
@@ -193,7 +191,9 @@ pub fn set_level(level: LogLevel) -> Result<(), &'static str> {
     let _change_guard = LEVEL_CHANGE_LOCK
         .lock()
         .map_err(|_| "WFIDE log level change lock is poisoned")?;
-    let handle = LEVEL_RELOAD.get().ok_or("WFIDE logging is not initialized")?;
+    let handle = LEVEL_RELOAD
+        .get()
+        .ok_or("WFIDE logging is not initialized")?;
     let previous = self::level();
 
     if previous == level {
@@ -204,7 +204,8 @@ pub fn set_level(level: LogLevel) -> Result<(), &'static str> {
     // Temporarily enable INFO when the current filter is WARN/ERROR, emit the
     // transition, then apply the requested level while holding the change lock.
     if matches!(previous, LogLevel::Error | LogLevel::Warn) {
-        handle.reload(LevelFilter::INFO)
+        handle
+            .reload(LevelFilter::INFO)
             .map_err(|_| "failed to temporarily enable INFO for WFIDE log level change")?;
     }
 
@@ -215,7 +216,9 @@ pub fn set_level(level: LogLevel) -> Result<(), &'static str> {
         "runtime log level changed"
     );
 
-    handle.reload(level.filter()).map_err(|_| "failed to reload WFIDE log level")?;
+    handle
+        .reload(level.filter())
+        .map_err(|_| "failed to reload WFIDE log level")?;
     if let Some(current) = CURRENT_LEVEL.get() {
         if let Ok(mut current) = current.lock() {
             *current = level;
@@ -228,7 +231,12 @@ pub fn set_level(level: LogLevel) -> Result<(), &'static str> {
 pub fn snapshot() -> Vec<LogEntry> {
     MEMORY
         .get()
-        .and_then(|memory| memory.lock().ok().map(|lines| lines.iter().cloned().collect()))
+        .and_then(|memory| {
+            memory
+                .lock()
+                .ok()
+                .map(|lines| lines.iter().cloned().collect())
+        })
         .unwrap_or_default()
 }
 
@@ -254,7 +262,7 @@ pub fn init(
     let make_writer = move || CombinedWriter {
         console: io::stdout(),
         file: file_writer.clone(),
-     };
+    };
 
     let (level_filter, level_handle) = reload::Layer::new(config.level.filter());
     // Keep the shared file/memory stream free of terminal ANSI escapes.
@@ -290,13 +298,13 @@ pub fn init(
 struct CombinedWriter {
     console: io::Stdout,
     file: NonBlocking,
- }
+}
 
 impl Write for CombinedWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.console.write_all(buf)?;
         self.file.write_all(buf)?;
-         Ok(buf.len())
+        Ok(buf.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -305,4 +313,3 @@ impl Write for CombinedWriter {
         Ok(())
     }
 }
-

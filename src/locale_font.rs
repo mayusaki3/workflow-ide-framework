@@ -43,7 +43,9 @@ pub fn find_os_fallback_font() -> Option<PathBuf> {
     // File-system and project names may contain local-script characters even
     // when the Framework UI locale is English. Keep an OS-appropriate font
     // available independently from the selected UI locale.
-    locale_font_candidates().into_iter().find(|path| path.is_file())
+    locale_font_candidates()
+        .into_iter()
+        .find(|path| path.is_file())
 }
 
 fn install_font(
@@ -54,10 +56,9 @@ fn install_font(
 ) -> Result<(), String> {
     let bytes = std::fs::read(path)
         .map_err(|error| format!("failed to read font {}: {error}", path.display()))?;
-    fonts.font_data.insert(
-        name.to_owned(),
-        egui::FontData::from_owned(bytes).into(),
-    );
+    fonts
+        .font_data
+        .insert(name.to_owned(), egui::FontData::from_owned(bytes).into());
     for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
         let entries = fonts.families.entry(family).or_default();
         if primary {
@@ -73,7 +74,9 @@ pub fn find_locale_font(locale: &str) -> Option<PathBuf> {
     if !locale.eq_ignore_ascii_case("ja-JP") {
         return None;
     }
-    locale_font_candidates().into_iter().find(|path| path.is_file())
+    locale_font_candidates()
+        .into_iter()
+        .find(|path| path.is_file())
 }
 
 #[cfg(target_os = "windows")]
@@ -82,15 +85,10 @@ fn locale_font_candidates() -> Vec<PathBuf> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(r"C:\\Windows"));
     let fonts = root.join("Fonts");
-    [
-        "YuGothM.ttc",
-        "YuGothR.ttc",
-        "meiryo.ttc",
-        "msgothic.ttc",
-    ]
-    .into_iter()
-    .map(|name| fonts.join(name))
-    .collect()
+    ["YuGothM.ttc", "YuGothR.ttc", "meiryo.ttc", "msgothic.ttc"]
+        .into_iter()
+        .map(|name| fonts.join(name))
+        .collect()
 }
 
 #[cfg(target_os = "macos")]
@@ -134,7 +132,11 @@ mod tests {
 
     #[test]
     fn japanese_has_platform_candidates() {
-        if cfg!(any(target_os = "windows", target_os = "macos", target_os = "linux")) {
+        if cfg!(any(
+            target_os = "windows",
+            target_os = "macos",
+            target_os = "linux"
+        )) {
             assert!(!locale_font_candidates().is_empty());
         }
     }
@@ -145,5 +147,4 @@ mod tests {
         let result = install_for_locale(&ctx, "en-US", Some(&missing));
         assert!(result.is_ok());
     }
-
 }

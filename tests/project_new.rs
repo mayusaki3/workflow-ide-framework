@@ -23,7 +23,9 @@ fn required_new_project_requires_root() {
 #[test]
 fn required_new_project_accepts_root() {
     let context = ProjectContext::new("demo");
-    let session = ProjectSession::new_project(NewProjectStoragePolicy::Required, Some(context.clone())).unwrap();
+    let session =
+        ProjectSession::new_project(NewProjectStoragePolicy::Required, Some(context.clone()))
+            .unwrap();
     assert_eq!(session.context(), Some(&context));
     assert!(session.dirty.is_dirty());
 }

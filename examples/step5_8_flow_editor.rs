@@ -30,7 +30,11 @@ fn main() -> eframe::Result<()> {
 
     Application::new("step5-8-flow-editor", "Step 5.8 Flow Editor / フロー編集")
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
-        .panel(PanelDefinition::new("flow", "ロボット接続 / Robot Connections", PanelKind::StandardUi))
+        .panel(PanelDefinition::new(
+            "flow",
+            "ロボット接続 / Robot Connections",
+            PanelKind::StandardUi,
+        ))
         .layout(LayoutConfig::new(["flow"]))
         .flow_editor_panel("flow", model)
         .run()

@@ -17,12 +17,18 @@ pub struct ApplicationEventDispatcher {
 }
 
 impl ApplicationEventDispatcher {
-    pub fn subscribe(&mut self, handler: impl FnMut(ApplicationEvent) + 'static) { self.handlers.push(Box::new(handler)); }
+    pub fn subscribe(&mut self, handler: impl FnMut(ApplicationEvent) + 'static) {
+        self.handlers.push(Box::new(handler));
+    }
     pub fn emit(&mut self, event: ApplicationEvent) {
         if event == ApplicationEvent::Started {
-            if self.started_emitted { return; }
+            if self.started_emitted {
+                return;
+            }
             self.started_emitted = true;
         }
-        for handler in &mut self.handlers { handler(event); }
+        for handler in &mut self.handlers {
+            handler(event);
+        }
     }
 }

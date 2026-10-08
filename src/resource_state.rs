@@ -1,5 +1,10 @@
-use crate::project_resource::{ResourceReference, ResourceRootStatus, ResourceScope, ResourceState};
-use std::{fs, path::{Path, PathBuf}};
+use crate::project_resource::{
+    ResourceReference, ResourceRootStatus, ResourceScope, ResourceState,
+};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourceRoots {

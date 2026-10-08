@@ -11,9 +11,7 @@ fn main() {
     config.logging.directory = "logs/step4-5".into();
     config.logging.file_prefix = "wfide-step4-5".into();
     config.localization.default_locale = workflow_ide_framework::localization::JA_JP.to_owned();
-    config.appearance.font_path = Some(
-        "assets/fonts/default/NotoSansCJK-Regular.ttc".into(),
-    );
+    config.appearance.font_path = Some("assets/fonts/default/NotoSansCJK-Regular.ttc".into());
 
     let layout = wfide::LayoutConfig::new(["simulation-view"])
         .split_left("simulation-view", 0.25, ["runtime-control"])
@@ -22,10 +20,26 @@ fn main() {
         .selected("simulation-view");
 
     wfide::Application::with_config(config)
-        .panel(wfide::PanelDefinition::new("simulation-view", "Simulation View", wfide::PanelKind::GpuViewport))
-        .panel(wfide::PanelDefinition::new("runtime-control", "Runtime Control", wfide::PanelKind::StandardUi))
-        .panel(wfide::PanelDefinition::new("runtime-status", "Runtime Status", wfide::PanelKind::StandardUi))
-        .panel(wfide::PanelDefinition::new("log", "Log", wfide::PanelKind::StandardUi))
+        .panel(wfide::PanelDefinition::new(
+            "simulation-view",
+            "Simulation View",
+            wfide::PanelKind::GpuViewport,
+        ))
+        .panel(wfide::PanelDefinition::new(
+            "runtime-control",
+            "Runtime Control",
+            wfide::PanelKind::StandardUi,
+        ))
+        .panel(wfide::PanelDefinition::new(
+            "runtime-status",
+            "Runtime Status",
+            wfide::PanelKind::StandardUi,
+        ))
+        .panel(wfide::PanelDefinition::new(
+            "log",
+            "Log",
+            wfide::PanelKind::StandardUi,
+        ))
         .layout(layout)
         .framework_probe_panel()
         .logging_settings_panel()

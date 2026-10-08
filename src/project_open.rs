@@ -26,8 +26,13 @@ pub trait ApplicationProjectInspector {
 pub enum FrameworkSettingsOpen {
     Loaded(FrameworkSettings),
     MissingUseDefaults,
-    InvalidUseDefaults { reason: String },
-    SaveIdMismatch { project_save_id: String, framework_save_id: String },
+    InvalidUseDefaults {
+        reason: String,
+    },
+    SaveIdMismatch {
+        project_save_id: String,
+        framework_save_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,8 +64,8 @@ pub fn open_project<A: ApplicationProjectInspector + ?Sized>(
     expected_application_id: &str,
     application: &mut A,
 ) -> Result<ProjectOpenResult, ProjectOpenError> {
-    let project_text = fs::read_to_string(context.project_file_path())
-        .map_err(ProjectOpenError::ReadProject)?;
+    let project_text =
+        fs::read_to_string(context.project_file_path()).map_err(ProjectOpenError::ReadProject)?;
     let project_file = ProjectFile::from_toml(&project_text, expected_application_id)
         .map_err(ProjectOpenError::ProjectFile)?;
 
@@ -75,16 +80,22 @@ pub fn open_project<A: ApplicationProjectInspector + ?Sized>(
                 }
                 _ => FrameworkSettingsOpen::Loaded(settings),
             },
-            Err(error) => FrameworkSettingsOpen::InvalidUseDefaults { reason: format!("{error:?}") },
+            Err(error) => FrameworkSettingsOpen::InvalidUseDefaults {
+                reason: format!("{error:?}"),
+            },
         },
-        Err(error) if error.kind() == io::ErrorKind::NotFound => FrameworkSettingsOpen::MissingUseDefaults,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            FrameworkSettingsOpen::MissingUseDefaults
+        }
         Err(error) => return Err(ProjectOpenError::ReadFramework(error)),
     };
 
     let pending_resource_operation = match ResourceOperationJournal::load(context) {
         Ok(Some(journal)) => PendingResourceOperationOpen::Pending(journal),
         Ok(None) => PendingResourceOperationOpen::None,
-        Err(error) => PendingResourceOperationOpen::Invalid { reason: error.to_string() },
+        Err(error) => PendingResourceOperationOpen::Invalid {
+            reason: error.to_string(),
+        },
     };
 
     let application_compatibility = application
@@ -106,17 +117,32 @@ pub fn open_project<A: ApplicationProjectInspector + ?Sized>(
 
 pub fn open_requires_user_decision(result: &ProjectOpenResult) -> bool {
     !matches!(result.framework_settings, FrameworkSettingsOpen::Loaded(_))
-        || !matches!(result.pending_resource_operation, PendingResourceOperationOpen::None)
-        || matches!(result.application_compatibility, ProjectDataCompatibility::Converted { .. } | ProjectDataCompatibility::Incompatible { .. })
-        || matches!(result.application_consistency, ProjectDataConsistency::Inconsistent { .. })
+        || !matches!(
+            result.pending_resource_operation,
+            PendingResourceOperationOpen::None
+        )
+        || matches!(
+            result.application_compatibility,
+            ProjectDataCompatibility::Converted { .. }
+                | ProjectDataCompatibility::Incompatible { .. }
+        )
+        || matches!(
+            result.application_consistency,
+            ProjectDataConsistency::Inconsistent { .. }
+        )
 }
 
 pub fn open_can_continue(result: &ProjectOpenResult) -> bool {
-    !matches!(result.application_compatibility, ProjectDataCompatibility::Incompatible { .. })
-        && !matches!(
-            result.application_consistency,
-            ProjectDataConsistency::Inconsistent { can_open: false, .. }
-        )
+    !matches!(
+        result.application_compatibility,
+        ProjectDataCompatibility::Incompatible { .. }
+    ) && !matches!(
+        result.application_consistency,
+        ProjectDataConsistency::Inconsistent {
+            can_open: false,
+            ..
+        }
+    )
 }
 
 pub fn open_dirty_state(result: &ProjectOpenResult) -> crate::project_resource::ProjectDirtyState {

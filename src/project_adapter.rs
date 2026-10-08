@@ -67,7 +67,8 @@ impl<A: ApplicationProjectAdapter> ApplicationProjectInspector for ProjectAdapte
         context: &ProjectContext,
         stored_data_version: Option<&str>,
     ) -> Result<ProjectDataCompatibility, Self::Error> {
-        self.application.inspect_project_data(context, stored_data_version)
+        self.application
+            .inspect_project_data(context, stored_data_version)
     }
 
     fn check_project_consistency(

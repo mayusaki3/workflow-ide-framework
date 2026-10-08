@@ -10,7 +10,12 @@ pub struct TreeNode {
 
 impl TreeNode {
     pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
-        Self { id: id.into(), label: label.into(), node_type: None, children: Vec::new() }
+        Self {
+            id: id.into(),
+            label: label.into(),
+            node_type: None,
+            children: Vec::new(),
+        }
     }
 
     pub fn node_type(mut self, node_type: impl Into<String>) -> Self {
@@ -57,7 +62,12 @@ pub fn show(ui: &mut egui::Ui, model: &mut TreeModel) -> TreeResponse {
     response
 }
 
-fn show_node(ui: &mut egui::Ui, node: &TreeNode, model: &mut TreeModel, response: &mut TreeResponse) {
+fn show_node(
+    ui: &mut egui::Ui,
+    node: &TreeNode,
+    model: &mut TreeModel,
+    response: &mut TreeResponse,
+) {
     if node.children.is_empty() {
         let selected = model.selected_id.as_deref() == Some(node.id.as_str());
         if ui.selectable_label(selected, &node.label).clicked() {

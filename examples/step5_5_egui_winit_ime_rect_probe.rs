@@ -3,7 +3,7 @@
 //! This probe does not render egui. It records the distinction between
 //! the TextEdit rectangle and the primary cursor rectangle using plain egui types.
 
-use egui_winit::egui::{pos2, vec2, Rect};
+use egui_winit::egui::{Rect, pos2, vec2};
 
 fn main() {
     let editor_rect = Rect::from_min_size(pos2(0.0, 168.0), vec2(995.0, 118.0));

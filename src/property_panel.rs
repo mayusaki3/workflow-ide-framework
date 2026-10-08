@@ -21,9 +21,17 @@ pub struct PropertyItem {
 
 impl PropertyItem {
     pub fn new(id: impl Into<String>, label: impl Into<String>, value: PropertyValue) -> Self {
-        Self { id: id.into(), label: label.into(), value, read_only: false }
+        Self {
+            id: id.into(),
+            label: label.into(),
+            value,
+            read_only: false,
+        }
     }
-    pub fn read_only(mut self, value: bool) -> Self { self.read_only = value; self }
+    pub fn read_only(mut self, value: bool) -> Self {
+        self.read_only = value;
+        self
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -41,11 +49,16 @@ pub struct PropertyModel {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PropertyAction {
-    ValueChanged { property_id: String, value: PropertyValue },
+    ValueChanged {
+        property_id: String,
+        value: PropertyValue,
+    },
 }
 
 #[derive(Debug, Default)]
-pub struct PropertyResponse { pub actions: Vec<PropertyAction> }
+pub struct PropertyResponse {
+    pub actions: Vec<PropertyAction>,
+}
 
 pub fn show(ui: &mut egui::Ui, model: &mut PropertyModel) -> PropertyResponse {
     let mut response = PropertyResponse::default();
@@ -56,7 +69,9 @@ pub fn show(ui: &mut egui::Ui, model: &mut PropertyModel) -> PropertyResponse {
     if let Some(id) = &model.object_id {
         ui.label(egui::RichText::new(id).weak().monospace());
     }
-    if model.display_name.is_some() || model.object_id.is_some() { ui.separator(); }
+    if model.display_name.is_some() || model.object_id.is_some() {
+        ui.separator();
+    }
 
     for group in &mut model.groups {
         let mut body = |ui: &mut egui::Ui| {
@@ -80,7 +95,9 @@ pub fn show(ui: &mut egui::Ui, model: &mut PropertyModel) -> PropertyResponse {
         if group.label.is_empty() {
             body(ui);
         } else {
-            egui::CollapsingHeader::new(&group.label).default_open(true).show(ui, body);
+            egui::CollapsingHeader::new(&group.label)
+                .default_open(true)
+                .show(ui, body);
         }
     }
     response
@@ -89,13 +106,27 @@ pub fn show(ui: &mut egui::Ui, model: &mut PropertyModel) -> PropertyResponse {
 fn show_value(ui: &mut egui::Ui, id: &str, value: &mut PropertyValue, read_only: bool) -> bool {
     if read_only {
         match value {
-            PropertyValue::Text(v) => { ui.label(v.as_str()); }
-            PropertyValue::Bool(v) => { ui.label(if *v { "true" } else { "false" }); }
-            PropertyValue::Integer(v) => { ui.label(v.to_string()); }
-            PropertyValue::Float(v) => { ui.label(v.to_string()); }
-            PropertyValue::Color(v) => { ui.label(format!("#{:02X}{:02X}{:02X}{:02X}", v[0], v[1], v[2], v[3])); }
-            PropertyValue::FilePath(v) => { ui.label(v.as_str()); }
-            PropertyValue::Enum { value, .. } => { ui.label(value.as_str()); }
+            PropertyValue::Text(v) => {
+                ui.label(v.as_str());
+            }
+            PropertyValue::Bool(v) => {
+                ui.label(if *v { "true" } else { "false" });
+            }
+            PropertyValue::Integer(v) => {
+                ui.label(v.to_string());
+            }
+            PropertyValue::Float(v) => {
+                ui.label(v.to_string());
+            }
+            PropertyValue::Color(v) => {
+                ui.label(format!("#{:02X}{:02X}{:02X}{:02X}", v[0], v[1], v[2], v[3]));
+            }
+            PropertyValue::FilePath(v) => {
+                ui.label(v.as_str());
+            }
+            PropertyValue::Enum { value, .. } => {
+                ui.label(value.as_str());
+            }
         }
         return false;
     }
@@ -121,7 +152,9 @@ fn show_value(ui: &mut egui::Ui, id: &str, value: &mut PropertyValue, read_only:
         PropertyValue::Color(v) => {
             let mut color = egui::Color32::from_rgba_unmultiplied(v[0], v[1], v[2], v[3]);
             let changed = ui.color_edit_button_srgba(&mut color).changed();
-            if changed { *v = color.to_array(); }
+            if changed {
+                *v = color.to_array();
+            }
             changed
         }
         PropertyValue::Enum { value, options } => {
@@ -138,7 +171,6 @@ fn show_value(ui: &mut egui::Ui, id: &str, value: &mut PropertyValue, read_only:
     }
 }
 
-
 /// Build a generic property view for a Flow Editor node.
 /// Domain-specific properties remain the Consumer's responsibility.
 pub fn from_flow_node(node: &crate::flow_editor::FlowNode) -> PropertyModel {
@@ -149,8 +181,16 @@ pub fn from_flow_node(node: &crate::flow_editor::FlowNode) -> PropertyModel {
             label: "Node".into(),
             items: vec![
                 PropertyItem::new("label", "Label", PropertyValue::Text(node.label.clone())),
-                PropertyItem::new("position.x", "X", PropertyValue::Float(node.position.x as f64)),
-                PropertyItem::new("position.y", "Y", PropertyValue::Float(node.position.y as f64)),
+                PropertyItem::new(
+                    "position.x",
+                    "X",
+                    PropertyValue::Float(node.position.x as f64),
+                ),
+                PropertyItem::new(
+                    "position.y",
+                    "Y",
+                    PropertyValue::Float(node.position.y as f64),
+                ),
             ],
         }],
     }
@@ -164,8 +204,18 @@ pub fn from_flow_edge(edge: &crate::flow_editor::FlowEdge) -> PropertyModel {
         groups: vec![PropertyGroup {
             label: "Edge".into(),
             items: vec![
-                PropertyItem::new("from", "From", PropertyValue::Text(format!("{}.{}", edge.from_node, edge.from_port))).read_only(true),
-                PropertyItem::new("to", "To", PropertyValue::Text(format!("{}.{}", edge.to_node, edge.to_port))).read_only(true),
+                PropertyItem::new(
+                    "from",
+                    "From",
+                    PropertyValue::Text(format!("{}.{}", edge.from_node, edge.from_port)),
+                )
+                .read_only(true),
+                PropertyItem::new(
+                    "to",
+                    "To",
+                    PropertyValue::Text(format!("{}.{}", edge.to_node, edge.to_port)),
+                )
+                .read_only(true),
             ],
         }],
     }

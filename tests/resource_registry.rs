@@ -23,7 +23,10 @@ fn duplicate_scope_and_normalized_path_returns_existing_entry() {
 fn same_path_in_different_scopes_is_not_duplicate() {
     let mut registry = ResourceRegistry::default();
     registry.register("project", project("robot.png"));
-    registry.register("application", ResourceReference::new(ResourceScope::Application, "robot.png").unwrap());
+    registry.register(
+        "application",
+        ResourceReference::new(ResourceScope::Application, "robot.png").unwrap(),
+    );
     assert_eq!(registry.entries().len(), 2);
 }
 
@@ -40,11 +43,13 @@ fn remove_is_registry_only_model_operation() {
 fn replace_reference_preserves_resource_id() {
     let mut registry = ResourceRegistry::default();
     registry.register("stable-id", project("old.png"));
-    assert_eq!(registry.replace_reference(&project("old.png"), project("new.png")), 1);
+    assert_eq!(
+        registry.replace_reference(&project("old.png"), project("new.png")),
+        1
+    );
     let entry = registry.find_by_id("stable-id").unwrap();
     assert_eq!(entry.reference, project("new.png"));
 }
-
 
 #[test]
 fn registry_round_trips_through_framework_settings() {

@@ -55,22 +55,34 @@ impl LayoutConfig {
     }
 
     pub fn split_left<I, S>(self, anchor: impl Into<String>, fraction: f32, panels: I) -> Self
-    where I: IntoIterator<Item = S>, S: Into<String> {
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
         self.split(anchor, SplitDirection::Left, fraction, panels)
     }
 
     pub fn split_right<I, S>(self, anchor: impl Into<String>, fraction: f32, panels: I) -> Self
-    where I: IntoIterator<Item = S>, S: Into<String> {
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
         self.split(anchor, SplitDirection::Right, fraction, panels)
     }
 
     pub fn split_above<I, S>(self, anchor: impl Into<String>, fraction: f32, panels: I) -> Self
-    where I: IntoIterator<Item = S>, S: Into<String> {
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
         self.split(anchor, SplitDirection::Above, fraction, panels)
     }
 
     pub fn split_below<I, S>(self, anchor: impl Into<String>, fraction: f32, panels: I) -> Self
-    where I: IntoIterator<Item = S>, S: Into<String> {
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
         self.split(anchor, SplitDirection::Below, fraction, panels)
     }
 
@@ -79,4 +91,3 @@ impl LayoutConfig {
         self
     }
 }
-

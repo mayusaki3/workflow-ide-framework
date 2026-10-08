@@ -49,7 +49,8 @@ impl<A: ApplicationProjectAdapter> ErasedApplicationProjectAdapter for A {
         &mut self,
         context: &ProjectContext,
     ) -> Result<ProjectDataConsistency, String> {
-        ApplicationProjectAdapter::check_project_consistency(self, context).map_err(|e| e.to_string())
+        ApplicationProjectAdapter::check_project_consistency(self, context)
+            .map_err(|e| e.to_string())
     }
 
     fn save_project_data(
@@ -57,7 +58,8 @@ impl<A: ApplicationProjectAdapter> ErasedApplicationProjectAdapter for A {
         context: &ProjectContext,
         save_id: &str,
     ) -> Result<ApplicationSaveResult, String> {
-        ApplicationProjectAdapter::save_project_data(self, context, save_id).map_err(|e| e.to_string())
+        ApplicationProjectAdapter::save_project_data(self, context, save_id)
+            .map_err(|e| e.to_string())
     }
 
     fn save_project_data_as(
@@ -73,24 +75,40 @@ impl<A: ApplicationProjectAdapter> ErasedApplicationProjectAdapter for A {
 
 impl crate::project_open::ApplicationProjectInspector for dyn ErasedApplicationProjectAdapter + '_ {
     type Error = String;
-    fn inspect_project_data(&mut self, context: &ProjectContext, stored_data_version: Option<&str>) -> Result<ProjectDataCompatibility, Self::Error> {
+    fn inspect_project_data(
+        &mut self,
+        context: &ProjectContext,
+        stored_data_version: Option<&str>,
+    ) -> Result<ProjectDataCompatibility, Self::Error> {
         ErasedApplicationProjectAdapter::inspect_project_data(self, context, stored_data_version)
     }
-    fn check_project_consistency(&mut self, context: &ProjectContext) -> Result<ProjectDataConsistency, Self::Error> {
+    fn check_project_consistency(
+        &mut self,
+        context: &ProjectContext,
+    ) -> Result<ProjectDataConsistency, Self::Error> {
         ErasedApplicationProjectAdapter::check_project_consistency(self, context)
     }
 }
 
 impl crate::project_save::ApplicationProjectSaver for dyn ErasedApplicationProjectAdapter + '_ {
     type Error = String;
-    fn save_project_data(&mut self, context: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
+    fn save_project_data(
+        &mut self,
+        context: &ProjectContext,
+        save_id: &str,
+    ) -> Result<ApplicationSaveResult, Self::Error> {
         ErasedApplicationProjectAdapter::save_project_data(self, context, save_id)
     }
 }
 
 impl crate::project_save_as::ApplicationProjectSaveAs for dyn ErasedApplicationProjectAdapter + '_ {
     type Error = String;
-    fn save_project_data_as(&mut self, source: Option<&ProjectContext>, destination: &ProjectContext, save_id: &str) -> Result<ApplicationSaveResult, Self::Error> {
+    fn save_project_data_as(
+        &mut self,
+        source: Option<&ProjectContext>,
+        destination: &ProjectContext,
+        save_id: &str,
+    ) -> Result<ApplicationSaveResult, Self::Error> {
         ErasedApplicationProjectAdapter::save_project_data_as(self, source, destination, save_id)
     }
 }

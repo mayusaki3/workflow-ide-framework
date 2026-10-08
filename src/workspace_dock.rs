@@ -4,7 +4,9 @@ use std::collections::BTreeMap;
 
 use egui_dock::DockState;
 
-use crate::workspace::{ContainerKind, FloatingGeometry, PanelInstanceId, Workspace, WorkspaceError, WorkspaceRegistry};
+use crate::workspace::{
+    ContainerKind, FloatingGeometry, PanelInstanceId, Workspace, WorkspaceError, WorkspaceRegistry,
+};
 
 /// Stable backend-independent tab key; does not conflate panel definitions and instances.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -15,7 +17,10 @@ pub struct DockPanelKey {
 
 impl From<&PanelInstanceId> for DockPanelKey {
     fn from(panel: &PanelInstanceId) -> Self {
-        Self { definition_id: panel.definition_id.clone(), instance_id: panel.instance_id.clone() }
+        Self {
+            definition_id: panel.definition_id.clone(),
+            instance_id: panel.instance_id.clone(),
+        }
     }
 }
 
@@ -33,8 +38,13 @@ pub fn project_workspace(workspace: &Workspace) -> Result<WorkspaceDockProjectio
     for (id, container) in &workspace.containers {
         match container.kind {
             ContainerKind::Normal => {
-                let tabs: Vec<DockPanelKey> = container.panels.iter().map(DockPanelKey::from).collect();
-                let tree = if tabs.is_empty() { None } else { Some(DockState::new(tabs)) };
+                let tabs: Vec<DockPanelKey> =
+                    container.panels.iter().map(DockPanelKey::from).collect();
+                let tree = if tabs.is_empty() {
+                    None
+                } else {
+                    Some(DockState::new(tabs))
+                };
                 normal.insert(id.clone(), tree);
             }
             ContainerKind::Floating => {
@@ -48,9 +58,6 @@ pub fn project_workspace(workspace: &Workspace) -> Result<WorkspaceDockProjectio
     Ok(WorkspaceDockProjection { normal, floating })
 }
 
-
-
-
 /// Reconcile all normal dock trees atomically. Tab moves between normal
 /// containers are accepted, but no panel may disappear, duplicate, or enter
 /// a floating container. Preserve each live DockState's split topology.
@@ -61,15 +68,21 @@ pub fn sync_normal_tab_order(
 ) -> Result<(), WorkspaceError> {
     use std::collections::BTreeSet;
     let ws = registry.get_mut_workspace_for_dock(workspace_id)?;
-    let expected_containers: BTreeSet<_> = ws.containers.iter()
+    let expected_containers: BTreeSet<_> = ws
+        .containers
+        .iter()
         .filter(|(_, c)| c.kind == ContainerKind::Normal)
-        .map(|(id, _)| id.clone()).collect();
+        .map(|(id, _)| id.clone())
+        .collect();
     let actual_containers: BTreeSet<_> = projection.normal.keys().cloned().collect();
     if expected_containers != actual_containers {
         return Err(WorkspaceError::InvalidContainerTarget);
     }
-    let expected_panels: BTreeSet<_> = ws.containers.values()
-        .flat_map(|c| c.panels.iter().cloned()).collect();
+    let expected_panels: BTreeSet<_> = ws
+        .containers
+        .values()
+        .flat_map(|c| c.panels.iter().cloned())
+        .collect();
     let mut observed_panels = BTreeSet::new();
     let mut updates = Vec::new();
     for (container_id, tree) in &projection.normal {
@@ -90,7 +103,9 @@ pub fn sync_normal_tab_order(
         updates.push((container_id.clone(), observed));
     }
     for (container_id, panel) in &projection.floating {
-        let container = ws.containers.get(container_id)
+        let container = ws
+            .containers
+            .get(container_id)
             .ok_or_else(|| WorkspaceError::ContainerNotFound(container_id.clone()))?;
         let identity = PanelInstanceId::new(&panel.definition_id, &panel.instance_id);
         if container.kind != ContainerKind::Floating
@@ -104,7 +119,10 @@ pub fn sync_normal_tab_order(
         return Err(WorkspaceError::InvalidContainerTarget);
     }
     for (id, panels) in updates {
-        ws.containers.get_mut(&id).expect("validated container").panels = panels;
+        ws.containers
+            .get_mut(&id)
+            .expect("validated container")
+            .panels = panels;
     }
     Ok(())
 }
@@ -117,22 +135,40 @@ pub fn apply_initial_layout(
 ) -> Result<(), WorkspaceError> {
     use crate::workspace::DEFAULT_CONTAINER_ID;
     let Some(slot) = projection.normal.get_mut(DEFAULT_CONTAINER_ID) else {
-        return Err(WorkspaceError::ContainerNotFound(DEFAULT_CONTAINER_ID.into()));
+        return Err(WorkspaceError::ContainerNotFound(
+            DEFAULT_CONTAINER_ID.into(),
+        ));
     };
     // Read the source panel identities from the initial layout instead of
     // depending on the egui_dock Node iterator representation.
-    let all = layout.root_panel_ids.iter()
-        .chain(layout.splits.iter().flat_map(|split| split.panel_ids.iter()))
-        .map(|id| DockPanelKey { definition_id: id.clone(), instance_id: id.clone() })
+    let all = layout
+        .root_panel_ids
+        .iter()
+        .chain(
+            layout
+                .splits
+                .iter()
+                .flat_map(|split| split.panel_ids.iter()),
+        )
+        .map(|id| DockPanelKey {
+            definition_id: id.clone(),
+            instance_id: id.clone(),
+        })
         .collect::<Vec<_>>();
     // The projection is initially a single root leaf. Count its tabs using
     // the public tree iterator rather than matching egui_dock's tuple variant.
-    let expected_count = slot.as_ref().map(|dock| {
-        dock.main_surface().iter().filter_map(|node| match node {
-            egui_dock::Node::Leaf(leaf) => Some(leaf.tabs.len()),
-            _ => None,
-        }).sum::<usize>()
-    }).unwrap_or(0);
+    let expected_count = slot
+        .as_ref()
+        .map(|dock| {
+            dock.main_surface()
+                .iter()
+                .filter_map(|node| match node {
+                    egui_dock::Node::Leaf(leaf) => Some(leaf.tabs.len()),
+                    _ => None,
+                })
+                .sum::<usize>()
+        })
+        .unwrap_or(0);
     if all.len() != expected_count {
         return Err(WorkspaceError::InvalidContainerTarget);
     }
@@ -142,35 +178,72 @@ pub fn apply_initial_layout(
     }
     let mut used = std::collections::BTreeSet::new();
     let mut lookup = |id: &str| -> Result<DockPanelKey, WorkspaceError> {
-        let key = keys.get(id).ok_or_else(|| WorkspaceError::PanelNotRegistered(id.into()))?;
-        if !used.insert(id.to_owned()) { return Err(WorkspaceError::PanelAlreadyPlaced(id.into())); }
+        let key = keys
+            .get(id)
+            .ok_or_else(|| WorkspaceError::PanelNotRegistered(id.into()))?;
+        if !used.insert(id.to_owned()) {
+            return Err(WorkspaceError::PanelAlreadyPlaced(id.into()));
+        }
         Ok(key.clone())
     };
-    let roots = layout.root_panel_ids.iter().map(|id| lookup(id)).collect::<Result<Vec<_>, _>>()?;
-    if roots.is_empty() { return Ok(()); }
+    let roots = layout
+        .root_panel_ids
+        .iter()
+        .map(|id| lookup(id))
+        .collect::<Result<Vec<_>, _>>()?;
+    if roots.is_empty() {
+        return Ok(());
+    }
     let mut dock = DockState::new(roots);
     for split in &layout.splits {
-        if !split.fraction.is_finite() || !(0.0..=1.0).contains(&split.fraction) || split.panel_ids.is_empty() {
+        if !split.fraction.is_finite()
+            || !(0.0..=1.0).contains(&split.fraction)
+            || split.panel_ids.is_empty()
+        {
             return Err(WorkspaceError::InvalidContainerTarget);
         }
-        let anchor = keys.get(&split.anchor_panel_id)
+        let anchor = keys
+            .get(&split.anchor_panel_id)
             .ok_or_else(|| WorkspaceError::PanelNotRegistered(split.anchor_panel_id.clone()))?;
-        let (node, _) = dock.main_surface().find_tab(anchor)
+        let (node, _) = dock
+            .main_surface()
+            .find_tab(anchor)
             .ok_or(WorkspaceError::InvalidContainerTarget)?;
-        let tabs = split.panel_ids.iter().map(|id| lookup(id)).collect::<Result<Vec<_>, _>>()?;
+        let tabs = split
+            .panel_ids
+            .iter()
+            .map(|id| lookup(id))
+            .collect::<Result<Vec<_>, _>>()?;
         let tree = dock.main_surface_mut();
         match split.direction {
-            crate::layout::SplitDirection::Left => { tree.split_left(node, split.fraction, tabs); }
-            crate::layout::SplitDirection::Right => { tree.split_right(node, split.fraction, tabs); }
-            crate::layout::SplitDirection::Above => { tree.split_above(node, split.fraction, tabs); }
-            crate::layout::SplitDirection::Below => { tree.split_below(node, split.fraction, tabs); }
+            crate::layout::SplitDirection::Left => {
+                tree.split_left(node, split.fraction, tabs);
+            }
+            crate::layout::SplitDirection::Right => {
+                tree.split_right(node, split.fraction, tabs);
+            }
+            crate::layout::SplitDirection::Above => {
+                tree.split_above(node, split.fraction, tabs);
+            }
+            crate::layout::SplitDirection::Below => {
+                tree.split_below(node, split.fraction, tabs);
+            }
         }
     }
-    if used.len() != keys.len() { return Err(WorkspaceError::InvalidContainerTarget); }
+    if used.len() != keys.len() {
+        return Err(WorkspaceError::InvalidContainerTarget);
+    }
     if let Some(selected) = &layout.selected_panel_id {
-        let key = keys.get(selected).ok_or_else(|| WorkspaceError::PanelNotRegistered(selected.clone()))?;
-        let (node, tab) = dock.main_surface().find_tab(key).ok_or(WorkspaceError::InvalidContainerTarget)?;
-        dock.main_surface_mut().set_active_tab(node, tab).map_err(|_| WorkspaceError::InvalidContainerTarget)?;
+        let key = keys
+            .get(selected)
+            .ok_or_else(|| WorkspaceError::PanelNotRegistered(selected.clone()))?;
+        let (node, tab) = dock
+            .main_surface()
+            .find_tab(key)
+            .ok_or(WorkspaceError::InvalidContainerTarget)?;
+        dock.main_surface_mut()
+            .set_active_tab(node, tab)
+            .map_err(|_| WorkspaceError::InvalidContainerTarget)?;
     }
     *slot = Some(dock);
     Ok(())
@@ -185,10 +258,17 @@ pub fn import_legacy_root_panels(
 ) -> Result<(), WorkspaceError> {
     use crate::workspace::{DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID};
     // Validate all references before changing any placements.
-    let ws = registry.get(DEFAULT_WORKSPACE_ID).ok_or_else(|| WorkspaceError::WorkspaceNotFound(DEFAULT_WORKSPACE_ID.into()))?;
+    let ws = registry
+        .get(DEFAULT_WORKSPACE_ID)
+        .ok_or_else(|| WorkspaceError::WorkspaceNotFound(DEFAULT_WORKSPACE_ID.into()))?;
     let mut seen = std::collections::BTreeSet::new();
     for id in panel_ids {
-        if !seen.insert(id) || ws.containers.values().any(|c| c.panels.iter().any(|p| p.definition_id == *id)) {
+        if !seen.insert(id)
+            || ws
+                .containers
+                .values()
+                .any(|c| c.panels.iter().any(|p| p.definition_id == *id))
+        {
             return Err(WorkspaceError::PanelAlreadyPlaced(id.clone()));
         }
     }
@@ -204,12 +284,28 @@ pub fn import_legacy_root_panels(
 /// Floating windows are not drop targets.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DockGesture {
-    MoveToNormal { panel: PanelInstanceId, container: String },
-    Float { panel: PanelInstanceId, geometry: FloatingGeometry },
-    Hide { panel: PanelInstanceId },
-    ShowPrevious { panel: PanelInstanceId },
-    ShowInNormal { panel: PanelInstanceId, container: String },
-    ResizeFloating { container: String, geometry: FloatingGeometry },
+    MoveToNormal {
+        panel: PanelInstanceId,
+        container: String,
+    },
+    Float {
+        panel: PanelInstanceId,
+        geometry: FloatingGeometry,
+    },
+    Hide {
+        panel: PanelInstanceId,
+    },
+    ShowPrevious {
+        panel: PanelInstanceId,
+    },
+    ShowInNormal {
+        panel: PanelInstanceId,
+        container: String,
+    },
+    ResizeFloating {
+        container: String,
+        geometry: FloatingGeometry,
+    },
 }
 
 /// Call only after the UI gesture has completed; on error, re-project from
@@ -223,22 +319,27 @@ pub fn apply_dock_gesture(
         DockGesture::MoveToNormal { panel, container } => {
             registry.move_panel(workspace, &panel, &container)
         }
-        DockGesture::Float { panel, geometry } => {
-            registry.float_panel(workspace, &panel, geometry).map(|_| ())
-        }
+        DockGesture::Float { panel, geometry } => registry
+            .float_panel(workspace, &panel, geometry)
+            .map(|_| ()),
         DockGesture::Hide { panel } => registry.hide_panel(workspace, &panel),
         DockGesture::ShowPrevious { panel } => registry.show_panel(workspace, &panel, None),
-        DockGesture::ShowInNormal { panel, container } => registry.show_panel(workspace, &panel, Some(&container)),
-        DockGesture::ResizeFloating { container, geometry } => {
-            registry.update_floating_geometry(workspace, &container, geometry)
+        DockGesture::ShowInNormal { panel, container } => {
+            registry.show_panel(workspace, &panel, Some(&container))
         }
+        DockGesture::ResizeFloating {
+            container,
+            geometry,
+        } => registry.update_floating_geometry(workspace, &container, geometry),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::workspace::{FloatingGeometry, WorkspaceRegistry, DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID};
+    use crate::workspace::{
+        DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID, FloatingGeometry, WorkspaceRegistry,
+    };
 
     #[test]
     fn empty_default_container_does_not_require_a_dock_tree() {
@@ -252,9 +353,19 @@ mod tests {
         let mut registry = WorkspaceRegistry::new();
         let panel = PanelInstanceId::new("editor", "instance-1");
         registry.register_panel(panel.clone());
-        registry.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
-        let id = registry.float_panel(DEFAULT_WORKSPACE_ID, &panel,
-            FloatingGeometry { position: [10.0, 20.0], size: [200.0, 100.0] }).unwrap();
+        registry
+            .place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID)
+            .unwrap();
+        let id = registry
+            .float_panel(
+                DEFAULT_WORKSPACE_ID,
+                &panel,
+                FloatingGeometry {
+                    position: [10.0, 20.0],
+                    size: [200.0, 100.0],
+                },
+            )
+            .unwrap();
         let projected = project_workspace(registry.get(DEFAULT_WORKSPACE_ID).unwrap()).unwrap();
         assert!(projected.normal[DEFAULT_CONTAINER_ID].is_none());
         assert_eq!(projected.floating[&id].instance_id, "instance-1");
@@ -267,8 +378,12 @@ mod tests {
         let b = PanelInstanceId::new("editor", "b");
         registry.register_panel(a.clone());
         registry.register_panel(b.clone());
-        registry.place_panel(DEFAULT_WORKSPACE_ID, &a, DEFAULT_CONTAINER_ID).unwrap();
-        registry.place_panel(DEFAULT_WORKSPACE_ID, &b, DEFAULT_CONTAINER_ID).unwrap();
+        registry
+            .place_panel(DEFAULT_WORKSPACE_ID, &a, DEFAULT_CONTAINER_ID)
+            .unwrap();
+        registry
+            .place_panel(DEFAULT_WORKSPACE_ID, &b, DEFAULT_CONTAINER_ID)
+            .unwrap();
         let projected = project_workspace(registry.get(DEFAULT_WORKSPACE_ID).unwrap()).unwrap();
         assert!(projected.normal[DEFAULT_CONTAINER_ID].is_some());
         assert!(projected.floating.is_empty());
@@ -277,17 +392,42 @@ mod tests {
     #[test]
     fn gestures_move_panel_and_preserve_authoritative_state_on_error() {
         let mut registry = WorkspaceRegistry::new();
-        registry.add_container(DEFAULT_WORKSPACE_ID, "right").unwrap();
+        registry
+            .add_container(DEFAULT_WORKSPACE_ID, "right")
+            .unwrap();
         let panel = PanelInstanceId::new("editor", "one");
         registry.register_panel(panel.clone());
-        registry.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
-        apply_dock_gesture(&mut registry, DEFAULT_WORKSPACE_ID,
-            DockGesture::MoveToNormal { panel: panel.clone(), container: "right".into() }).unwrap();
-        assert_eq!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers["right"].panels, vec![panel.clone()]);
-        assert_eq!(apply_dock_gesture(&mut registry, DEFAULT_WORKSPACE_ID,
-            DockGesture::MoveToNormal { panel: panel.clone(), container: "missing".into() }),
-            Err(WorkspaceError::ContainerNotFound("missing".into())));
-        assert_eq!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers["right"].panels, vec![panel]);
+        registry
+            .place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID)
+            .unwrap();
+        apply_dock_gesture(
+            &mut registry,
+            DEFAULT_WORKSPACE_ID,
+            DockGesture::MoveToNormal {
+                panel: panel.clone(),
+                container: "right".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers["right"].panels,
+            vec![panel.clone()]
+        );
+        assert_eq!(
+            apply_dock_gesture(
+                &mut registry,
+                DEFAULT_WORKSPACE_ID,
+                DockGesture::MoveToNormal {
+                    panel: panel.clone(),
+                    container: "missing".into()
+                }
+            ),
+            Err(WorkspaceError::ContainerNotFound("missing".into()))
+        );
+        assert_eq!(
+            registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers["right"].panels,
+            vec![panel]
+        );
     }
 
     #[test]
@@ -295,18 +435,39 @@ mod tests {
         let mut registry = WorkspaceRegistry::new();
         let panel = PanelInstanceId::new("editor", "one");
         registry.register_panel(panel.clone());
-        registry.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
-        let geometry = FloatingGeometry { position: [11.0, 22.0], size: [333.0, 222.0] };
-        apply_dock_gesture(&mut registry, DEFAULT_WORKSPACE_ID,
-            DockGesture::Float { panel: panel.clone(), geometry }).unwrap();
-        apply_dock_gesture(&mut registry, DEFAULT_WORKSPACE_ID,
-            DockGesture::Hide { panel: panel.clone() }).unwrap();
-        apply_dock_gesture(&mut registry, DEFAULT_WORKSPACE_ID,
-            DockGesture::ShowPrevious { panel }).unwrap();
+        registry
+            .place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID)
+            .unwrap();
+        let geometry = FloatingGeometry {
+            position: [11.0, 22.0],
+            size: [333.0, 222.0],
+        };
+        apply_dock_gesture(
+            &mut registry,
+            DEFAULT_WORKSPACE_ID,
+            DockGesture::Float {
+                panel: panel.clone(),
+                geometry,
+            },
+        )
+        .unwrap();
+        apply_dock_gesture(
+            &mut registry,
+            DEFAULT_WORKSPACE_ID,
+            DockGesture::Hide {
+                panel: panel.clone(),
+            },
+        )
+        .unwrap();
+        apply_dock_gesture(
+            &mut registry,
+            DEFAULT_WORKSPACE_ID,
+            DockGesture::ShowPrevious { panel },
+        )
+        .unwrap();
         let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
         assert_eq!(ws.floating_geometry.values().next(), Some(&geometry));
     }
-
 
     #[test]
     fn legacy_panel_import_preserves_ids() {
@@ -314,14 +475,20 @@ mod tests {
         import_legacy_root_panels(&mut registry, &["one".into(), "two".into()]).unwrap();
         let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
         assert_eq!(ws.containers[DEFAULT_CONTAINER_ID].panels.len(), 2);
-        assert_eq!(ws.containers[DEFAULT_CONTAINER_ID].panels[0].definition_id, "one");
+        assert_eq!(
+            ws.containers[DEFAULT_CONTAINER_ID].panels[0].definition_id,
+            "one"
+        );
     }
     #[test]
     fn legacy_panel_import_rejects_duplicate_without_partial_placement() {
         let mut registry = WorkspaceRegistry::new();
         let result = import_legacy_root_panels(&mut registry, &["one".into(), "one".into()]);
         assert!(matches!(result, Err(WorkspaceError::PanelAlreadyPlaced(_))));
-        assert!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers[DEFAULT_CONTAINER_ID].panels.is_empty());
+        assert!(
+            registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers[DEFAULT_CONTAINER_ID]
+                .panels
+                .is_empty()
+        );
     }
-
 }

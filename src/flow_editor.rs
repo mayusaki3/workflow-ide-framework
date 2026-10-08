@@ -1,7 +1,10 @@
 use eframe::egui;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PortDirection { Input, Output }
+pub enum PortDirection {
+    Input,
+    Output,
+}
 
 #[derive(Debug, Clone)]
 pub struct FlowPort {
@@ -12,10 +15,16 @@ pub struct FlowPort {
 }
 impl FlowPort {
     pub fn new(id: impl Into<String>, label: impl Into<String>, direction: PortDirection) -> Self {
-        Self { id: id.into(), label: label.into(), direction, data_type: None }
+        Self {
+            id: id.into(),
+            label: label.into(),
+            direction,
+            data_type: None,
+        }
     }
     pub fn data_type(mut self, data_type: impl Into<String>) -> Self {
-        self.data_type = Some(data_type.into()); self
+        self.data_type = Some(data_type.into());
+        self
     }
 }
 
@@ -28,9 +37,17 @@ pub struct FlowNode {
 }
 impl FlowNode {
     pub fn new(id: impl Into<String>, label: impl Into<String>, position: [f32; 2]) -> Self {
-        Self { id: id.into(), label: label.into(), position: position.into(), ports: Vec::new() }
+        Self {
+            id: id.into(),
+            label: label.into(),
+            position: position.into(),
+            ports: Vec::new(),
+        }
     }
-    pub fn port(mut self, port: FlowPort) -> Self { self.ports.push(port); self }
+    pub fn port(mut self, port: FlowPort) -> Self {
+        self.ports.push(port);
+        self
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -42,15 +59,28 @@ pub struct FlowEdge {
     pub to_port: String,
 }
 impl FlowEdge {
-    pub fn new(id: impl Into<String>, from_node: impl Into<String>, from_port: impl Into<String>,
-        to_node: impl Into<String>, to_port: impl Into<String>) -> Self {
-        Self { id: id.into(), from_node: from_node.into(), from_port: from_port.into(),
-            to_node: to_node.into(), to_port: to_port.into() }
+    pub fn new(
+        id: impl Into<String>,
+        from_node: impl Into<String>,
+        from_port: impl Into<String>,
+        to_node: impl Into<String>,
+        to_port: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            from_node: from_node.into(),
+            from_port: from_port.into(),
+            to_node: to_node.into(),
+            to_port: to_port.into(),
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PortRef { pub node_id: String, pub port_id: String }
+pub struct PortRef {
+    pub node_id: String,
+    pub port_id: String,
+}
 
 #[derive(Debug, Clone)]
 pub struct FlowModel {
@@ -81,16 +111,35 @@ impl Default for FlowModel {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FlowAction {
-    NodeSelected { node_id: String },
-    EdgeSelected { edge_id: String },
+    NodeSelected {
+        node_id: String,
+    },
+    EdgeSelected {
+        edge_id: String,
+    },
     SelectionCleared,
-    NodeMoved { node_id: String, position: [f32; 2] },
-    ConnectionCreated { edge_id: String, from: PortRef, to: PortRef },
-    ConnectionRejected { from: PortRef, to: PortRef, reason: String },
-    EdgeDeleted { edge_id: String },
+    NodeMoved {
+        node_id: String,
+        position: [f32; 2],
+    },
+    ConnectionCreated {
+        edge_id: String,
+        from: PortRef,
+        to: PortRef,
+    },
+    ConnectionRejected {
+        from: PortRef,
+        to: PortRef,
+        reason: String,
+    },
+    EdgeDeleted {
+        edge_id: String,
+    },
 }
 #[derive(Debug, Default)]
-pub struct FlowResponse { pub actions: Vec<FlowAction> }
+pub struct FlowResponse {
+    pub actions: Vec<FlowAction>,
+}
 
 pub type ConnectionValidator = dyn Fn(&FlowModel, &PortRef, &PortRef) -> Result<(), String>;
 
@@ -98,18 +147,34 @@ fn next_edge_id(model: &FlowModel) -> String {
     let mut index = model.edges.len() + 1;
     loop {
         let id = format!("edge-{index}");
-        if !model.edges.iter().any(|edge| edge.id == id) { return id; }
+        if !model.edges.iter().any(|edge| edge.id == id) {
+            return id;
+        }
         index += 1;
     }
 }
 
 fn port_direction(model: &FlowModel, port: &PortRef) -> Option<PortDirection> {
-    model.nodes.iter().find(|node| node.id == port.node_id)
-        .and_then(|node| node.ports.iter().find(|candidate| candidate.id == port.port_id))
+    model
+        .nodes
+        .iter()
+        .find(|node| node.id == port.node_id)
+        .and_then(|node| {
+            node.ports
+                .iter()
+                .find(|candidate| candidate.id == port.port_id)
+        })
         .map(|port| port.direction)
 }
 
-fn port_position(rect: egui::Rect, node: &FlowNode, port_id: &str, node_size: egui::Vec2, pan: egui::Vec2, zoom: f32) -> Option<egui::Pos2> {
+fn port_position(
+    rect: egui::Rect,
+    node: &FlowNode,
+    port_id: &str,
+    node_size: egui::Vec2,
+    pan: egui::Vec2,
+    zoom: f32,
+) -> Option<egui::Pos2> {
     let node_rect = egui::Rect::from_min_size(
         rect.min + pan + node.position.to_vec2() * zoom,
         node_size * zoom,
@@ -118,10 +183,20 @@ fn port_position(rect: egui::Rect, node: &FlowNode, port_id: &str, node_size: eg
     let mut output_y = node_rect.top() + 34.0 * zoom;
     for port in &node.ports {
         let p = match port.direction {
-            PortDirection::Input => { let p=egui::pos2(node_rect.left(), input_y); input_y+=18.0 * zoom; p }
-            PortDirection::Output => { let p=egui::pos2(node_rect.right(), output_y); output_y+=18.0 * zoom; p }
+            PortDirection::Input => {
+                let p = egui::pos2(node_rect.left(), input_y);
+                input_y += 18.0 * zoom;
+                p
+            }
+            PortDirection::Output => {
+                let p = egui::pos2(node_rect.right(), output_y);
+                output_y += 18.0 * zoom;
+                p
+            }
         };
-        if port.id == port_id { return Some(p); }
+        if port.id == port_id {
+            return Some(p);
+        }
     }
     None
 }
@@ -129,7 +204,9 @@ fn port_position(rect: egui::Rect, node: &FlowNode, port_id: &str, node_size: eg
 fn distance_to_segment(point: egui::Pos2, a: egui::Pos2, b: egui::Pos2) -> f32 {
     let ab = b - a;
     let length_sq = ab.length_sq();
-    if length_sq <= f32::EPSILON { return point.distance(a); }
+    if length_sq <= f32::EPSILON {
+        return point.distance(a);
+    }
     let t = ((point - a).dot(ab) / length_sq).clamp(0.0, 1.0);
     point.distance(a + ab * t)
 }
@@ -138,7 +215,11 @@ pub fn show(ui: &mut egui::Ui, model: &mut FlowModel) -> FlowResponse {
     show_with_validator(ui, model, None)
 }
 
-pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&ConnectionValidator>) -> FlowResponse {
+pub fn show_with_validator(
+    ui: &mut egui::Ui,
+    model: &mut FlowModel,
+    validator: Option<&ConnectionValidator>,
+) -> FlowResponse {
     // Keep scroll bars as an alternate navigation path, but do not let the
     // ScrollArea own canvas drag or mouse-wheel input. This prevents a prior
     // scrollbar interaction from stealing later pan/zoom input from the canvas.
@@ -150,7 +231,11 @@ pub fn show_with_validator(ui: &mut egui::Ui, model: &mut FlowModel, validator: 
         .inner
 }
 
-fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&ConnectionValidator>) -> FlowResponse {
+fn show_canvas(
+    ui: &mut egui::Ui,
+    model: &mut FlowModel,
+    validator: Option<&ConnectionValidator>,
+) -> FlowResponse {
     let mut response = FlowResponse::default();
     let viewport = ui.available_rect_before_wrap();
     let node_size = egui::vec2(170.0, 84.0);
@@ -202,7 +287,10 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
     // Mouse-wheel input is disabled as a ScrollArea source, so wheel input
     // over the canvas always belongs to zoom even after scrollbar interaction.
     let pointer_over_canvas = ui.input(|input| {
-        input.pointer.hover_pos().is_some_and(|pointer| rect.contains(pointer))
+        input
+            .pointer
+            .hover_pos()
+            .is_some_and(|pointer| rect.contains(pointer))
     });
     let zoom_delta = if pointer_over_canvas {
         ui.input(|input| input.smooth_scroll_delta.y)
@@ -229,10 +317,34 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
 
     let mut delete_edge: Option<String> = None;
     for edge in &model.edges {
-        let from = model.nodes.iter().find(|n| n.id == edge.from_node)
-            .and_then(|n| port_position(graph_rect, n, &edge.from_port, node_size, model.pan, model.zoom));
-        let to = model.nodes.iter().find(|n| n.id == edge.to_node)
-            .and_then(|n| port_position(graph_rect, n, &edge.to_port, node_size, model.pan, model.zoom));
+        let from = model
+            .nodes
+            .iter()
+            .find(|n| n.id == edge.from_node)
+            .and_then(|n| {
+                port_position(
+                    graph_rect,
+                    n,
+                    &edge.from_port,
+                    node_size,
+                    model.pan,
+                    model.zoom,
+                )
+            });
+        let to = model
+            .nodes
+            .iter()
+            .find(|n| n.id == edge.to_node)
+            .and_then(|n| {
+                port_position(
+                    graph_rect,
+                    n,
+                    &edge.to_port,
+                    node_size,
+                    model.pan,
+                    model.zoom,
+                )
+            });
         if let (Some(a), Some(b)) = (from, to) {
             let selected = model.selected_edge_id.as_deref() == Some(edge.id.as_str());
             let stroke = if selected {
@@ -240,21 +352,24 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
             } else {
                 ui.visuals().widgets.inactive.fg_stroke
             };
-            painter.line_segment([a,b], stroke);
+            painter.line_segment([a, b], stroke);
             let edge_rect = egui::Rect::from_two_pos(a, b).expand(8.0);
             let edge_hit = ui.interact(
                 edge_rect,
                 ui.make_persistent_id(("wfide_edge", &edge.id)),
                 egui::Sense::click(),
             );
-            let near_edge = edge_hit.hover_pos()
+            let near_edge = edge_hit
+                .hover_pos()
                 .map(|pointer| distance_to_segment(pointer, a, b) <= 8.0)
                 .unwrap_or(false);
             if near_edge {
                 if edge_hit.clicked() {
                     model.selected_node_id = None;
                     model.selected_edge_id = Some(edge.id.clone());
-                    response.actions.push(FlowAction::EdgeSelected { edge_id: edge.id.clone() });
+                    response.actions.push(FlowAction::EdgeSelected {
+                        edge_id: edge.id.clone(),
+                    });
                 }
                 if edge_hit.double_clicked() {
                     delete_edge = Some(edge.id.clone());
@@ -268,25 +383,41 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
         response.actions.push(FlowAction::EdgeDeleted { edge_id });
     }
 
-    if let (Some(start), Some(pointer)) = (&model.pending_connection, ui.input(|i| i.pointer.hover_pos())) {
+    if let (Some(start), Some(pointer)) = (
+        &model.pending_connection,
+        ui.input(|i| i.pointer.hover_pos()),
+    ) {
         if let Some(node) = model.nodes.iter().find(|n| n.id == start.node_id) {
-            if let Some(a) = port_position(graph_rect, node, &start.port_id, node_size, model.pan, model.zoom) {
-                painter.line_segment([a,pointer], ui.visuals().widgets.hovered.fg_stroke);
+            if let Some(a) = port_position(
+                graph_rect,
+                node,
+                &start.port_id,
+                node_size,
+                model.pan,
+                model.zoom,
+            ) {
+                painter.line_segment([a, pointer], ui.visuals().widgets.hovered.fg_stroke);
             }
         }
     }
 
     let mut clicked_port: Option<PortRef> = None;
     for node in &mut model.nodes {
-        let node_rect=egui::Rect::from_min_size(
+        let node_rect = egui::Rect::from_min_size(
             graph_rect.min + model.pan + node.position.to_vec2() * model.zoom,
             node_size * model.zoom,
         );
-        let hit=ui.interact(node_rect,ui.make_persistent_id(("wfide_flow_node",&node.id)),egui::Sense::click_and_drag());
+        let hit = ui.interact(
+            node_rect,
+            ui.make_persistent_id(("wfide_flow_node", &node.id)),
+            egui::Sense::click_and_drag(),
+        );
         if hit.clicked() {
-            model.selected_node_id=Some(node.id.clone());
-            model.selected_edge_id=None;
-            response.actions.push(FlowAction::NodeSelected{node_id:node.id.clone()});
+            model.selected_node_id = Some(node.id.clone());
+            model.selected_edge_id = None;
+            response.actions.push(FlowAction::NodeSelected {
+                node_id: node.id.clone(),
+            });
         }
         if hit.drag_started() {
             tracing::debug!(
@@ -305,80 +436,147 @@ fn show_canvas(ui: &mut egui::Ui, model: &mut FlowModel, validator: Option<&Conn
                 "node drag"
             );
             node.position += delta / model.zoom;
-            response.actions.push(FlowAction::NodeMoved{node_id:node.id.clone(),position:[node.position.x,node.position.y]});
+            response.actions.push(FlowAction::NodeMoved {
+                node_id: node.id.clone(),
+                position: [node.position.x, node.position.y],
+            });
         }
-        let selected=model.selected_node_id.as_deref()==Some(node.id.as_str());
-        let visuals=if selected {&ui.visuals().widgets.active}else{&ui.visuals().widgets.inactive};
-        painter.rect(node_rect,6.0,visuals.bg_fill,visuals.bg_stroke,egui::StrokeKind::Inside);
+        let selected = model.selected_node_id.as_deref() == Some(node.id.as_str());
+        let visuals = if selected {
+            &ui.visuals().widgets.active
+        } else {
+            &ui.visuals().widgets.inactive
+        };
+        painter.rect(
+            node_rect,
+            6.0,
+            visuals.bg_fill,
+            visuals.bg_stroke,
+            egui::StrokeKind::Inside,
+        );
         painter.text(
-            node_rect.left_top()+egui::vec2(8.0,8.0) * model.zoom,
+            node_rect.left_top() + egui::vec2(8.0, 8.0) * model.zoom,
             egui::Align2::LEFT_TOP,
             &node.label,
-            egui::FontId::proportional(egui::TextStyle::Button.resolve(ui.style()).size * model.zoom),
+            egui::FontId::proportional(
+                egui::TextStyle::Button.resolve(ui.style()).size * model.zoom,
+            ),
             visuals.fg_stroke.color,
         );
 
-        let mut iy=node_rect.top()+34.0 * model.zoom; let mut oy=node_rect.top()+34.0 * model.zoom;
+        let mut iy = node_rect.top() + 34.0 * model.zoom;
+        let mut oy = node_rect.top() + 34.0 * model.zoom;
         for port in &node.ports {
-            let p=match port.direction {
-                PortDirection::Input=>{let p=egui::pos2(node_rect.left(),iy);iy+=18.0 * model.zoom;p}
-                PortDirection::Output=>{let p=egui::pos2(node_rect.right(),oy);oy+=18.0 * model.zoom;p}
+            let p = match port.direction {
+                PortDirection::Input => {
+                    let p = egui::pos2(node_rect.left(), iy);
+                    iy += 18.0 * model.zoom;
+                    p
+                }
+                PortDirection::Output => {
+                    let p = egui::pos2(node_rect.right(), oy);
+                    oy += 18.0 * model.zoom;
+                    p
+                }
             };
-            let port_hit=ui.interact(egui::Rect::from_center_size(p,egui::vec2(16.0,16.0) * model.zoom.max(0.5)),
-                ui.make_persistent_id(("wfide_port",&node.id,&port.id)),egui::Sense::click());
-            painter.circle_filled(p,(if port_hit.hovered(){6.0}else{4.0}) * model.zoom,visuals.fg_stroke.color);
-            let (offset,align)=match port.direction {
-                PortDirection::Input=>(egui::vec2(8.0,-7.0) * model.zoom,egui::Align2::LEFT_TOP),
-                PortDirection::Output=>(egui::vec2(-8.0,-7.0) * model.zoom,egui::Align2::RIGHT_TOP),
-            };
-            painter.text(
-                p+offset,
-                align,
-                &port.label,
-                egui::FontId::proportional(egui::TextStyle::Small.resolve(ui.style()).size * model.zoom),
+            let port_hit = ui.interact(
+                egui::Rect::from_center_size(p, egui::vec2(16.0, 16.0) * model.zoom.max(0.5)),
+                ui.make_persistent_id(("wfide_port", &node.id, &port.id)),
+                egui::Sense::click(),
+            );
+            painter.circle_filled(
+                p,
+                (if port_hit.hovered() { 6.0 } else { 4.0 }) * model.zoom,
                 visuals.fg_stroke.color,
             );
-            if port_hit.clicked() { clicked_port=Some(PortRef{node_id:node.id.clone(),port_id:port.id.clone()}); }
+            let (offset, align) = match port.direction {
+                PortDirection::Input => {
+                    (egui::vec2(8.0, -7.0) * model.zoom, egui::Align2::LEFT_TOP)
+                }
+                PortDirection::Output => {
+                    (egui::vec2(-8.0, -7.0) * model.zoom, egui::Align2::RIGHT_TOP)
+                }
+            };
+            painter.text(
+                p + offset,
+                align,
+                &port.label,
+                egui::FontId::proportional(
+                    egui::TextStyle::Small.resolve(ui.style()).size * model.zoom,
+                ),
+                visuals.fg_stroke.color,
+            );
+            if port_hit.clicked() {
+                clicked_port = Some(PortRef {
+                    node_id: node.id.clone(),
+                    port_id: port.id.clone(),
+                });
+            }
         }
     }
 
-    let selection_changed = response.actions.iter().any(|action| matches!(
-        action,
-        FlowAction::NodeSelected { .. } | FlowAction::EdgeSelected { .. }
-    ));
+    let selection_changed = response.actions.iter().any(|action| {
+        matches!(
+            action,
+            FlowAction::NodeSelected { .. } | FlowAction::EdgeSelected { .. }
+        )
+    });
     if canvas_hit.clicked() && !selection_changed && clicked_port.is_none() {
         model.selected_node_id = None;
         model.selected_edge_id = None;
         response.actions.push(FlowAction::SelectionCleared);
     }
 
-    if let Some(clicked)=clicked_port {
-        if let Some(start)=model.pending_connection.take() {
+    if let Some(clicked) = clicked_port {
+        if let Some(start) = model.pending_connection.take() {
             if start != clicked {
-                let normalized = match (port_direction(model, &start), port_direction(model, &clicked)) {
-                    (Some(PortDirection::Output), Some(PortDirection::Input)) => Ok((start.clone(), clicked.clone())),
-                    (Some(PortDirection::Input), Some(PortDirection::Output)) => Ok((clicked.clone(), start.clone())),
+                let normalized = match (
+                    port_direction(model, &start),
+                    port_direction(model, &clicked),
+                ) {
+                    (Some(PortDirection::Output), Some(PortDirection::Input)) => {
+                        Ok((start.clone(), clicked.clone()))
+                    }
+                    (Some(PortDirection::Input), Some(PortDirection::Output)) => {
+                        Ok((clicked.clone(), start.clone()))
+                    }
                     _ => Err("connection requires one Output and one Input".to_owned()),
                 };
                 match normalized {
                     Ok((from, to)) => {
-                        match validator.map(|v|v(model,&from,&to)).unwrap_or(Ok(())) {
+                        match validator.map(|v| v(model, &from, &to)).unwrap_or(Ok(())) {
                             Ok(()) => {
                                 let edge_id = next_edge_id(model);
                                 model.edges.push(FlowEdge::new(
                                     edge_id.clone(),
-                                    from.node_id.clone(), from.port_id.clone(),
-                                    to.node_id.clone(), to.port_id.clone(),
+                                    from.node_id.clone(),
+                                    from.port_id.clone(),
+                                    to.node_id.clone(),
+                                    to.port_id.clone(),
                                 ));
-                                response.actions.push(FlowAction::ConnectionCreated { edge_id, from, to });
+                                response.actions.push(FlowAction::ConnectionCreated {
+                                    edge_id,
+                                    from,
+                                    to,
+                                });
                             }
-                            Err(reason) => response.actions.push(FlowAction::ConnectionRejected { from, to, reason }),
+                            Err(reason) => response.actions.push(FlowAction::ConnectionRejected {
+                                from,
+                                to,
+                                reason,
+                            }),
                         }
                     }
-                    Err(reason) => response.actions.push(FlowAction::ConnectionRejected { from: start, to: clicked, reason }),
+                    Err(reason) => response.actions.push(FlowAction::ConnectionRejected {
+                        from: start,
+                        to: clicked,
+                        reason,
+                    }),
                 }
             }
-        } else { model.pending_connection=Some(clicked); }
+        } else {
+            model.pending_connection = Some(clicked);
+        }
     }
 
     response

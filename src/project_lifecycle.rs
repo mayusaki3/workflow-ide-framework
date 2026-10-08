@@ -27,22 +27,37 @@ impl Default for ProjectSession {
 }
 
 impl ProjectSession {
-    pub fn new_project(policy: NewProjectStoragePolicy, root: Option<ProjectContext>) -> Result<Self, NewProjectError> {
+    pub fn new_project(
+        policy: NewProjectStoragePolicy,
+        root: Option<ProjectContext>,
+    ) -> Result<Self, NewProjectError> {
         let storage = match (policy, root) {
             (NewProjectStoragePolicy::Deferred, None) => ProjectStorageState::Unsaved,
             (_, Some(context)) => ProjectStorageState::Stored(context),
-            (NewProjectStoragePolicy::Required, None) => return Err(NewProjectError::StorageRequired),
+            (NewProjectStoragePolicy::Required, None) => {
+                return Err(NewProjectError::StorageRequired);
+            }
         };
         Ok(Self {
-            dirty: ProjectDirtyState { metadata: true, framework: true, application: true },
+            dirty: ProjectDirtyState {
+                metadata: true,
+                framework: true,
+                application: true,
+            },
             current_save_id: None,
             storage,
         })
     }
 
-    pub fn mark_metadata_dirty(&mut self) { self.dirty.metadata = true; }
-    pub fn mark_framework_dirty(&mut self) { self.dirty.framework = true; }
-    pub fn mark_application_dirty(&mut self) { self.dirty.application = true; }
+    pub fn mark_metadata_dirty(&mut self) {
+        self.dirty.metadata = true;
+    }
+    pub fn mark_framework_dirty(&mut self) {
+        self.dirty.framework = true;
+    }
+    pub fn mark_application_dirty(&mut self) {
+        self.dirty.application = true;
+    }
 
     pub fn context(&self) -> Option<&ProjectContext> {
         match &self.storage {
@@ -65,9 +80,15 @@ impl ProjectSession {
     }
 
     pub fn complete_save(&mut self, pending: PendingProjectSave) -> Result<(), SaveStateError> {
-        if !pending.application_saved { return Err(SaveStateError::ApplicationNotSaved); }
-        if !pending.framework_saved { return Err(SaveStateError::FrameworkNotSaved); }
-        if !pending.project_file_saved { return Err(SaveStateError::ProjectFileNotSaved); }
+        if !pending.application_saved {
+            return Err(SaveStateError::ApplicationNotSaved);
+        }
+        if !pending.framework_saved {
+            return Err(SaveStateError::FrameworkNotSaved);
+        }
+        if !pending.project_file_saved {
+            return Err(SaveStateError::ProjectFileNotSaved);
+        }
         self.current_save_id = Some(pending.save_id);
         self.dirty = ProjectDirtyState::default();
         Ok(())
@@ -75,7 +96,9 @@ impl ProjectSession {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NewProjectError { StorageRequired }
+pub enum NewProjectError {
+    StorageRequired,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingProjectSave {
@@ -86,9 +109,18 @@ pub struct PendingProjectSave {
 }
 
 impl PendingProjectSave {
-    pub fn application_saved(mut self) -> Self { self.application_saved = true; self }
-    pub fn framework_saved(mut self) -> Self { self.framework_saved = true; self }
-    pub fn project_file_saved(mut self) -> Self { self.project_file_saved = true; self }
+    pub fn application_saved(mut self) -> Self {
+        self.application_saved = true;
+        self
+    }
+    pub fn framework_saved(mut self) -> Self {
+        self.framework_saved = true;
+        self
+    }
+    pub fn project_file_saved(mut self) -> Self {
+        self.project_file_saved = true;
+        self
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

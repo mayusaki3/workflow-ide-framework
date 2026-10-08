@@ -20,10 +20,14 @@ fn main() -> eframe::Result<()> {
                 label: "Joint".into(),
                 items: vec![
                     PropertyItem::new("angle", "Angle", PropertyValue::Float(0.0)),
-                    PropertyItem::new("mode", "Mode", PropertyValue::Enum {
-                        value: "Position".into(),
-                        options: vec!["Position".into(), "Velocity".into(), "Torque".into()],
-                    }),
+                    PropertyItem::new(
+                        "mode",
+                        "Mode",
+                        PropertyValue::Enum {
+                            value: "Position".into(),
+                            options: vec!["Position".into(), "Velocity".into(), "Torque".into()],
+                        },
+                    ),
                 ],
             },
         ],
@@ -31,8 +35,16 @@ fn main() -> eframe::Result<()> {
 
     Application::new("step5-9-property-panel", "Step 5.9 Property Panel")
         .font_path("assets/fonts/default/NotoSansCJK-Regular.ttc")
-        .panel(PanelDefinition::new("viewport", "Selection Source", PanelKind::StandardUi))
-        .panel(PanelDefinition::new("properties", "Properties", PanelKind::StandardUi))
+        .panel(PanelDefinition::new(
+            "viewport",
+            "Selection Source",
+            PanelKind::StandardUi,
+        ))
+        .panel(PanelDefinition::new(
+            "properties",
+            "Properties",
+            PanelKind::StandardUi,
+        ))
         .layout(LayoutConfig {
             root_panel_ids: vec!["viewport".into()],
             splits: vec![LayoutSplit {

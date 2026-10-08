@@ -1,8 +1,14 @@
 use crate::{
-    project_resource::{FileTypeFilter, ResourceReference, ResourceReferenceError, ResourceScope, ResourceSelectionMode},
+    project_resource::{
+        FileTypeFilter, ResourceReference, ResourceReferenceError, ResourceScope,
+        ResourceSelectionMode,
+    },
     resource_state::ResourceRoots,
 };
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FileSelectionResult {
@@ -13,12 +19,18 @@ pub enum FileSelectionResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FileSelectionError {
-    InvalidCount { mode: ResourceSelectionMode, count: usize },
+    InvalidCount {
+        mode: ResourceSelectionMode,
+        count: usize,
+    },
     FileDoesNotExist(PathBuf),
     NotRegularFile(PathBuf),
     ExtensionNotAllowed(PathBuf),
     RootUnavailable(ResourceScope),
-    OutsideRoot { scope: ResourceScope, path: PathBuf },
+    OutsideRoot {
+        scope: ResourceScope,
+        path: PathBuf,
+    },
     Reference(ResourceReferenceError),
     Io(String),
 }
@@ -38,7 +50,10 @@ impl FileSelectionRequest {
     ) -> FileSelectionResult {
         let count = selected_paths.len();
         if count == 0 || (self.mode == ResourceSelectionMode::Single && count != 1) {
-            return FileSelectionResult::Error(FileSelectionError::InvalidCount { mode: self.mode, count });
+            return FileSelectionResult::Error(FileSelectionError::InvalidCount {
+                mode: self.mode,
+                count,
+            });
         }
 
         let mut references = Vec::with_capacity(count);
@@ -74,7 +89,8 @@ fn validate_one(
 
     match scope {
         ResourceScope::External => {
-            let absolute = fs::canonicalize(path).map_err(|error| FileSelectionError::Io(error.to_string()))?;
+            let absolute = fs::canonicalize(path)
+                .map_err(|error| FileSelectionError::Io(error.to_string()))?;
             ResourceReference::new(scope, absolute).map_err(FileSelectionError::Reference)
         }
         ResourceScope::Application | ResourceScope::Project => {
@@ -83,13 +99,18 @@ fn validate_one(
                 ResourceScope::Project => &roots.project,
                 ResourceScope::External => unreachable!(),
             };
-            let canonical_root = fs::canonicalize(root)
-                .map_err(|_| FileSelectionError::RootUnavailable(scope))?;
+            let canonical_root =
+                fs::canonicalize(root).map_err(|_| FileSelectionError::RootUnavailable(scope))?;
             let canonical_path = fs::canonicalize(path)
                 .map_err(|error| FileSelectionError::Io(error.to_string()))?;
-            let relative = canonical_path.strip_prefix(&canonical_root)
-                .map_err(|_| FileSelectionError::OutsideRoot { scope, path: path.to_path_buf() })?;
-            ResourceReference::new(scope, relative.to_path_buf()).map_err(FileSelectionError::Reference)
+            let relative = canonical_path.strip_prefix(&canonical_root).map_err(|_| {
+                FileSelectionError::OutsideRoot {
+                    scope,
+                    path: path.to_path_buf(),
+                }
+            })?;
+            ResourceReference::new(scope, relative.to_path_buf())
+                .map_err(FileSelectionError::Reference)
         }
     }
 }
