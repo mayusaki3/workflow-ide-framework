@@ -519,12 +519,17 @@ impl Application {
         let _logging_guard = logging::init(&config.id, &config.logging)
             .map_err(eframe::Error::AppCreation)?;
         tracing::info!(target: "wfide::application", application_id = %config.id, "WFIDE application starting");
-        let dock_state = config
-            .layout
-            .as_ref()
-            .map(|layout| layout::build_dock_state(layout, &config.panels))
-            .transpose()
-            .map_err(|error| eframe::Error::AppCreation(Box::new(error)))?;
+        // Workspace is the authoritative placement model. Legacy layout roots
+        // are imported as panel instances; dock trees are rendering projections.
+        let mut workspace_registry = workspace::WorkspaceRegistry::new();
+        let initial_panel_ids = config.layout.as_ref()
+            .map(|layout| layout.root_panel_ids.clone())
+            .unwrap_or_default();
+        workspace_dock::import_legacy_root_panels(&mut workspace_registry, &initial_panel_ids)
+            .map_err(|error| eframe::Error::AppCreation(Box::new(std::io::Error::other(format!("{error:?}")))))?;
+        let workspace_docks = workspace_dock::project_workspace(
+            workspace_registry.get(workspace::DEFAULT_WORKSPACE_ID).expect("default workspace")
+        ).map_err(|error| eframe::Error::AppCreation(Box::new(std::io::Error::other(format!("{error:?}")))))?;
         let window_title = config
             .window
             .title
@@ -569,7 +574,8 @@ impl Application {
 
                 Ok(Box::new(FrameworkHost {
                     config,
-                    dock_state,
+                    workspace_registry,
+                    workspace_docks,
                     text_editors,
                     text_editor_options,
                     log_viewers,
@@ -620,7 +626,8 @@ fn apply_theme_mode(ctx: &egui::Context, selected: theme::Theme) {
 
 struct FrameworkHost {
     config: ApplicationConfig,
-    dock_state: Option<egui_dock::DockState<String>>,
+    workspace_registry: workspace::WorkspaceRegistry,
+    workspace_docks: workspace_dock::WorkspaceDockProjection,
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
@@ -1326,7 +1333,7 @@ impl eframe::App for FrameworkHost {
         ui.label(format!("Application ID: {}", self.config.id));
         ui.label("workflow-ide-framework v0.1.0 Sample");
 
-        if let Some(dock_state) = &mut self.dock_state {
+        if !self.workspace_docks.normal.is_empty() || !self.workspace_docks.floating.is_empty() {
             ui.separator();
             let mut viewer = FrameworkTabViewer {
                 panels: &self.config.panels,
@@ -1351,7 +1358,33 @@ impl eframe::App for FrameworkHost {
                 controller_panels: &mut self.controller_panels,
                 controller_property_links: &self.controller_property_links,
             };
-            egui_dock::DockArea::new(dock_state).show_inside(ui, &mut viewer);
+            for (container_id, dock_state) in &mut self.workspace_docks.normal {
+                if let Some(dock_state) = dock_state {
+                    ui.push_id(container_id, |ui| {
+                        let mut workspace_viewer = WorkspaceTabViewer { inner: &mut viewer };
+                        egui_dock::DockArea::new(dock_state).show_inside(ui, &mut workspace_viewer);
+                    });
+                }
+            }
+            // Floating containers are separate windows and are never dock targets.
+            let selected_workspace = self.workspace_registry.selected_id();
+            if let Some(workspace) = self.workspace_registry.get(selected_workspace) {
+                for (container_id, panel) in &self.workspace_docks.floating {
+                    if let Some(geometry) = workspace.floating_geometry.get(container_id) {
+                        let mut open = true;
+                        egui::Window::new(format!("{}##{}", panel.definition_id, container_id))
+                            .id(egui::Id::new(("workspace.floating", selected_workspace, container_id)))
+                            .default_pos(egui::pos2(geometry.position[0], geometry.position[1]))
+                            .default_size(egui::vec2(geometry.size[0], geometry.size[1]))
+                            .open(&mut open)
+                            .show(ui.ctx(), |ui| {
+                                let mut key = panel.clone();
+                                let mut workspace_viewer = WorkspaceTabViewer { inner: &mut viewer };
+                                <WorkspaceTabViewer<'_, '_> as egui_dock::TabViewer>::ui(&mut workspace_viewer, ui, &mut key);
+                            });
+                    }
+                }
+            }
         } else if !self.config.panels.is_empty() {
             ui.separator();
             ui.label("Declared panels:");
