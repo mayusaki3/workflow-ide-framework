@@ -90,19 +90,30 @@ canonical_document: true
 | WS-040 | Dialogを閉じる | 表示終了だけではWorkspaceが暗黙に破棄されない |
 | WS-041 | 所有者がWorkspaceを破棄 | Dialogの表示終了とは独立して所有者がlifetimeを管理できる |
 
-## 8. 実装前の確認事項
+## 8. Floating Container
+
+| ID | 条件・操作 | 期待結果 |
+|---|---|---|
+| WS-042 | 通常ContainerからPanelをFloating化 | 対象Panel専用のFloating Containerが生成される |
+| WS-043 | 他のPanelを既存Floating Containerへドラッグ＆ドロップ | 追加・タブ化・分割・置換を行わず、既存Panelの配置を維持する |
+| WS-044 | Floating Panelを通常Containerへ移動 | 空になったFloating Containerが破棄され、Panel instanceは維持される |
+| WS-045 | Floating Panelを非表示にし、配置先を指定せず再表示 | 元のFloating位置・サイズで専用Floating Containerが再生成される |
+| WS-046 | Floating Panelを非表示にし、通常Containerを指定して再表示 | 指定された通常Containerへ配置される |
+| WS-047 | Floating Panelの位置・サイズを変更して保存・復元 | 変更後のFloating位置・サイズが復元される |
+
+## 9. 実装前の確認事項
 
 以下は本テストの期待結果を変更するための項目ではなく、公開I/F設計時に具体化する事項である。
 
 - Workspace/Containerの識別子、登録・生成・破棄APIおよび失敗結果の表現
-- Panelの再表示先指定と、保存済み配置先との優先順位
+- Panelの再表示先指定と、保存済み配置先との優先順位（Floating履歴の復帰規則を含む）
 - Project内User設定の保存形式・保存タイミング
 - Dialog表示対象Workspaceの生成・所有・破棄の公開境界
 - Dock backendを利用した場合の観測可能なLayout検証方法
 
-## 9. 完了条件
+## 10. 完了条件
 
-- 仕様テスト`WS-001`～`WS-041`がすべて成功すること。
+- 仕様テスト`WS-001`～`WS-047`がすべて成功すること。
 - Workspace関連の既存機能にregressionがないこと。
 - 単体テストのカバレッジ100%を、別管理のカバレッジ補完テストを含めて確認すること。
 - 利用アプリケーションがKairi内部実装へ依存せずWorkspaceを構成・利用できること。
