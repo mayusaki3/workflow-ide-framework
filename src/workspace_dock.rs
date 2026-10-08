@@ -51,6 +51,48 @@ pub fn project_workspace(workspace: &Workspace) -> Result<WorkspaceDockProjectio
 
 
 
+/// Synchronize the tab ordering inside normal containers without rebuilding
+/// dock trees. Rebuilding would discard user-created splits and active tabs.
+/// Only accept a complete permutation of the registered visible panels.
+pub fn sync_normal_tab_order(
+    registry: &mut WorkspaceRegistry,
+    workspace_id: &str,
+    projection: &WorkspaceDockProjection,
+) -> Result<(), WorkspaceError> {
+    use std::collections::BTreeSet;
+    let ws = registry.get_mut_workspace_for_dock(workspace_id)?;
+    let mut updates = Vec::new();
+    for (container_id, tree) in &projection.normal {
+        let container = ws.containers.get(container_id)
+            .ok_or_else(|| WorkspaceError::ContainerNotFound(container_id.clone()))?;
+        if container.kind != ContainerKind::Normal {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        }
+        let Some(tree) = tree else {
+            if !container.panels.is_empty() { return Err(WorkspaceError::InvalidContainerTarget); }
+            continue;
+        };
+        let observed: Vec<PanelInstanceId> = tree.main_surface().iter().flat_map(|node| {
+            match node {
+                egui_dock::Node::Leaf(leaf) => leaf.tabs.iter()
+                    .map(|tab| PanelInstanceId::new(&tab.definition_id, &tab.instance_id))
+                    .collect::<Vec<_>>(),
+                _ => Vec::new(),
+            }
+        }).collect();
+        let expected: BTreeSet<_> = container.panels.iter().cloned().collect();
+        let actual: BTreeSet<_> = observed.iter().cloned().collect();
+        if observed.len() != container.panels.len() || expected != actual {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        }
+        updates.push((container_id.clone(), observed));
+    }
+    for (id, panels) in updates {
+        ws.containers.get_mut(&id).expect("validated container").panels = panels;
+    }
+    Ok(())
+}
+
 /// Build the default Container's initial split tree from the application layout.
 /// The registry owns panel placement; this only chooses their visual arrangement.
 pub fn apply_initial_layout(
