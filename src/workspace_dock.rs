@@ -61,15 +61,21 @@ pub fn apply_initial_layout(
     let Some(slot) = projection.normal.get_mut(DEFAULT_CONTAINER_ID) else {
         return Err(WorkspaceError::ContainerNotFound(DEFAULT_CONTAINER_ID.into()));
     };
-    let all = slot.as_ref().map(|dock| {
-        // The registry has already validated ownership; the layout is validated below.
-        dock.main_surface().iter().flat_map(|node| {
-            match node {
-                egui_dock::Node::Leaf { tabs, .. } => tabs.iter().cloned().collect::<Vec<_>>(),
-                _ => Vec::new(),
-            }
-        }).collect::<Vec<_>>()
-    }).unwrap_or_default();
+    // Read the source panel identities from the initial layout instead of
+    // depending on the egui_dock Node iterator representation.
+    let all = layout.root_panel_ids.iter()
+        .chain(layout.splits.iter().flat_map(|split| split.panel_ids.iter()))
+        .map(|id| DockPanelKey { definition_id: id.clone(), instance_id: id.clone() })
+        .collect::<Vec<_>>();
+    let expected_count = slot.as_ref().map(|dock| {
+        dock.main_surface().iter().map(|node| match node {
+            egui_dock::Node::Leaf { tabs, .. } => tabs.len(),
+            _ => 0,
+        }).sum::<usize>()
+    }).unwrap_or(0);
+    if all.len() != expected_count {
+        return Err(WorkspaceError::InvalidContainerTarget);
+    }
     let mut keys = BTreeMap::new();
     for key in all {
         keys.insert(key.definition_id.clone(), key);
