@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use egui_dock::DockState;
 
-use crate::workspace::{ContainerKind, PanelInstanceId, Workspace, WorkspaceError};
+use crate::workspace::{ContainerKind, FloatingGeometry, PanelInstanceId, Workspace, WorkspaceError, WorkspaceRegistry};
 
 /// Stable backend-independent tab key; does not conflate panel definitions and instances.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -48,6 +48,42 @@ pub fn project_workspace(workspace: &Workspace) -> Result<WorkspaceDockProjectio
     Ok(WorkspaceDockProjection { normal, floating })
 }
 
+
+/// A UI gesture is validated and applied to the authoritative registry.
+/// Floating windows are not drop targets.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DockGesture {
+    MoveToNormal { panel: PanelInstanceId, container: String },
+    Float { panel: PanelInstanceId, geometry: FloatingGeometry },
+    Hide { panel: PanelInstanceId },
+    ShowPrevious { panel: PanelInstanceId },
+    ShowInNormal { panel: PanelInstanceId, container: String },
+    ResizeFloating { container: String, geometry: FloatingGeometry },
+}
+
+/// Call only after the UI gesture has completed; on error, re-project from
+/// the unchanged registry instead of retaining the UI's provisional state.
+pub fn apply_dock_gesture(
+    registry: &mut WorkspaceRegistry,
+    workspace: &str,
+    gesture: DockGesture,
+) -> Result<(), WorkspaceError> {
+    match gesture {
+        DockGesture::MoveToNormal { panel, container } => {
+            registry.move_panel(workspace, &panel, &container)
+        }
+        DockGesture::Float { panel, geometry } => {
+            registry.float_panel(workspace, &panel, geometry).map(|_| ())
+        }
+        DockGesture::Hide { panel } => registry.hide_panel(workspace, &panel),
+        DockGesture::ShowPrevious { panel } => registry.show_panel(workspace, &panel, None),
+        DockGesture::ShowInNormal { panel, container } => registry.show_panel(workspace, &panel, Some(&container)),
+        DockGesture::ResizeFloating { container, geometry } => {
+            registry.update_floating_geometry(workspace, &container, geometry)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,4 +122,38 @@ mod tests {
         assert!(projected.normal[DEFAULT_CONTAINER_ID].is_some());
         assert!(projected.floating.is_empty());
     }
+
+    #[test]
+    fn gestures_move_panel_and_preserve_authoritative_state_on_error() {
+        let mut registry = WorkspaceRegistry::new();
+        registry.add_container(DEFAULT_WORKSPACE_ID, "right").unwrap();
+        let panel = PanelInstanceId::new("editor", "one");
+        registry.register_panel(panel.clone());
+        registry.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+        apply_dock_gesture(&mut registry, DEFAULT_WORKSPACE_ID,
+            DockGesture::MoveToNormal { panel: panel.clone(), container: "right".into() }).unwrap();
+        assert_eq!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers["right"].panels, vec![panel.clone()]);
+        assert_eq!(apply_dock_gesture(&mut registry, DEFAULT_WORKSPACE_ID,
+            DockGesture::MoveToNormal { panel: panel.clone(), container: "missing".into() }),
+            Err(WorkspaceError::ContainerNotFound("missing".into())));
+        assert_eq!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers["right"].panels, vec![panel]);
+    }
+
+    #[test]
+    fn gestures_hide_and_restore_floating_panel() {
+        let mut registry = WorkspaceRegistry::new();
+        let panel = PanelInstanceId::new("editor", "one");
+        registry.register_panel(panel.clone());
+        registry.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+        let geometry = FloatingGeometry { position: [11.0, 22.0], size: [333.0, 222.0] };
+        apply_dock_gesture(&mut registry, DEFAULT_WORKSPACE_ID,
+            DockGesture::Float { panel: panel.clone(), geometry }).unwrap();
+        apply_dock_gesture(&mut registry, DEFAULT_WORKSPACE_ID,
+            DockGesture::Hide { panel: panel.clone() }).unwrap();
+        apply_dock_gesture(&mut registry, DEFAULT_WORKSPACE_ID,
+            DockGesture::ShowPrevious { panel }).unwrap();
+        let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
+        assert_eq!(ws.floating_geometry.values().next(), Some(&geometry));
+    }
+
 }
