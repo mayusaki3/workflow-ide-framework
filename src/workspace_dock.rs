@@ -51,9 +51,9 @@ pub fn project_workspace(workspace: &Workspace) -> Result<WorkspaceDockProjectio
 
 
 
-/// Synchronize the tab ordering inside normal containers without rebuilding
-/// dock trees. Rebuilding would discard user-created splits and active tabs.
-/// Only accept a complete permutation of the registered visible panels.
+/// Reconcile all normal dock trees atomically. Tab moves between normal
+/// containers are accepted, but no panel may disappear, duplicate, or enter
+/// a floating container. Preserve each live DockState's split topology.
 pub fn sync_normal_tab_order(
     registry: &mut WorkspaceRegistry,
     workspace_id: &str,
@@ -61,31 +61,47 @@ pub fn sync_normal_tab_order(
 ) -> Result<(), WorkspaceError> {
     use std::collections::BTreeSet;
     let ws = registry.get_mut_workspace_for_dock(workspace_id)?;
+    let expected_containers: BTreeSet<_> = ws.containers.iter()
+        .filter(|(_, c)| c.kind == ContainerKind::Normal)
+        .map(|(id, _)| id.clone()).collect();
+    let actual_containers: BTreeSet<_> = projection.normal.keys().cloned().collect();
+    if expected_containers != actual_containers {
+        return Err(WorkspaceError::InvalidContainerTarget);
+    }
+    let expected_panels: BTreeSet<_> = ws.containers.values()
+        .flat_map(|c| c.panels.iter().cloned()).collect();
+    let mut observed_panels = BTreeSet::new();
     let mut updates = Vec::new();
     for (container_id, tree) in &projection.normal {
-        let container = ws.containers.get(container_id)
-            .ok_or_else(|| WorkspaceError::ContainerNotFound(container_id.clone()))?;
-        if container.kind != ContainerKind::Normal {
-            return Err(WorkspaceError::InvalidContainerTarget);
-        }
-        let Some(tree) = tree else {
-            if !container.panels.is_empty() { return Err(WorkspaceError::InvalidContainerTarget); }
-            continue;
-        };
-        let observed: Vec<PanelInstanceId> = tree.main_surface().iter().flat_map(|node| {
-            match node {
-                egui_dock::Node::Leaf(leaf) => leaf.tabs.iter()
-                    .map(|tab| PanelInstanceId::new(&tab.definition_id, &tab.instance_id))
-                    .collect::<Vec<_>>(),
-                _ => Vec::new(),
+        let mut observed = Vec::new();
+        if let Some(tree) = tree {
+            for node in tree.main_surface().iter() {
+                if let egui_dock::Node::Leaf(leaf) = node {
+                    for tab in &leaf.tabs {
+                        let panel = PanelInstanceId::new(&tab.definition_id, &tab.instance_id);
+                        if !observed_panels.insert(panel.clone()) {
+                            return Err(WorkspaceError::InvalidContainerTarget);
+                        }
+                        observed.push(panel);
+                    }
+                }
             }
-        }).collect();
-        let expected: BTreeSet<_> = container.panels.iter().cloned().collect();
-        let actual: BTreeSet<_> = observed.iter().cloned().collect();
-        if observed.len() != container.panels.len() || expected != actual {
-            return Err(WorkspaceError::InvalidContainerTarget);
         }
         updates.push((container_id.clone(), observed));
+    }
+    for (container_id, panel) in &projection.floating {
+        let container = ws.containers.get(container_id)
+            .ok_or_else(|| WorkspaceError::ContainerNotFound(container_id.clone()))?;
+        let identity = PanelInstanceId::new(&panel.definition_id, &panel.instance_id);
+        if container.kind != ContainerKind::Floating
+            || container.panels.as_slice() != [identity.clone()]
+            || !observed_panels.insert(identity)
+        {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        }
+    }
+    if expected_panels != observed_panels {
+        return Err(WorkspaceError::InvalidContainerTarget);
     }
     for (id, panels) in updates {
         ws.containers.get_mut(&id).expect("validated container").panels = panels;
