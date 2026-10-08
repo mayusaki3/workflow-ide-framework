@@ -49,6 +49,31 @@ pub fn project_workspace(workspace: &Workspace) -> Result<WorkspaceDockProjectio
 }
 
 
+
+/// Resolve the initial legacy application layout into the default Workspace.
+/// This is an additive bridge: the existing DockState<String> remains active
+/// until the host can render multiple containers.
+pub fn import_legacy_root_panels(
+    registry: &mut WorkspaceRegistry,
+    panel_ids: &[String],
+) -> Result<(), WorkspaceError> {
+    use crate::workspace::{DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID};
+    // Validate all references before changing any placements.
+    let ws = registry.get(DEFAULT_WORKSPACE_ID).ok_or_else(|| WorkspaceError::WorkspaceNotFound(DEFAULT_WORKSPACE_ID.into()))?;
+    let mut seen = std::collections::BTreeSet::new();
+    for id in panel_ids {
+        if !seen.insert(id) || ws.containers.values().any(|c| c.panels.iter().any(|p| p.definition_id == *id)) {
+            return Err(WorkspaceError::PanelAlreadyPlaced(id.clone()));
+        }
+    }
+    for id in panel_ids {
+        let instance = PanelInstanceId::new(id.clone(), id.clone());
+        registry.register_panel(instance.clone());
+        registry.place_panel(DEFAULT_WORKSPACE_ID, &instance, DEFAULT_CONTAINER_ID)?;
+    }
+    Ok(())
+}
+
 /// A UI gesture is validated and applied to the authoritative registry.
 /// Floating windows are not drop targets.
 #[derive(Debug, Clone, PartialEq)]
@@ -154,6 +179,23 @@ mod tests {
             DockGesture::ShowPrevious { panel }).unwrap();
         let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
         assert_eq!(ws.floating_geometry.values().next(), Some(&geometry));
+    }
+
+
+    #[test]
+    fn legacy_panel_import_preserves_ids() {
+        let mut registry = WorkspaceRegistry::new();
+        import_legacy_root_panels(&mut registry, &["one".into(), "two".into()]).unwrap();
+        let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
+        assert_eq!(ws.containers[DEFAULT_CONTAINER_ID].panels.len(), 2);
+        assert_eq!(ws.containers[DEFAULT_CONTAINER_ID].panels[0].definition_id, "one");
+    }
+    #[test]
+    fn legacy_panel_import_rejects_duplicate_without_partial_placement() {
+        let mut registry = WorkspaceRegistry::new();
+        let result = import_legacy_root_panels(&mut registry, &["one".into(), "one".into()]);
+        assert!(matches!(result, Err(WorkspaceError::PanelAlreadyPlaced(_))));
+        assert!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers[DEFAULT_CONTAINER_ID].panels.is_empty());
     }
 
 }
