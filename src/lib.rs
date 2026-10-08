@@ -523,13 +523,21 @@ impl Application {
         // are imported as panel instances; dock trees are rendering projections.
         let mut workspace_registry = workspace::WorkspaceRegistry::new();
         let initial_panel_ids = config.layout.as_ref()
-            .map(|layout| layout.root_panel_ids.clone())
+            .map(|layout| {
+                layout.root_panel_ids.iter().cloned()
+                    .chain(layout.splits.iter().flat_map(|split| split.panel_ids.iter().cloned()))
+                    .collect::<Vec<_>>()
+            })
             .unwrap_or_default();
         workspace_dock::import_legacy_root_panels(&mut workspace_registry, &initial_panel_ids)
             .map_err(|error| eframe::Error::AppCreation(Box::new(std::io::Error::other(format!("{error:?}")))))?;
-        let workspace_docks = workspace_dock::project_workspace(
+        let mut workspace_docks = workspace_dock::project_workspace(
             workspace_registry.get(workspace::DEFAULT_WORKSPACE_ID).expect("default workspace")
         ).map_err(|error| eframe::Error::AppCreation(Box::new(std::io::Error::other(format!("{error:?}")))))?;
+        if let Some(layout) = &config.layout {
+            workspace_dock::apply_initial_layout(&mut workspace_docks, layout)
+                .map_err(|error| eframe::Error::AppCreation(Box::new(std::io::Error::other(format!("{error:?}")))))?;
+        }
         let window_title = config
             .window
             .title
