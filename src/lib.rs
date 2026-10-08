@@ -1389,6 +1389,38 @@ struct FrameworkTabViewer<'a> {
     controller_property_links: &'a [ControllerPropertyLink],
 }
 
+/// Instance-aware renderer for Workspace-owned DockState trees.
+///
+/// Panel content remains keyed by definition ID until per-instance model
+/// storage is introduced; tab identity is always the full instance key.
+struct WorkspaceTabViewer<'a, 'b> {
+    inner: &'a mut FrameworkTabViewer<'b>,
+}
+
+impl egui_dock::TabViewer for WorkspaceTabViewer<'_, '_> {
+    type Tab = workspace_dock::DockPanelKey;
+
+    fn id(&mut self, tab: &mut Self::Tab) -> egui::Id {
+        egui::Id::new(("workspace.panel", &tab.definition_id, &tab.instance_id))
+    }
+
+    fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
+        <FrameworkTabViewer<'_> as egui_dock::TabViewer>::title(
+            self.inner, &mut tab.definition_id,
+        )
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        <FrameworkTabViewer<'_> as egui_dock::TabViewer>::ui(
+            self.inner, ui, &mut tab.definition_id,
+        );
+    }
+
+    fn is_closeable(&self, _tab: &Self::Tab) -> bool {
+        false
+    }
+}
+
 impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
     type Tab = String;
 
