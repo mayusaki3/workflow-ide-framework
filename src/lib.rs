@@ -6,6 +6,7 @@ pub mod flow_editor;
 pub mod logging;
 pub mod log_viewer;
 pub mod layout;
+pub mod workspace;
 pub mod localization;
 pub mod locale_font;
 pub mod probe;
