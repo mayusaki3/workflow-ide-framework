@@ -1374,6 +1374,14 @@ impl eframe::App for FrameworkHost {
                     });
                 }
             }
+            // Keep registry tab order aligned with user-driven tab rearrangement.
+            // Do not recreate dock trees here: that would erase splits.
+            let selected = self.workspace_registry.selected_id().to_owned();
+            if let Err(error) = workspace_dock::sync_normal_tab_order(
+                &mut self.workspace_registry, &selected, &self.workspace_docks
+            ) {
+                tracing::warn!(target: "wfide::workspace", ?error, "dock tab reconciliation rejected");
+            }
             // Capture floating window changes after rendering, then update the
             // authoritative registry and rebuild the projection on change.
             let selected_workspace = self.workspace_registry.selected_id().to_owned();
