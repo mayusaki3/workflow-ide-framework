@@ -17,6 +17,7 @@ pub enum WorkspaceError {
     PanelNotPlaced(String),
     FloatingContainerRejectsDrop,
     InvalidContainerTarget,
+    InvalidFloatingGeometry,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -41,11 +42,33 @@ pub struct Container {
     pub panels: Vec<PanelInstanceId>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FloatingGeometry {
+    pub position: [f32; 2],
+    pub size: [f32; 2],
+}
+
+impl FloatingGeometry {
+    fn valid(self) -> bool {
+        self.position.iter().all(|v| v.is_finite())
+            && self.size.iter().all(|v| v.is_finite() && *v > 0.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PreviousPlacement {
+    Normal(String),
+    Floating(FloatingGeometry),
+}
+
 #[derive(Debug, Clone)]
 pub struct Workspace {
     pub id: String,
     pub name: String,
     pub containers: BTreeMap<String, Container>,
+    pub floating_geometry: BTreeMap<String, FloatingGeometry>,
+    pub hidden_panels: BTreeMap<PanelInstanceId, PreviousPlacement>,
+    next_floating_id: u64,
 }
 
 impl Workspace {
@@ -54,7 +77,7 @@ impl Workspace {
         containers.insert(DEFAULT_CONTAINER_ID.into(), Container {
             id: DEFAULT_CONTAINER_ID.into(), kind: ContainerKind::Normal, panels: Vec::new()
         });
-        Self { id, name, containers }
+        Self { id, name, containers, floating_geometry: BTreeMap::new(), hidden_panels: BTreeMap::new(), next_floating_id: 0 }
     }
 }
 
@@ -125,6 +148,7 @@ impl WorkspaceRegistry {
         let target = ws.containers.get_mut(container).ok_or_else(|| WorkspaceError::ContainerNotFound(container.into()))?;
         if target.kind == ContainerKind::Floating { return Err(WorkspaceError::FloatingContainerRejectsDrop); }
         target.panels.push(panel.clone());
+        ws.hidden_panels.remove(panel);
         Ok(())
     }
 
@@ -137,11 +161,89 @@ impl WorkspaceRegistry {
         if source == container { return Ok(()); }
         ws.containers.get_mut(&source).unwrap().panels.retain(|p| p != panel);
         ws.containers.get_mut(container).unwrap().panels.push(panel.clone());
+        ws.hidden_panels.remove(panel);
         if ws.containers.get(&source).is_some_and(|c| c.kind == ContainerKind::Floating && c.panels.is_empty()) {
             ws.containers.remove(&source);
+            ws.floating_geometry.remove(&source);
         }
         Ok(())
     }
+
+    /// Create a dedicated floating container for an already placed panel.
+    pub fn float_panel(&mut self, workspace: &str, panel: &PanelInstanceId, geometry: FloatingGeometry) -> Result<String, WorkspaceError> {
+        if !geometry.valid() { return Err(WorkspaceError::InvalidFloatingGeometry); }
+        let ws = self.workspaces.get_mut(workspace).ok_or_else(|| WorkspaceError::WorkspaceNotFound(workspace.into()))?;
+        let source = ws.containers.values().find(|c| c.panels.contains(panel)).map(|c| c.id.clone())
+            .ok_or_else(|| WorkspaceError::PanelNotPlaced(panel.instance_id.clone()))?;
+        ws.next_floating_id += 1;
+        let id = format!("framework.container.floating.{}", ws.next_floating_id);
+        ws.containers.get_mut(&source).unwrap().panels.retain(|p| p != panel);
+        if ws.containers.get(&source).is_some_and(|c| c.kind == ContainerKind::Floating && c.panels.is_empty()) {
+            ws.containers.remove(&source);
+            ws.floating_geometry.remove(&source);
+        }
+        ws.containers.insert(id.clone(), Container { id: id.clone(), kind: ContainerKind::Floating, panels: vec![panel.clone()] });
+        ws.floating_geometry.insert(id.clone(), geometry);
+        ws.hidden_panels.remove(panel);
+        Ok(id)
+    }
+
+    /// Hide a panel without destroying its instance or previous placement.
+    pub fn hide_panel(&mut self, workspace: &str, panel: &PanelInstanceId) -> Result<(), WorkspaceError> {
+        let ws = self.workspaces.get_mut(workspace).ok_or_else(|| WorkspaceError::WorkspaceNotFound(workspace.into()))?;
+        let source = ws.containers.values().find(|c| c.panels.contains(panel)).map(|c| c.id.clone())
+            .ok_or_else(|| WorkspaceError::PanelNotPlaced(panel.instance_id.clone()))?;
+        let previous = if ws.containers[&source].kind == ContainerKind::Floating {
+            PreviousPlacement::Floating(ws.floating_geometry[&source])
+        } else {
+            PreviousPlacement::Normal(source.clone())
+        };
+        ws.containers.get_mut(&source).unwrap().panels.retain(|p| p != panel);
+        if matches!(previous, PreviousPlacement::Floating(_)) {
+            ws.containers.remove(&source);
+            ws.floating_geometry.remove(&source);
+        }
+        ws.hidden_panels.insert(panel.clone(), previous);
+        Ok(())
+    }
+
+    /// Restore a hidden panel to its last placement, or to the default container.
+    pub fn show_panel(&mut self, workspace: &str, panel: &PanelInstanceId, target: Option<&str>) -> Result<(), WorkspaceError> {
+        if !self.registered_panels.contains(panel) {
+            return Err(WorkspaceError::PanelNotRegistered(panel.definition_id.clone()));
+        }
+        let ws = self.workspaces.get(workspace).ok_or_else(|| WorkspaceError::WorkspaceNotFound(workspace.into()))?;
+        if ws.containers.values().any(|c| c.panels.contains(panel)) {
+            return Err(WorkspaceError::PanelAlreadyPlaced(panel.instance_id.clone()));
+        }
+        if let Some(target) = target {
+            // An invalid explicit target must fail instead of silently falling back.
+            return self.place_panel(workspace, panel, target);
+        }
+        let previous = ws.hidden_panels.get(panel).cloned();
+        match previous {
+            Some(PreviousPlacement::Floating(geometry)) => {
+                self.place_panel(workspace, panel, DEFAULT_CONTAINER_ID)?;
+                self.float_panel(workspace, panel, geometry)?;
+                Ok(())
+            }
+            Some(PreviousPlacement::Normal(id)) if ws.containers.get(&id).is_some_and(|c| c.kind == ContainerKind::Normal) => {
+                self.place_panel(workspace, panel, &id)
+            }
+            _ => self.place_panel(workspace, panel, DEFAULT_CONTAINER_ID),
+        }
+    }
+
+    pub fn update_floating_geometry(&mut self, workspace: &str, container: &str, geometry: FloatingGeometry) -> Result<(), WorkspaceError> {
+        if !geometry.valid() { return Err(WorkspaceError::InvalidFloatingGeometry); }
+        let ws = self.workspaces.get_mut(workspace).ok_or_else(|| WorkspaceError::WorkspaceNotFound(workspace.into()))?;
+        if !ws.containers.get(container).is_some_and(|c| c.kind == ContainerKind::Floating) {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        }
+        ws.floating_geometry.insert(container.into(), geometry);
+        Ok(())
+    }
+
 }
 
 #[cfg(test)]
@@ -178,4 +280,47 @@ mod tests {
         registry.move_panel(DEFAULT_WORKSPACE_ID, &panel, "other").unwrap();
         assert_eq!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers["other"].panels, vec![panel]);
     }
+
+    #[test]
+    fn floating_container_rejects_other_panel_drop() {
+        let mut registry = WorkspaceRegistry::new();
+        let a = PanelInstanceId::new("editor", "a");
+        let b = PanelInstanceId::new("editor", "b");
+        registry.register_panel(a.clone());
+        registry.register_panel(b.clone());
+        registry.place_panel(DEFAULT_WORKSPACE_ID, &a, DEFAULT_CONTAINER_ID).unwrap();
+        registry.place_panel(DEFAULT_WORKSPACE_ID, &b, DEFAULT_CONTAINER_ID).unwrap();
+        let floating = registry.float_panel(DEFAULT_WORKSPACE_ID, &a, FloatingGeometry { position: [20.0, 30.0], size: [400.0, 300.0] }).unwrap();
+        assert_eq!(registry.move_panel(DEFAULT_WORKSPACE_ID, &b, &floating), Err(WorkspaceError::FloatingContainerRejectsDrop));
+        assert_eq!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers[&floating].panels, vec![a]);
+    }
+    #[test]
+    fn hidden_floating_panel_restores_geometry() {
+        let mut registry = WorkspaceRegistry::new();
+        let panel = PanelInstanceId::new("editor", "one");
+        registry.register_panel(panel.clone());
+        registry.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+        let geometry = FloatingGeometry { position: [20.0, 30.0], size: [400.0, 300.0] };
+        let floating = registry.float_panel(DEFAULT_WORKSPACE_ID, &panel, geometry).unwrap();
+        registry.hide_panel(DEFAULT_WORKSPACE_ID, &panel).unwrap();
+        assert!(!registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers.contains_key(&floating));
+        registry.show_panel(DEFAULT_WORKSPACE_ID, &panel, None).unwrap();
+        let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
+        assert_eq!(ws.floating_geometry.values().next(), Some(&geometry));
+        assert_eq!(ws.containers.values().filter(|c| c.kind == ContainerKind::Floating).count(), 1);
+    }
+    #[test]
+    fn explicit_container_overrides_floating_history() {
+        let mut registry = WorkspaceRegistry::new();
+        let panel = PanelInstanceId::new("editor", "one");
+        registry.register_panel(panel.clone());
+        registry.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+        registry.float_panel(DEFAULT_WORKSPACE_ID, &panel, FloatingGeometry { position: [1.0, 2.0], size: [50.0, 60.0] }).unwrap();
+        registry.hide_panel(DEFAULT_WORKSPACE_ID, &panel).unwrap();
+        registry.show_panel(DEFAULT_WORKSPACE_ID, &panel, Some(DEFAULT_CONTAINER_ID)).unwrap();
+        let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
+        assert_eq!(ws.containers[DEFAULT_CONTAINER_ID].panels, vec![panel]);
+        assert!(ws.floating_geometry.is_empty());
+    }
+
 }
