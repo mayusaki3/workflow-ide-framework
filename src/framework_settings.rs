@@ -7,13 +7,78 @@ use std::path::PathBuf;
 
 pub const FRAMEWORK_SETTINGS_FORMAT_VERSION: u32 = 1;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Backend-independent layout snapshot stored in Project framework settings.
+/// The tree uses stable panel instance identities, not egui_dock node indices.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StoredWorkspaceLayout {
+    pub containers: Vec<StoredWorkspaceContainer>,
+    #[serde(default)]
+    pub hidden_panels: Vec<StoredHiddenPanel>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StoredWorkspaceContainer {
+    pub id: String,
+    pub floating: bool,
+    #[serde(default)]
+    pub geometry: Option<StoredFloatingGeometry>,
+    #[serde(default)]
+    pub tree: Option<StoredDockNode>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StoredFloatingGeometry {
+    pub position: [f32; 2],
+    pub size: [f32; 2],
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StoredPanelIdentity {
+    pub definition_id: String,
+    pub instance_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum StoredDockNode {
+    Tabs {
+        panels: Vec<StoredPanelIdentity>,
+        active: usize,
+    },
+    Split {
+        axis: StoredSplitAxis,
+        fraction: f32,
+        first: Box<StoredDockNode>,
+        second: Box<StoredDockNode>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StoredSplitAxis {
+    Horizontal,
+    Vertical,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StoredHiddenPanel {
+    pub panel: StoredPanelIdentity,
+    #[serde(default)]
+    pub normal_container: Option<String>,
+    #[serde(default)]
+    pub floating_geometry: Option<StoredFloatingGeometry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FrameworkSettings {
     pub format_version: u32,
     #[serde(default)]
     pub save_id: Option<String>,
     #[serde(default)]
     pub resources: Vec<StoredResourceEntry>,
+    /// Project-scoped user workspace layouts, keyed by stable Workspace ID.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub workspace_layouts: std::collections::BTreeMap<String, StoredWorkspaceLayout>,
 }
 
 impl Default for FrameworkSettings {
@@ -22,6 +87,7 @@ impl Default for FrameworkSettings {
             format_version: FRAMEWORK_SETTINGS_FORMAT_VERSION,
             save_id: None,
             resources: Vec::new(),
+            workspace_layouts: std::collections::BTreeMap::new(),
         }
     }
 }
@@ -105,6 +171,7 @@ impl FrameworkSettings {
                 .iter()
                 .map(StoredResourceEntry::from_resource)
                 .collect(),
+            workspace_layouts: std::collections::BTreeMap::new(),
         }
     }
 
