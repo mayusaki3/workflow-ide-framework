@@ -1366,14 +1366,16 @@ impl eframe::App for FrameworkHost {
                     });
                 }
             }
-            // Floating containers are separate windows and are never dock targets.
-            let selected_workspace = self.workspace_registry.selected_id();
-            if let Some(workspace) = self.workspace_registry.get(selected_workspace) {
+            // Capture floating window changes after rendering, then update the
+            // authoritative registry and rebuild the projection on change.
+            let selected_workspace = self.workspace_registry.selected_id().to_owned();
+            let mut gestures = Vec::new();
+            if let Some(workspace) = self.workspace_registry.get(&selected_workspace) {
                 for (container_id, panel) in &self.workspace_docks.floating {
                     if let Some(geometry) = workspace.floating_geometry.get(container_id) {
                         let mut open = true;
-                        egui::Window::new(format!("{}##{}", panel.definition_id, container_id))
-                            .id(egui::Id::new(("workspace.floating", selected_workspace, container_id)))
+                        let response = egui::Window::new(format!("{}##{}", panel.definition_id, container_id))
+                            .id(egui::Id::new(("workspace.floating", &selected_workspace, container_id)))
                             .default_pos(egui::pos2(geometry.position[0], geometry.position[1]))
                             .default_size(egui::vec2(geometry.size[0], geometry.size[1]))
                             .open(&mut open)
@@ -1382,6 +1384,37 @@ impl eframe::App for FrameworkHost {
                                 let mut workspace_viewer = WorkspaceTabViewer { inner: &mut viewer };
                                 <WorkspaceTabViewer<'_, '_> as egui_dock::TabViewer>::ui(&mut workspace_viewer, ui, &mut key);
                             });
+                        if !open {
+                            gestures.push(workspace_dock::DockGesture::Hide {
+                                panel: workspace::PanelInstanceId::new(&panel.definition_id, &panel.instance_id),
+                            });
+                        } else if let Some(response) = response {
+                            let rect = response.response.rect;
+                            let updated = workspace::FloatingGeometry {
+                                position: [rect.min.x, rect.min.y],
+                                size: [rect.width(), rect.height()],
+                            };
+                            if updated != *geometry {
+                                gestures.push(workspace_dock::DockGesture::ResizeFloating {
+                                    container: container_id.clone(), geometry: updated,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            if !gestures.is_empty() {
+                for gesture in gestures {
+                    if let Err(error) = workspace_dock::apply_dock_gesture(
+                        &mut self.workspace_registry, &selected_workspace, gesture
+                    ) {
+                        tracing::warn!(target: "wfide::workspace", ?error, "floating window gesture rejected");
+                    }
+                }
+                if let Some(workspace) = self.workspace_registry.get(&selected_workspace) {
+                    match workspace_dock::project_workspace(workspace) {
+                        Ok(projection) => self.workspace_docks = projection,
+                        Err(error) => tracing::error!(target: "wfide::workspace", ?error, "workspace projection failed"),
                     }
                 }
             }
