@@ -22,7 +22,7 @@ pub trait ApplicationProjectInspector {
     ) -> Result<ProjectDataConsistency, Self::Error>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FrameworkSettingsOpen {
     Loaded(FrameworkSettings),
     MissingUseDefaults,
@@ -35,7 +35,7 @@ pub enum FrameworkSettingsOpen {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProjectOpenResult {
     pub project_file: ProjectFile,
     pub framework_settings: FrameworkSettingsOpen,
