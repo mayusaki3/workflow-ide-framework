@@ -14,7 +14,7 @@ use crate::{
     project_save_as::save_project_as,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ProjectCommandResult {
     Completed,
     NeedsSaveLocation,
