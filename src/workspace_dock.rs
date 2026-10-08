@@ -67,10 +67,12 @@ pub fn apply_initial_layout(
         .chain(layout.splits.iter().flat_map(|split| split.panel_ids.iter()))
         .map(|id| DockPanelKey { definition_id: id.clone(), instance_id: id.clone() })
         .collect::<Vec<_>>();
+    // The projection is initially a single root leaf. Count its tabs using
+    // the public tree iterator rather than matching egui_dock's tuple variant.
     let expected_count = slot.as_ref().map(|dock| {
-        dock.main_surface().iter().map(|node| match node {
-            egui_dock::Node::Leaf { tabs, .. } => tabs.len(),
-            _ => 0,
+        dock.main_surface().iter().filter_map(|node| match node {
+            egui_dock::Node::Leaf(leaf) => Some(leaf.tabs.len()),
+            _ => None,
         }).sum::<usize>()
     }).unwrap_or(0);
     if all.len() != expected_count {
