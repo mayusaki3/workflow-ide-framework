@@ -216,6 +216,108 @@ fn snapshot_node(
     }
 }
 
+/// Restore project-owned container placement and dock topology together.
+/// Validation occurs against a detached candidate; failure leaves the registry unchanged.
+pub fn restore_workspace_layout(
+    registry: &mut WorkspaceRegistry,
+    workspace_id: &str,
+    stored: &StoredWorkspaceLayout,
+) -> Result<WorkspaceDockProjection, WorkspaceError> {
+    use std::collections::{BTreeMap, BTreeSet};
+    use crate::workspace::{Container, PreviousPlacement};
+
+    let mut candidate = registry.get(workspace_id)
+        .ok_or_else(|| WorkspaceError::WorkspaceNotFound(workspace_id.into()))?
+        .clone();
+    let mut containers = BTreeMap::new();
+    let mut floating_geometry = BTreeMap::new();
+    let mut hidden_panels = BTreeMap::new();
+    let mut observed = BTreeSet::new();
+
+    for entry in &stored.containers {
+        if entry.id.is_empty() || containers.contains_key(&entry.id) {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        }
+        let (kind, panels) = if entry.floating {
+            let geometry = entry.geometry.as_ref()
+                .ok_or(WorkspaceError::InvalidContainerTarget)?;
+            validate_stored_geometry(geometry)?;
+            let Some(StoredDockNode::Tabs { panels, active: 0 }) = &entry.tree else {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            };
+            if panels.len() != 1 {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            floating_geometry.insert(entry.id.clone(), FloatingGeometry {
+                position: geometry.position,
+                size: geometry.size,
+            });
+            (ContainerKind::Floating, panels.iter().map(stored_identity).collect::<Vec<_>>())
+        } else {
+            if entry.geometry.is_some() {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            let mut panels = Vec::new();
+            if let Some(tree) = &entry.tree {
+                let _ = restore_dock_node(tree, &mut panels)?;
+            }
+            (ContainerKind::Normal, panels)
+        };
+        for panel in &panels {
+            if !registry.is_registered_panel_for_dock(panel) || !observed.insert(panel.clone()) {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+        }
+        containers.insert(entry.id.clone(), Container {
+            id: entry.id.clone(),
+            kind,
+            panels,
+        });
+    }
+    if !containers.get(crate::workspace::DEFAULT_CONTAINER_ID)
+        .is_some_and(|c| c.kind == ContainerKind::Normal) {
+        return Err(WorkspaceError::InvalidContainerTarget);
+    }
+    for hidden in &stored.hidden_panels {
+        let panel = stored_identity(&hidden.panel);
+        if !registry.is_registered_panel_for_dock(&panel) || !observed.insert(panel.clone()) {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        }
+        let previous = match (&hidden.normal_container, &hidden.floating_geometry) {
+            (Some(id), None) if containers.get(id).is_some_and(|c| c.kind == ContainerKind::Normal) =>
+                PreviousPlacement::Normal(id.clone()),
+            (None, Some(geometry)) => {
+                validate_stored_geometry(geometry)?;
+                PreviousPlacement::Floating(FloatingGeometry {
+                    position: geometry.position,
+                    size: geometry.size,
+                })
+            }
+            _ => return Err(WorkspaceError::InvalidContainerTarget),
+        };
+        hidden_panels.insert(panel, previous);
+    }
+    candidate.containers = containers;
+    candidate.floating_geometry = floating_geometry;
+    candidate.hidden_panels = hidden_panels;
+    let projection = restore_workspace_projection(&candidate, stored)?;
+    registry.replace_workspace_for_dock(workspace_id, candidate)?;
+    Ok(projection)
+}
+
+fn stored_identity(panel: &StoredPanelIdentity) -> PanelInstanceId {
+    PanelInstanceId::new(&panel.definition_id, &panel.instance_id)
+}
+
+fn validate_stored_geometry(geometry: &StoredFloatingGeometry) -> Result<(), WorkspaceError> {
+    if geometry.position.iter().all(|value| value.is_finite())
+        && geometry.size.iter().all(|value| value.is_finite() && *value > 0.0) {
+        Ok(())
+    } else {
+        Err(WorkspaceError::InvalidFloatingGeometry)
+    }
+}
+
 /// Reconstruct dock trees from a validated project snapshot without changing
 /// the registry or the current projection on failure.
 pub fn restore_workspace_projection(
