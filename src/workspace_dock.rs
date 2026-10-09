@@ -38,6 +38,30 @@ pub struct WorkspaceDockProjection {
     pub floating: BTreeMap<String, DockPanelKey>,
 }
 
+/// Swap the live dock projection when the selected workspace changes.
+pub fn switch_workspace_projection(
+    registry: &WorkspaceRegistry,
+    active_id: &mut String,
+    live: &mut WorkspaceDockProjection,
+    cached: &mut BTreeMap<String, WorkspaceDockProjection>,
+) -> Result<(), WorkspaceError> {
+    let selected = registry.selected_id();
+    if selected == active_id {
+        return Ok(());
+    }
+    let next = if let Some(saved) = cached.remove(selected) {
+        saved
+    } else {
+        project_workspace(
+            registry.get(selected)
+                .ok_or_else(|| WorkspaceError::WorkspaceNotFound(selected.to_owned()))?,
+        )?
+    };
+    cached.insert(active_id.clone(), std::mem::replace(live, next));
+    *active_id = selected.to_owned();
+    Ok(())
+}
+
 pub fn project_workspace(workspace: &Workspace) -> Result<WorkspaceDockProjection, WorkspaceError> {
     let mut normal = BTreeMap::new();
     let mut floating = BTreeMap::new();
@@ -1151,4 +1175,33 @@ mod tests {
                 .is_empty()
         );
     }
+}
+
+#[cfg(test)]
+mod workspace_projection_switch_tests {
+    use super::*;
+
+    #[test]
+    fn switching_workspaces_preserves_independent_live_tab_trees() {
+        let mut registry = WorkspaceRegistry::new();
+        registry.register("second", "Second").unwrap();
+        let mut active = DEFAULT_WORKSPACE_ID.to_owned();
+        let mut live = project_workspace(registry.get(&active).unwrap()).unwrap();
+        let mut cache = BTreeMap::new();
+        let first = live.normal.get_mut(crate::workspace::DEFAULT_CONTAINER_ID).unwrap();
+        *first = Some(DockState::new(vec![
+            DockPanelKey { definition_id: "a".into(), instance_id: "1".into() },
+            DockPanelKey { definition_id: "b".into(), instance_id: "2".into() },
+        ]));
+        registry.select("second").unwrap();
+        switch_workspace_projection(&registry, &mut active, &mut live, &mut cache).unwrap();
+        assert_eq!(active, "second");
+        assert!(live.normal.values().all(Option::is_none));
+        registry.select(DEFAULT_WORKSPACE_ID).unwrap();
+        switch_workspace_projection(&registry, &mut active, &mut live, &mut cache).unwrap();
+        let restored = live.normal.get(crate::workspace::DEFAULT_CONTAINER_ID).unwrap().as_ref().unwrap();
+        assert_eq!(restored.iter_all_tabs().count(), 2);
+    }
+
+    use crate::workspace::DEFAULT_WORKSPACE_ID;
 }
