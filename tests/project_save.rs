@@ -1,6 +1,10 @@
-use std::{fs, path::PathBuf};
+use std::{collections::BTreeMap, fs, path::PathBuf};
 use workflow_ide_framework::{
-    framework_settings::{FrameworkSettings, StoredResourceEntry, StoredResourceScope},
+    framework_settings::{
+        FrameworkSettings, StoredDockNode, StoredFloatingGeometry, StoredHiddenPanel,
+        StoredPanelIdentity, StoredResourceEntry, StoredResourceScope, StoredSplitAxis,
+        StoredWorkspaceContainer, StoredWorkspaceLayout,
+    },
     project::{
         ApplicationMetadata, PROJECT_FORMAT_VERSION, ProjectContext, ProjectFile, ProjectMetadata,
     },
@@ -187,4 +191,62 @@ fn failed_project_file_write_does_not_mutate_in_memory_project_metadata() {
     assert_eq!(file, original);
     assert!(session.dirty.is_dirty());
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn workspace_layout_round_trips_split_tabs_floating_and_hidden_panels() {
+    let panel = |id: &str| StoredPanelIdentity {
+        definition_id: "editor".into(),
+        instance_id: id.into(),
+    };
+    let layout = StoredWorkspaceLayout {
+        containers: vec![
+            StoredWorkspaceContainer {
+                id: "default".into(),
+                floating: false,
+                geometry: None,
+                tree: Some(StoredDockNode::Split {
+                    axis: StoredSplitAxis::Horizontal,
+                    fraction: 0.35,
+                    first: Box::new(StoredDockNode::Tabs {
+                        panels: vec![panel("one"), panel("two")],
+                        active: 1,
+                    }),
+                    second: Box::new(StoredDockNode::Tabs {
+                        panels: vec![panel("three")],
+                        active: 0,
+                    }),
+                }),
+            },
+            StoredWorkspaceContainer {
+                id: "floating-1".into(),
+                floating: true,
+                geometry: Some(StoredFloatingGeometry {
+                    position: [120.0, 80.0],
+                    size: [640.0, 480.0],
+                }),
+                tree: Some(StoredDockNode::Tabs {
+                    panels: vec![panel("four")],
+                    active: 0,
+                }),
+            },
+        ],
+        hidden_panels: vec![StoredHiddenPanel {
+            panel: panel("five"),
+            normal_container: Some("default".into()),
+            floating_geometry: None,
+        }],
+    };
+    let mut settings = FrameworkSettings::default();
+    settings.workspace_layouts = BTreeMap::from([("workspace-main".into(), layout)]);
+    let encoded = settings.to_toml().expect("serialize workspace layout");
+    let decoded = FrameworkSettings::from_toml(&encoded).expect("parse workspace layout");
+    assert_eq!(decoded, settings);
+}
+
+#[test]
+fn legacy_framework_settings_without_workspace_layouts_defaults_to_empty() {
+    let decoded = FrameworkSettings::from_toml("format_version = 1\nresources = []\n")
+        .expect("parse legacy framework settings");
+    assert!(decoded.workspace_layouts.is_empty());
 }
