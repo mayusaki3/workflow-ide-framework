@@ -99,7 +99,7 @@ impl Workspace {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WorkspaceRegistry {
     workspaces: BTreeMap<String, Workspace>,
     selected: String,
