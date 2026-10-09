@@ -184,6 +184,24 @@ impl WorkspaceRegistry {
     }
 
     /// Check whether a saved panel identity is known to the host application.
+    /// Replace one workspace only after its restored layout has been validated.
+    pub(crate) fn replace_workspace_for_dock(
+        &mut self,
+        id: &str,
+        mut workspace: Workspace,
+    ) -> Result<(), WorkspaceError> {
+        if !self.workspaces.contains_key(id) || workspace.id != id {
+            return Err(WorkspaceError::WorkspaceNotFound(id.into()));
+        }
+        workspace.next_floating_id = workspace.containers.keys()
+            .filter_map(|key| key.strip_prefix("framework.container.floating."))
+            .filter_map(|suffix| suffix.parse::<u64>().ok())
+            .max()
+            .unwrap_or(0);
+        self.workspaces.insert(id.into(), workspace);
+        Ok(())
+    }
+
     pub(crate) fn is_registered_panel_for_dock(&self, panel: &PanelInstanceId) -> bool {
         self.registered_panels.contains(panel)
     }
