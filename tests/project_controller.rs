@@ -223,3 +223,89 @@ fn legacy_project_without_workspace_layouts_keeps_defaults() {
     assert!(restored.is_empty());
     assert!(registry.get(DEFAULT_WORKSPACE_ID).is_some());
 }
+
+#[test]
+fn independent_workspace_splits_and_active_tabs_survive_switch_and_project_restore() {
+    use std::collections::BTreeMap;
+    use egui_dock::{Node, NodeIndex, TabIndex};
+    use workflow_ide_framework::{
+        workspace::{PanelInstanceId, WorkspaceRegistry, DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID},
+        workspace_dock::{
+            project_workspace, snapshot_workspace_layout, switch_workspace_projection,
+            DockPanelKey,
+        },
+    };
+
+    let mut registry = WorkspaceRegistry::new();
+    registry.register("second", "Second").unwrap();
+    for id in ["a", "b", "c"] {
+        let panel = PanelInstanceId::new("editor", id);
+        registry.register_panel(panel.clone());
+        for workspace_id in [DEFAULT_WORKSPACE_ID, "second"] {
+            registry.place_panel(workspace_id, &panel, DEFAULT_CONTAINER_ID).unwrap();
+        }
+    }
+
+    let mut active = DEFAULT_WORKSPACE_ID.to_owned();
+    let mut live = project_workspace(registry.get(&active).unwrap()).unwrap();
+    let mut cached = BTreeMap::new();
+    let key = |id| DockPanelKey::from(&PanelInstanceId::new("editor", id));
+
+    // Workspace A: a | (b,c), with c selected.
+    {
+        let dock = live.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        for node in dock.main_surface_mut().iter_mut() {
+            if let Node::Leaf(leaf) = node {
+                leaf.tabs.retain(|tab| tab.instance_id == "a");
+            }
+        }
+        dock.main_surface_mut().split_right(NodeIndex::root(), 0.4, vec![key("b"), key("c")]);
+        dock.main_surface_mut().set_active_tab(NodeIndex(2), TabIndex(1)).unwrap();
+    }
+    let expected_a = snapshot_workspace_layout(registry.get(&active).unwrap(), &live).unwrap();
+
+    registry.select("second").unwrap();
+    switch_workspace_projection(&registry, &mut active, &mut live, &mut cached).unwrap();
+
+    // Workspace B: (a,b) / c, with b selected.
+    {
+        let dock = live.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        for node in dock.main_surface_mut().iter_mut() {
+            if let Node::Leaf(leaf) = node {
+                leaf.tabs.retain(|tab| tab.instance_id != "c");
+            }
+        }
+        dock.main_surface_mut().split_below(NodeIndex::root(), 0.65, vec![key("c")]);
+        dock.main_surface_mut().set_active_tab(NodeIndex(1), TabIndex(1)).unwrap();
+    }
+    let expected_b = snapshot_workspace_layout(registry.get(&active).unwrap(), &live).unwrap();
+    assert_ne!(expected_a, expected_b);
+
+    registry.select(DEFAULT_WORKSPACE_ID).unwrap();
+    switch_workspace_projection(&registry, &mut active, &mut live, &mut cached).unwrap();
+    assert_eq!(snapshot_workspace_layout(registry.get(&active).unwrap(), &live).unwrap(), expected_a);
+    registry.select("second").unwrap();
+    switch_workspace_projection(&registry, &mut active, &mut live, &mut cached).unwrap();
+    assert_eq!(snapshot_workspace_layout(registry.get(&active).unwrap(), &live).unwrap(), expected_b);
+
+    // Capture the active projection and the independent cached projection.
+    let mut projections = cached;
+    projections.insert(active.clone(), live);
+    let mut controller = ProjectController::new("org.test", "Test");
+    controller.capture_workspace_layouts(&registry, &projections).unwrap();
+
+    let mut fresh = WorkspaceRegistry::new();
+    fresh.register("second", "Second").unwrap();
+    for id in ["a", "b", "c"] {
+        fresh.register_panel(PanelInstanceId::new("editor", id));
+    }
+    let restored = controller.restore_project_workspace_layouts(&mut fresh).unwrap();
+    assert_eq!(
+        snapshot_workspace_layout(fresh.get(DEFAULT_WORKSPACE_ID).unwrap(), &restored[DEFAULT_WORKSPACE_ID]).unwrap(),
+        expected_a
+    );
+    assert_eq!(
+        snapshot_workspace_layout(fresh.get("second").unwrap(), &restored["second"]).unwrap(),
+        expected_b
+    );
+}
