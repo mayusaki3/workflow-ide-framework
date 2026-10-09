@@ -310,81 +310,75 @@ fn restore_dock_node(
     node: &StoredDockNode,
     panels: &mut Vec<PanelInstanceId>,
 ) -> Result<DockState<DockPanelKey>, WorkspaceError> {
-    match node {
-        StoredDockNode::Tabs { panels: stored, active } => {
-            if stored.is_empty() || *active >= stored.len() {
-                return Err(WorkspaceError::InvalidContainerTarget);
-            }
-            let tabs: Vec<_> = stored.iter().map(|p| {
-                panels.push(PanelInstanceId::new(&p.definition_id, &p.instance_id));
-                DockPanelKey {
-                    definition_id: p.definition_id.clone(),
-                    instance_id: p.instance_id.clone(),
-                }
-            }).collect();
-            let mut dock = DockState::new(tabs);
-            dock.main_surface_mut().set_active_tab(
-                egui_dock::NodeIndex::root(),
-                egui_dock::TabIndex(*active),
-            ).map_err(|_| WorkspaceError::InvalidContainerTarget)?;
-            Ok(dock)
-        }
-        StoredDockNode::Split { axis, fraction, first, second } => {
-            if !fraction.is_finite() || !(0.0..=1.0).contains(fraction) {
-                return Err(WorkspaceError::InvalidContainerTarget);
-            }
-            // Build a single tree by splitting the first subtree's root leaf.
-            // Nested splits are handled by recursively grafting each child.
-            let mut dock = restore_dock_node(first, panels)?;
-            let mut right_panels = Vec::new();
-            collect_stored_tabs(second, &mut right_panels)?;
-            if right_panels.is_empty() {
-                return Err(WorkspaceError::InvalidContainerTarget);
-            }
-            let tabs: Vec<_> = right_panels.iter().map(|p| DockPanelKey {
-                definition_id: p.definition_id.clone(),
-                instance_id: p.instance_id.clone(),
-            }).collect();
-            panels.extend(right_panels);
-            let tree = dock.main_surface_mut();
-            match axis {
-                StoredSplitAxis::Horizontal => { tree.split_right(egui_dock::NodeIndex::root(), *fraction, tabs); }
-                StoredSplitAxis::Vertical => { tree.split_below(egui_dock::NodeIndex::root(), *fraction, tabs); }
-            }
-            // A flattened secondary subtree cannot preserve nested topology;
-            // reject it rather than silently discarding layout information.
-            if matches!(second.as_ref(), StoredDockNode::Split { .. })
-                || matches!(first.as_ref(), StoredDockNode::Split { .. }) {
-                return Err(WorkspaceError::InvalidContainerTarget);
-            }
-            if let StoredDockNode::Tabs { active, .. } = second.as_ref() {
-                dock.main_surface_mut().set_active_tab(
-                    egui_dock::NodeIndex(2), egui_dock::TabIndex(*active)
-                ).map_err(|_| WorkspaceError::InvalidContainerTarget)?;
-            }
-            Ok(dock)
-        }
+    let mut leaves = Vec::new();
+    collect_stored_leaves(node, &mut leaves)?;
+    let first = leaves.first().ok_or(WorkspaceError::InvalidContainerTarget)?;
+    let mut dock = DockState::new(first.0.clone());
+    restore_tree_branch(dock.main_surface_mut(), egui_dock::NodeIndex::root(), node)?;
+    for (tabs, _) in leaves {
+        panels.extend(tabs.into_iter().map(|key|
+            PanelInstanceId::new(key.definition_id, key.instance_id)));
     }
+    Ok(dock)
 }
 
-fn collect_stored_tabs(
+fn collect_stored_leaves(
     node: &StoredDockNode,
-    out: &mut Vec<PanelInstanceId>,
+    leaves: &mut Vec<(Vec<DockPanelKey>, usize)>,
 ) -> Result<(), WorkspaceError> {
     match node {
         StoredDockNode::Tabs { panels, active } => {
             if panels.is_empty() || *active >= panels.len() {
                 return Err(WorkspaceError::InvalidContainerTarget);
             }
-            out.extend(panels.iter().map(|p|
-                PanelInstanceId::new(&p.definition_id, &p.instance_id)));
+            leaves.push((panels.iter().map(|panel| DockPanelKey {
+                definition_id: panel.definition_id.clone(),
+                instance_id: panel.instance_id.clone(),
+            }).collect(), *active));
         }
-        StoredDockNode::Split { first, second, .. } => {
-            collect_stored_tabs(first, out)?;
-            collect_stored_tabs(second, out)?;
+        StoredDockNode::Split { fraction, first, second, .. } => {
+            if !fraction.is_finite() || !(0.0..=1.0).contains(fraction) {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            collect_stored_leaves(first, leaves)?;
+            collect_stored_leaves(second, leaves)?;
         }
     }
     Ok(())
+}
+
+fn first_leaf_tabs(node: &StoredDockNode) -> Vec<DockPanelKey> {
+    match node {
+        StoredDockNode::Tabs { panels, .. } => panels.iter().map(|panel| DockPanelKey {
+            definition_id: panel.definition_id.clone(),
+            instance_id: panel.instance_id.clone(),
+        }).collect(),
+        StoredDockNode::Split { first, .. } => first_leaf_tabs(first),
+    }
+}
+
+fn restore_tree_branch(
+    tree: &mut egui_dock::Tree<DockPanelKey>,
+    index: egui_dock::NodeIndex,
+    node: &StoredDockNode,
+) -> Result<(), WorkspaceError> {
+    match node {
+        StoredDockNode::Tabs { active, .. } => {
+            tree.set_active_tab(index, egui_dock::TabIndex(*active))
+                .map_err(|_| WorkspaceError::InvalidContainerTarget)
+        }
+        StoredDockNode::Split { axis, fraction, first, second } => {
+            let right = first_leaf_tabs(second);
+            match axis {
+                StoredSplitAxis::Horizontal => { tree.split_right(index, *fraction, right); }
+                StoredSplitAxis::Vertical => { tree.split_below(index, *fraction, right); }
+            }
+            let left_index = egui_dock::NodeIndex(index.0 * 2 + 1);
+            let right_index = egui_dock::NodeIndex(index.0 * 2 + 2);
+            restore_tree_branch(tree, left_index, first)?;
+            restore_tree_branch(tree, right_index, second)
+        }
+    }
 }
 
 /// Reconcile all normal dock trees atomically. Tab moves between normal
