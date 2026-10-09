@@ -1,8 +1,8 @@
+use std::collections::BTreeMap;
 use crate::{
     framework_settings::FrameworkSettings,
     workspace::{WorkspaceRegistry, WorkspaceError},
     workspace_dock::{WorkspaceDockProjection, snapshot_workspace_layout, restore_workspace_layout},
-    std::collections::BTreeMap,
     project::{
         ApplicationMetadata, PROJECT_FORMAT_VERSION, ProjectContext, ProjectFile, ProjectMetadata,
     },
