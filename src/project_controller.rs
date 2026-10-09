@@ -1,5 +1,8 @@
 use crate::{
     framework_settings::FrameworkSettings,
+    workspace::{WorkspaceRegistry, WorkspaceError},
+    workspace_dock::{WorkspaceDockProjection, snapshot_workspace_layout, restore_workspace_layout},
+    std::collections::BTreeMap,
     project::{
         ApplicationMetadata, PROJECT_FORMAT_VERSION, ProjectContext, ProjectFile, ProjectMetadata,
     },
@@ -99,6 +102,45 @@ impl ProjectController {
         self.project_file = Some(result.project_file);
         self.session = Some(session);
         ProjectCommandResult::Completed
+    }
+
+    /// Capture the live layout of every workspace before saving the project.
+    /// The settings map is replaced only when every snapshot succeeds.
+    pub fn capture_workspace_layouts(
+        &mut self,
+        registry: &WorkspaceRegistry,
+        projections: &BTreeMap<String, WorkspaceDockProjection>,
+    ) -> Result<(), WorkspaceError> {
+        let mut layouts = BTreeMap::new();
+        for workspace in registry.iter() {
+            let projection = projections.get(&workspace.id)
+                .ok_or(WorkspaceError::InvalidContainerTarget)?;
+            layouts.insert(
+                workspace.id.clone(),
+                snapshot_workspace_layout(workspace, projection)?,
+            );
+        }
+        self.framework_settings.workspace_layouts = layouts;
+        Ok(())
+    }
+
+    /// Restore layouts from the opened project's framework settings.
+    /// Workspaces without stored layout keep their application-defined defaults.
+    /// The caller must register panel instances before invoking this method.
+    pub fn restore_project_workspace_layouts(
+        &self,
+        registry: &mut WorkspaceRegistry,
+    ) -> Result<BTreeMap<String, WorkspaceDockProjection>, WorkspaceError> {
+        let mut restored = BTreeMap::new();
+        // Validate all snapshots on a detached registry before touching the live registry.
+        // The live registry is changed only after every workspace succeeds.
+        let mut candidate = registry.clone();
+        for (id, layout) in &self.framework_settings.workspace_layouts {
+            let projection = restore_workspace_layout(&mut candidate, id, layout)?;
+            restored.insert(id.clone(), projection);
+        }
+        *registry = candidate;
+        Ok(restored)
     }
 
     pub fn save(
