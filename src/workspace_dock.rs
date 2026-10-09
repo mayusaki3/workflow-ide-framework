@@ -216,6 +216,177 @@ fn snapshot_node(
     }
 }
 
+/// Reconstruct dock trees from a validated project snapshot without changing
+/// the registry or the current projection on failure.
+pub fn restore_workspace_projection(
+    workspace: &Workspace,
+    stored: &StoredWorkspaceLayout,
+) -> Result<WorkspaceDockProjection, WorkspaceError> {
+    use std::collections::BTreeSet;
+    let mut projection = project_workspace(workspace)?;
+    let expected_ids: BTreeSet<_> = workspace.containers.keys().cloned().collect();
+    let actual_ids: BTreeSet<_> = stored.containers.iter().map(|c| c.id.clone()).collect();
+    if expected_ids != actual_ids || stored.containers.len() != expected_ids.len() {
+        return Err(WorkspaceError::InvalidContainerTarget);
+    }
+    let mut observed = BTreeSet::new();
+    for container in &stored.containers {
+        let source = workspace.containers.get(&container.id)
+            .ok_or(WorkspaceError::InvalidContainerTarget)?;
+        if container.floating != (source.kind == ContainerKind::Floating) {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        }
+        if container.floating {
+            let geometry = container.geometry.as_ref()
+                .ok_or(WorkspaceError::InvalidContainerTarget)?;
+            let expected = workspace.floating_geometry.get(&container.id)
+                .ok_or(WorkspaceError::InvalidContainerTarget)?;
+            if geometry.position != expected.position || geometry.size != expected.size {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            let Some(StoredDockNode::Tabs { panels, active: 0 }) = &container.tree else {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            };
+            if panels.len() != 1 {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            let identity = PanelInstanceId::new(&panels[0].definition_id, &panels[0].instance_id);
+            if source.panels.as_slice() != [identity.clone()] || !observed.insert(identity) {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+        } else {
+            if container.geometry.is_some() {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            let (dock, panels) = match &container.tree {
+                None => (None, Vec::new()),
+                Some(node) => {
+                    let mut panels = Vec::new();
+                    let dock = restore_dock_node(node, &mut panels)?;
+                    (Some(dock), panels)
+                }
+            };
+            let expected: BTreeSet<_> = source.panels.iter().cloned().collect();
+            let actual: BTreeSet<_> = panels.iter().cloned().collect();
+            if expected != actual || panels.len() != actual.len() {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            for panel in panels {
+                if !observed.insert(panel) {
+                    return Err(WorkspaceError::InvalidContainerTarget);
+                }
+            }
+            projection.normal.insert(container.id.clone(), dock);
+        }
+    }
+    let expected_hidden: BTreeSet<_> = workspace.hidden_panels.keys().cloned().collect();
+    let mut actual_hidden = BTreeSet::new();
+    for hidden in &stored.hidden_panels {
+        let panel = PanelInstanceId::new(&hidden.panel.definition_id, &hidden.panel.instance_id);
+        if !actual_hidden.insert(panel.clone()) || observed.contains(&panel) {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        }
+        let Some(previous) = workspace.hidden_panels.get(&panel) else {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        };
+        let matches = match previous {
+            crate::workspace::PreviousPlacement::Normal(id) =>
+                hidden.normal_container.as_ref() == Some(id) && hidden.floating_geometry.is_none(),
+            crate::workspace::PreviousPlacement::Floating(geometry) =>
+                hidden.normal_container.is_none() && hidden.floating_geometry.as_ref().is_some_and(|stored|
+                    stored.position == geometry.position && stored.size == geometry.size),
+        };
+        if !matches {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        }
+    }
+    if actual_hidden != expected_hidden {
+        return Err(WorkspaceError::InvalidContainerTarget);
+    }
+    Ok(projection)
+}
+
+fn restore_dock_node(
+    node: &StoredDockNode,
+    panels: &mut Vec<PanelInstanceId>,
+) -> Result<DockState<DockPanelKey>, WorkspaceError> {
+    match node {
+        StoredDockNode::Tabs { panels: stored, active } => {
+            if stored.is_empty() || *active >= stored.len() {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            let tabs: Vec<_> = stored.iter().map(|p| {
+                panels.push(PanelInstanceId::new(&p.definition_id, &p.instance_id));
+                DockPanelKey {
+                    definition_id: p.definition_id.clone(),
+                    instance_id: p.instance_id.clone(),
+                }
+            }).collect();
+            let mut dock = DockState::new(tabs);
+            dock.main_surface_mut().set_active_tab(
+                egui_dock::NodeIndex::root(),
+                egui_dock::TabIndex(*active),
+            ).map_err(|_| WorkspaceError::InvalidContainerTarget)?;
+            Ok(dock)
+        }
+        StoredDockNode::Split { axis, fraction, first, second } => {
+            if !fraction.is_finite() || !(0.0..=1.0).contains(fraction) {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            // Build a single tree by splitting the first subtree's root leaf.
+            // Nested splits are handled by recursively grafting each child.
+            let mut dock = restore_dock_node(first, panels)?;
+            let mut right_panels = Vec::new();
+            collect_stored_tabs(second, &mut right_panels)?;
+            if right_panels.is_empty() {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            let tabs: Vec<_> = right_panels.iter().map(|p| DockPanelKey {
+                definition_id: p.definition_id.clone(),
+                instance_id: p.instance_id.clone(),
+            }).collect();
+            panels.extend(right_panels);
+            let tree = dock.main_surface_mut();
+            match axis {
+                StoredSplitAxis::Horizontal => { tree.split_right(egui_dock::NodeIndex::root(), *fraction, tabs); }
+                StoredSplitAxis::Vertical => { tree.split_below(egui_dock::NodeIndex::root(), *fraction, tabs); }
+            }
+            // A flattened secondary subtree cannot preserve nested topology;
+            // reject it rather than silently discarding layout information.
+            if matches!(second.as_ref(), StoredDockNode::Split { .. })
+                || matches!(first.as_ref(), StoredDockNode::Split { .. }) {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            if let StoredDockNode::Tabs { active, .. } = second.as_ref() {
+                dock.main_surface_mut().set_active_tab(
+                    egui_dock::NodeIndex(2), egui_dock::TabIndex(*active)
+                ).map_err(|_| WorkspaceError::InvalidContainerTarget)?;
+            }
+            Ok(dock)
+        }
+    }
+}
+
+fn collect_stored_tabs(
+    node: &StoredDockNode,
+    out: &mut Vec<PanelInstanceId>,
+) -> Result<(), WorkspaceError> {
+    match node {
+        StoredDockNode::Tabs { panels, active } => {
+            if panels.is_empty() || *active >= panels.len() {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            out.extend(panels.iter().map(|p|
+                PanelInstanceId::new(&p.definition_id, &p.instance_id)));
+        }
+        StoredDockNode::Split { first, second, .. } => {
+            collect_stored_tabs(first, out)?;
+            collect_stored_tabs(second, out)?;
+        }
+    }
+    Ok(())
+}
+
 /// Reconcile all normal dock trees atomically. Tab moves between normal
 /// containers are accepted, but no panel may disappear, duplicate, or enter
 /// a floating container. Preserve each live DockState's split topology.
