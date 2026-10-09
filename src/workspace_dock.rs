@@ -30,6 +30,7 @@ impl From<&PanelInstanceId> for DockPanelKey {
 }
 
 /// One dock tree per normal Container. Empty containers have no tree.
+#[derive(Clone)]
 pub struct WorkspaceDockProjection {
     pub normal: BTreeMap<String, Option<DockState<DockPanelKey>>>,
     /// Floating containers must be rendered as independent single-panel windows,
