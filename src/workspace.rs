@@ -183,6 +183,11 @@ impl WorkspaceRegistry {
         Ok(())
     }
 
+    /// Check whether a saved panel identity is known to the host application.
+    pub(crate) fn is_registered_panel_for_dock(&self, panel: &PanelInstanceId) -> bool {
+        self.registered_panels.contains(panel)
+    }
+
     pub fn register_panel(&mut self, panel: PanelInstanceId) -> bool {
         self.registered_panels.insert(panel)
     }
