@@ -2,7 +2,12 @@
 //! The Workspace registry remains the authoritative placement model.
 use std::collections::BTreeMap;
 
-use egui_dock::DockState;
+use egui_dock::{DockState, Node};
+
+use crate::framework_settings::{
+    StoredDockNode, StoredFloatingGeometry, StoredHiddenPanel, StoredPanelIdentity,
+    StoredSplitAxis, StoredWorkspaceContainer, StoredWorkspaceLayout,
+};
 
 use crate::workspace::{
     ContainerKind, FloatingGeometry, PanelInstanceId, Workspace, WorkspaceError, WorkspaceRegistry,
@@ -56,6 +61,157 @@ pub fn project_workspace(workspace: &Workspace) -> Result<WorkspaceDockProjectio
         }
     }
     Ok(WorkspaceDockProjection { normal, floating })
+}
+
+/// Capture the live dock topology as backend-independent project settings.
+/// The registry remains authoritative for placement and floating geometry.
+pub fn snapshot_workspace_layout(
+    workspace: &Workspace,
+    projection: &WorkspaceDockProjection,
+) -> Result<StoredWorkspaceLayout, WorkspaceError> {
+    use std::collections::BTreeSet;
+
+    let mut seen = BTreeSet::new();
+    let mut containers = Vec::new();
+    for (id, container) in &workspace.containers {
+        let floating = container.kind == ContainerKind::Floating;
+        let geometry = if floating {
+            let value = workspace
+                .floating_geometry
+                .get(id)
+                .ok_or(WorkspaceError::InvalidContainerTarget)?;
+            Some(StoredFloatingGeometry {
+                position: value.position,
+                size: value.size,
+            })
+        } else {
+            None
+        };
+        let tree = if floating {
+            let key = projection
+                .floating
+                .get(id)
+                .ok_or(WorkspaceError::InvalidContainerTarget)?;
+            if container.panels.as_slice()
+                != [PanelInstanceId::new(&key.definition_id, &key.instance_id)]
+            {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            if !seen.insert(PanelInstanceId::new(&key.definition_id, &key.instance_id)) {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            Some(StoredDockNode::Tabs {
+                panels: vec![StoredPanelIdentity {
+                    definition_id: key.definition_id.clone(),
+                    instance_id: key.instance_id.clone(),
+                }],
+                active: 0,
+            })
+        } else {
+            let dock = projection
+                .normal
+                .get(id)
+                .ok_or(WorkspaceError::InvalidContainerTarget)?;
+            match dock {
+                None => None,
+                Some(dock) => {
+                    let nodes = dock.main_surface();
+                    let mut tabs = Vec::new();
+                    let root = snapshot_node(nodes, 0, &mut tabs)?;
+                    for panel in &tabs {
+                        if !seen.insert(panel.clone()) {
+                            return Err(WorkspaceError::InvalidContainerTarget);
+                        }
+                    }
+                    let expected: BTreeSet<_> = container.panels.iter().cloned().collect();
+                    if expected != tabs.into_iter().collect() {
+                        return Err(WorkspaceError::InvalidContainerTarget);
+                    }
+                    Some(root)
+                }
+            }
+        };
+        containers.push(StoredWorkspaceContainer {
+            id: id.clone(),
+            floating,
+            geometry,
+            tree,
+        });
+    }
+    let mut hidden_panels = Vec::new();
+    for (panel, previous) in &workspace.hidden_panels {
+        if !seen.insert(panel.clone()) {
+            return Err(WorkspaceError::InvalidContainerTarget);
+        }
+        let (normal_container, floating_geometry) = match previous {
+            crate::workspace::PreviousPlacement::Normal(id) => (Some(id.clone()), None),
+            crate::workspace::PreviousPlacement::Floating(geometry) => (
+                None,
+                Some(StoredFloatingGeometry {
+                    position: geometry.position,
+                    size: geometry.size,
+                }),
+            ),
+        };
+        hidden_panels.push(StoredHiddenPanel {
+            panel: StoredPanelIdentity {
+                definition_id: panel.definition_id.clone(),
+                instance_id: panel.instance_id.clone(),
+            },
+            normal_container,
+            floating_geometry,
+        });
+    }
+    Ok(StoredWorkspaceLayout {
+        containers,
+        hidden_panels,
+    })
+}
+
+fn snapshot_node(
+    nodes: &egui_dock::Tree<DockPanelKey>,
+    index: usize,
+    tabs: &mut Vec<PanelInstanceId>,
+) -> Result<StoredDockNode, WorkspaceError> {
+    let node = nodes
+        .get(egui_dock::NodeIndex(index))
+        .ok_or(WorkspaceError::InvalidContainerTarget)?;
+    match node {
+        Node::Leaf(leaf) => {
+            let panels = leaf
+                .tabs
+                .iter()
+                .map(|key| {
+                    tabs.push(PanelInstanceId::new(&key.definition_id, &key.instance_id));
+                    StoredPanelIdentity {
+                        definition_id: key.definition_id.clone(),
+                        instance_id: key.instance_id.clone(),
+                    }
+                })
+                .collect();
+            Ok(StoredDockNode::Tabs {
+                panels,
+                active: leaf.active.0,
+            })
+        }
+        Node::Horizontal { fraction, .. } | Node::Vertical { fraction, .. } => {
+            if !fraction.is_finite() || !(0.0..=1.0).contains(fraction) {
+                return Err(WorkspaceError::InvalidContainerTarget);
+            }
+            let axis = if matches!(node, Node::Horizontal { .. }) {
+                StoredSplitAxis::Horizontal
+            } else {
+                StoredSplitAxis::Vertical
+            };
+            Ok(StoredDockNode::Split {
+                axis,
+                fraction: *fraction,
+                first: Box::new(snapshot_node(nodes, index * 2 + 1, tabs)?),
+                second: Box::new(snapshot_node(nodes, index * 2 + 2, tabs)?),
+            })
+        }
+        _ => Err(WorkspaceError::InvalidContainerTarget),
+    }
 }
 
 /// Reconcile all normal dock trees atomically. Tab moves between normal
