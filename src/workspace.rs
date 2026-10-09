@@ -162,6 +162,18 @@ impl WorkspaceRegistry {
         Ok(())
     }
 
+    /// Allocate a stable user-workspace ID without colliding with registered IDs.
+    pub fn next_user_workspace_id(&self) -> String {
+        let mut number = 1_u64;
+        loop {
+            let id = format!("user.workspace.{number}");
+            if !self.workspaces.contains_key(&id) {
+                return id;
+            }
+            number += 1;
+        }
+    }
+
     pub fn unregister(&mut self, id: &str) -> Result<(), WorkspaceError> {
         if id == DEFAULT_WORKSPACE_ID {
             return Err(WorkspaceError::CannotRemoveDefaultWorkspace);
@@ -615,5 +627,29 @@ mod tests {
         let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
         assert_eq!(ws.containers[DEFAULT_CONTAINER_ID].panels, vec![panel]);
         assert!(ws.floating_geometry.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod workspace_ui_creation_tests {
+    use super::*;
+
+    #[test]
+    fn new_workspace_has_default_container_and_is_selectable() {
+        let mut registry = WorkspaceRegistry::new();
+        let id = registry.next_user_workspace_id();
+        registry.register(&id, "Workspace 1").unwrap();
+        registry.select(&id).unwrap();
+        assert_eq!(registry.selected_id(), id);
+        assert!(registry.get(&id).unwrap().containers.contains_key(DEFAULT_CONTAINER_ID));
+        assert_eq!(registry.next_user_workspace_id(), "user.workspace.2");
+    }
+
+    #[test]
+    fn generated_workspace_id_skips_existing_entries() {
+        let mut registry = WorkspaceRegistry::new();
+        registry.register("user.workspace.1", "Existing").unwrap();
+        registry.register("user.workspace.3", "Other").unwrap();
+        assert_eq!(registry.next_user_workspace_id(), "user.workspace.2");
     }
 }
