@@ -174,7 +174,8 @@ fn snapshot_node(
     tabs: &mut Vec<PanelInstanceId>,
 ) -> Result<StoredDockNode, WorkspaceError> {
     let node = nodes
-        .get(egui_dock::NodeIndex(index))
+        .iter()
+        .nth(index)
         .ok_or(WorkspaceError::InvalidContainerTarget)?;
     match node {
         Node::Leaf(leaf) => {
@@ -194,18 +195,19 @@ fn snapshot_node(
                 active: leaf.active.0,
             })
         }
-        Node::Horizontal { fraction, .. } | Node::Vertical { fraction, .. } => {
-            if !fraction.is_finite() || !(0.0..=1.0).contains(fraction) {
+        Node::Horizontal(parent) | Node::Vertical(parent) => {
+            let fraction = parent.fraction;
+            if !fraction.is_finite() || !(0.0..=1.0).contains(&fraction) {
                 return Err(WorkspaceError::InvalidContainerTarget);
             }
-            let axis = if matches!(node, Node::Horizontal { .. }) {
+            let axis = if matches!(node, Node::Horizontal(_)) {
                 StoredSplitAxis::Horizontal
             } else {
                 StoredSplitAxis::Vertical
             };
             Ok(StoredDockNode::Split {
                 axis,
-                fraction: *fraction,
+                fraction,
                 first: Box::new(snapshot_node(nodes, index * 2 + 1, tabs)?),
                 second: Box::new(snapshot_node(nodes, index * 2 + 2, tabs)?),
             })
