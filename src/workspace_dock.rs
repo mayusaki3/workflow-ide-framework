@@ -903,6 +903,38 @@ mod tests {
     }
 
     #[test]
+    fn restore_layout_rebuilds_registry_and_rejects_invalid_atomically() {
+        let mut original = WorkspaceRegistry::new();
+        for id in ["a", "b", "c"] {
+            let panel = PanelInstanceId::new("editor", id);
+            original.register_panel(panel.clone());
+            original.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+        }
+        original.float_panel(
+            DEFAULT_WORKSPACE_ID,
+            &PanelInstanceId::new("editor", "b"),
+            FloatingGeometry { position: [10.0, 20.0], size: [200.0, 100.0] },
+        ).unwrap();
+        original.hide_panel(DEFAULT_WORKSPACE_ID, &PanelInstanceId::new("editor", "c")).unwrap();
+        let source = original.get(DEFAULT_WORKSPACE_ID).unwrap();
+        let saved = snapshot_workspace_layout(source, &project_workspace(source).unwrap()).unwrap();
+
+        let mut fresh = WorkspaceRegistry::new();
+        for id in ["a", "b", "c"] {
+            fresh.register_panel(PanelInstanceId::new("editor", id));
+        }
+        let restored = restore_workspace_layout(&mut fresh, DEFAULT_WORKSPACE_ID, &saved).unwrap();
+        let target = fresh.get(DEFAULT_WORKSPACE_ID).unwrap();
+        assert_eq!(snapshot_workspace_layout(target, &restored).unwrap(), saved);
+
+        let mut invalid = saved.clone();
+        invalid.hidden_panels[0].panel.instance_id = "b".into();
+        assert!(restore_workspace_layout(&mut fresh, DEFAULT_WORKSPACE_ID, &invalid).is_err());
+        let unchanged = fresh.get(DEFAULT_WORKSPACE_ID).unwrap();
+        assert_eq!(snapshot_workspace_layout(unchanged, &restored).unwrap(), saved);
+    }
+
+    #[test]
     fn snapshot_rejects_duplicate_tabs() {
         let mut registry = WorkspaceRegistry::new();
         for id in ["a", "b"] {
