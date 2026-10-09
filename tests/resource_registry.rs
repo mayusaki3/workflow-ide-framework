@@ -70,6 +70,7 @@ fn invalid_stored_reference_is_not_silently_dropped() {
             scope: StoredResourceScope::Project,
             path: PathBuf::from("../escape.png"),
         }],
+        ..FrameworkSettings::default()
     };
     assert!(settings.to_registry().is_err());
 }
