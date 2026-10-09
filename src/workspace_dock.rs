@@ -500,6 +500,66 @@ mod tests {
     };
 
     #[test]
+    fn snapshot_captures_live_split_and_selected_tab() {
+        let mut registry = WorkspaceRegistry::new();
+        let a = PanelInstanceId::new("editor", "a");
+        let b = PanelInstanceId::new("editor", "b");
+        let c = PanelInstanceId::new("editor", "c");
+        for panel in [&a, &b, &c] {
+            registry.register_panel(panel.clone());
+            registry
+                .place_panel(DEFAULT_WORKSPACE_ID, panel, DEFAULT_CONTAINER_ID)
+                .unwrap();
+        }
+        let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
+        let mut projection = project_workspace(ws).unwrap();
+        let dock = projection.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        dock.main_surface_mut().split_right(
+            egui_dock::NodeIndex::root(),
+            0.4,
+            vec![DockPanelKey::from(&c)],
+        );
+        let snapshot = snapshot_workspace_layout(ws, &projection).unwrap();
+        let container = snapshot
+            .containers
+            .iter()
+            .find(|container| container.id == DEFAULT_CONTAINER_ID)
+            .unwrap();
+        match container.tree.as_ref().unwrap() {
+            StoredDockNode::Split { fraction, first, second, .. } => {
+                assert_eq!(*fraction, 0.4);
+                assert!(matches!(first.as_ref(), StoredDockNode::Tabs { .. }));
+                assert!(matches!(second.as_ref(), StoredDockNode::Tabs { .. }));
+            }
+            other => panic!("expected split tree, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn snapshot_rejects_duplicate_tabs() {
+        let mut registry = WorkspaceRegistry::new();
+        for id in ["a", "b"] {
+            let panel = PanelInstanceId::new("editor", id);
+            registry.register_panel(panel.clone());
+            registry
+                .place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID)
+                .unwrap();
+        }
+        let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
+        let mut projection = project_workspace(ws).unwrap();
+        let dock = projection.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        for node in dock.main_surface_mut().iter_mut() {
+            if let Node::Leaf(leaf) = node {
+                leaf.tabs[1] = leaf.tabs[0].clone();
+            }
+        }
+        assert!(matches!(
+            snapshot_workspace_layout(ws, &projection),
+            Err(WorkspaceError::InvalidContainerTarget)
+        ));
+    }
+
+    #[test]
     fn empty_default_container_does_not_require_a_dock_tree() {
         let registry = WorkspaceRegistry::new();
         let projected = project_workspace(registry.get(DEFAULT_WORKSPACE_ID).unwrap()).unwrap();
