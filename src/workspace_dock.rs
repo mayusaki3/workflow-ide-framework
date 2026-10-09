@@ -708,6 +708,44 @@ mod tests {
     }
 
     #[test]
+    fn restore_nested_split_round_trips_snapshot() {
+        let mut registry = WorkspaceRegistry::new();
+        for id in ["a", "b", "c", "d"] {
+            let panel = PanelInstanceId::new("editor", id);
+            registry.register_panel(panel.clone());
+            registry.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+        }
+        let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
+        let mut projection = project_workspace(ws).unwrap();
+        let dock = projection.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        let tree = dock.main_surface_mut();
+        for node in tree.iter_mut() {
+            if let Node::Leaf(leaf) = node {
+                leaf.tabs.retain(|key| key.instance_id == "a" || key.instance_id == "b");
+            }
+        }
+        tree.split_right(egui_dock::NodeIndex::root(), 0.4, vec![
+            DockPanelKey::from(&PanelInstanceId::new("editor", "c")),
+            DockPanelKey::from(&PanelInstanceId::new("editor", "d")),
+        ]);
+        tree.split_below(egui_dock::NodeIndex(1), 0.3, vec![
+            DockPanelKey::from(&PanelInstanceId::new("editor", "b")),
+        ]);
+        for node in tree.iter_mut() {
+            if let Node::Leaf(leaf) = node {
+                if leaf.tabs.len() > 1 {
+                    leaf.tabs.retain(|key| key.instance_id != "b");
+                }
+            }
+        }
+        tree.set_active_tab(egui_dock::NodeIndex(2), egui_dock::TabIndex(1)).unwrap();
+        let stored = snapshot_workspace_layout(ws, &projection).unwrap();
+        let restored = restore_workspace_projection(ws, &stored).unwrap();
+        let again = snapshot_workspace_layout(ws, &restored).unwrap();
+        assert_eq!(stored, again);
+    }
+
+    #[test]
     fn snapshot_rejects_duplicate_tabs() {
         let mut registry = WorkspaceRegistry::new();
         for id in ["a", "b"] {
