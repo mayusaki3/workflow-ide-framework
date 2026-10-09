@@ -677,6 +677,8 @@ impl Application {
                     config,
                     workspace_registry,
                     workspace_docks,
+                    workspace_docks_by_id: std::collections::BTreeMap::new(),
+                    active_workspace_dock_id: workspace::DEFAULT_WORKSPACE_ID.to_owned(),
                     text_editors,
                     text_editor_options,
                     log_viewers,
@@ -729,6 +731,8 @@ struct FrameworkHost {
     config: ApplicationConfig,
     workspace_registry: workspace::WorkspaceRegistry,
     workspace_docks: workspace_dock::WorkspaceDockProjection,
+    workspace_docks_by_id: std::collections::BTreeMap<String, workspace_dock::WorkspaceDockProjection>,
+    active_workspace_dock_id: String,
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
@@ -1052,21 +1056,41 @@ impl FrameworkHost {
         }
     }
 
-    /// Capture the live selected dock tree and the registry projections of
-    /// inactive workspaces before writing project settings.
-    fn capture_project_workspaces(&mut self) -> Result<(), workspace::WorkspaceError> {
+    /// Keep independent live dock trees for each workspace across selection changes.
+    fn sync_active_workspace_dock(&mut self) -> Result<(), workspace::WorkspaceError> {
         let selected = self.workspace_registry.selected_id().to_owned();
+        if selected == self.active_workspace_dock_id {
+            return Ok(());
+        }
+        let next = if let Some(saved) = self.workspace_docks_by_id.get(&selected) {
+            saved.clone()
+        } else {
+            workspace_dock::project_workspace(
+                self.workspace_registry.get(&selected)
+                    .ok_or_else(|| workspace::WorkspaceError::WorkspaceNotFound(selected.clone()))?,
+            )?
+        };
+        self.workspace_docks_by_id.insert(
+            self.active_workspace_dock_id.clone(), self.workspace_docks.clone()
+        );
+        self.workspace_docks = next;
+        self.active_workspace_dock_id = selected;
+        Ok(())
+    }
+
+    fn capture_project_workspaces(&mut self) -> Result<(), workspace::WorkspaceError> {
+        self.sync_active_workspace_dock()?;
         let mut projections = std::collections::BTreeMap::new();
         for workspace in self.workspace_registry.iter() {
-            if workspace.id == selected {
-                continue;
-            }
-            projections.insert(workspace.id.clone(), workspace_dock::project_workspace(workspace)?);
+            let projection = if workspace.id == self.active_workspace_dock_id {
+                self.workspace_docks.clone()
+            } else if let Some(cached) = self.workspace_docks_by_id.get(&workspace.id) {
+                cached.clone()
+            } else {
+                workspace_dock::project_workspace(workspace)?
+            };
+            projections.insert(workspace.id.clone(), projection);
         }
-        projections.insert(selected, workspace_dock::WorkspaceDockProjection {
-            normal: self.workspace_docks.normal.iter().map(|(id, tree)| (id.clone(), tree.clone())).collect(),
-            floating: self.workspace_docks.floating.clone(),
-        });
         if let Some(controller) = self.project_controller.as_mut() {
             controller.capture_workspace_layouts(&self.workspace_registry, &projections)?;
         }
@@ -1082,7 +1106,13 @@ impl FrameworkHost {
                 let selected = self.workspace_registry.selected_id().to_owned();
                 if let Some(projection) = restored.remove(&selected) {
                     self.workspace_docks = projection;
+                } else if let Some(workspace) = self.workspace_registry.get(&selected) {
+                    if let Ok(projection) = workspace_dock::project_workspace(workspace) {
+                        self.workspace_docks = projection;
+                    }
                 }
+                self.workspace_docks_by_id = restored;
+                self.active_workspace_dock_id = selected;
             }
             Err(error) => {
                 self.project_ui.message = Some(format!("Workspace layout restore failed: {error:?}"));
@@ -1894,6 +1924,9 @@ impl FrameworkHost {
 
 impl eframe::App for FrameworkHost {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        if let Err(error) = self.sync_active_workspace_dock() {
+            tracing::warn!(target: "wfide::workspace", ?error, "workspace dock switch rejected");
+        }
         if !self.started_emitted {
             self.application_events
                 .emit(application_event::ApplicationEvent::Started);
