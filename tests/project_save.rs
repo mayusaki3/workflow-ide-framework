@@ -250,3 +250,81 @@ fn legacy_framework_settings_without_workspace_layouts_defaults_to_empty() {
         .expect("parse legacy framework settings");
     assert!(decoded.workspace_layouts.is_empty());
 }
+
+#[test]
+fn workspace_layouts_survive_real_project_files_and_reopen() {
+    use workflow_ide_framework::{
+        project_controller::ProjectController,
+        project_open::{open_project, ApplicationProjectInspector, FrameworkSettingsOpen},
+        project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
+        workspace::{PanelInstanceId, WorkspaceRegistry, DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID},
+        workspace_dock::{project_workspace, snapshot_workspace_layout},
+    };
+    struct CompatibleInspector;
+    impl ApplicationProjectInspector for CompatibleInspector {
+        type Error = &'static str;
+        fn inspect_project_data(
+            &mut self, _: &ProjectContext, _: Option<&str>,
+        ) -> Result<ProjectDataCompatibility, Self::Error> {
+            Ok(ProjectDataCompatibility::Compatible)
+        }
+        fn check_project_consistency(
+            &mut self, _: &ProjectContext,
+        ) -> Result<ProjectDataConsistency, Self::Error> {
+            Ok(ProjectDataConsistency::Consistent)
+        }
+    }
+
+    let root = temp_root("workspace-disk-roundtrip");
+    let context = ProjectContext::new(&root);
+    let mut source = WorkspaceRegistry::new();
+    source.register("second", "Second").unwrap();
+    for (workspace, ids) in [
+        (DEFAULT_WORKSPACE_ID, vec!["a", "b"]),
+        ("second", vec!["b", "c"]),
+    ] {
+        for id in ids {
+            let panel = PanelInstanceId::new("editor", id);
+            source.register_panel(panel.clone());
+            source.place_panel(workspace, &panel, DEFAULT_CONTAINER_ID).unwrap();
+        }
+    }
+    let projections: BTreeMap<_, _> = source.iter()
+        .map(|ws| (ws.id.clone(), project_workspace(ws).unwrap()))
+        .collect();
+    let mut controller = ProjectController::new("org.example.test", "Test");
+    controller.capture_workspace_layouts(&source, &projections).unwrap();
+    let expected = controller.framework_settings.workspace_layouts.clone();
+
+    let mut session = ProjectSession::default();
+    session.mark_framework_dirty();
+    let mut file = project_file();
+    let mut saver = Saver { fail: false, calls: 0 };
+    save_project(
+        &mut session, &context, &mut file, &controller.framework_settings,
+        &mut saver, "workspace-save-1", "2026-10-09T16:00:00+09:00",
+    ).unwrap();
+
+    let reopened = open_project(&context, "org.example.test", &mut CompatibleInspector).unwrap();
+    let FrameworkSettingsOpen::Loaded(disk_settings) = reopened.framework_settings else {
+        panic!("expected saved framework settings");
+    };
+    assert_eq!(disk_settings.save_id.as_deref(), Some("workspace-save-1"));
+    assert_eq!(disk_settings.workspace_layouts, expected);
+
+    let mut restored_controller = ProjectController::new("org.example.test", "Test");
+    restored_controller.framework_settings = disk_settings;
+    let mut fresh = WorkspaceRegistry::new();
+    fresh.register("second", "Second").unwrap();
+    for id in ["a", "b", "c"] {
+        fresh.register_panel(PanelInstanceId::new("editor", id));
+    }
+    let restored = restored_controller.restore_project_workspace_layouts(&mut fresh).unwrap();
+    for (id, layout) in expected {
+        assert_eq!(
+            snapshot_workspace_layout(fresh.get(&id).unwrap(), &restored[&id]).unwrap(),
+            layout
+        );
+    }
+    fs::remove_dir_all(root).unwrap();
+}
