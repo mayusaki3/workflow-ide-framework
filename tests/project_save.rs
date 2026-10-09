@@ -69,6 +69,7 @@ fn framework_settings_round_trip_resource_registry() {
             scope: StoredResourceScope::Project,
             path: PathBuf::from("textures/robot.png"),
         }],
+        ..FrameworkSettings::default()
     };
     let text = settings.to_toml().unwrap();
     let parsed = FrameworkSettings::from_toml(&text).unwrap();
