@@ -144,3 +144,82 @@ fn project_properties_update_framework_metadata_and_mark_dirty() {
     );
     assert!(controller.session.as_ref().unwrap().dirty.metadata);
 }
+
+#[test]
+fn project_workspace_layout_capture_and_restore_round_trip() {
+    use std::collections::BTreeMap;
+    use workflow_ide_framework::{
+        workspace::{PanelInstanceId, WorkspaceRegistry, FloatingGeometry, DEFAULT_WORKSPACE_ID, DEFAULT_CONTAINER_ID},
+        workspace_dock::{project_workspace, snapshot_workspace_layout},
+    };
+    let mut source = WorkspaceRegistry::new();
+    source.register("custom", "Custom").unwrap();
+    for id in ["a", "b", "c"] {
+        let panel = PanelInstanceId::new("editor", id);
+        source.register_panel(panel.clone());
+        source.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+    }
+    source.float_panel(DEFAULT_WORKSPACE_ID, &PanelInstanceId::new("editor", "b"),
+        FloatingGeometry { position: [10.0, 20.0], size: [300.0, 200.0] }).unwrap();
+    source.hide_panel(DEFAULT_WORKSPACE_ID, &PanelInstanceId::new("editor", "c")).unwrap();
+    let mut projections = BTreeMap::new();
+    for ws in source.iter() {
+        projections.insert(ws.id.clone(), project_workspace(ws).unwrap());
+    }
+    let mut controller = ProjectController::new("org.test", "Test");
+    controller.capture_workspace_layouts(&source, &projections).unwrap();
+    assert_eq!(controller.framework_settings.workspace_layouts.len(), 2);
+    let saved = controller.framework_settings.workspace_layouts.clone();
+    let mut fresh = WorkspaceRegistry::new();
+    fresh.register("custom", "Custom").unwrap();
+    for id in ["a", "b", "c"] {
+        fresh.register_panel(PanelInstanceId::new("editor", id));
+    }
+    let restored = controller.restore_project_workspace_layouts(&mut fresh).unwrap();
+    assert_eq!(restored.len(), 2);
+    for (id, projection) in &restored {
+        assert_eq!(snapshot_workspace_layout(fresh.get(id).unwrap(), projection).unwrap(), saved[id]);
+    }
+}
+
+#[test]
+fn project_workspace_layout_restore_is_atomic_across_workspaces() {
+    use std::collections::BTreeMap;
+    use workflow_ide_framework::{
+        workspace::{PanelInstanceId, WorkspaceRegistry, DEFAULT_WORKSPACE_ID, DEFAULT_CONTAINER_ID},
+        workspace_dock::{project_workspace, snapshot_workspace_layout},
+    };
+    let mut source = WorkspaceRegistry::new();
+    source.register("custom", "Custom").unwrap();
+    let panel = PanelInstanceId::new("editor", "a");
+    source.register_panel(panel.clone());
+    source.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+    let mut projections = BTreeMap::new();
+    for ws in source.iter() {
+        projections.insert(ws.id.clone(), project_workspace(ws).unwrap());
+    }
+    let mut controller = ProjectController::new("org.test", "Test");
+    controller.capture_workspace_layouts(&source, &projections).unwrap();
+    controller.framework_settings.workspace_layouts.get_mut("custom").unwrap()
+        .containers[0].id = "invalid.container".into();
+    let mut fresh = WorkspaceRegistry::new();
+    fresh.register("custom", "Custom").unwrap();
+    fresh.register_panel(panel);
+    let before: BTreeMap<_, _> = fresh.iter().map(|ws| {
+        (ws.id.clone(), snapshot_workspace_layout(ws, &project_workspace(ws).unwrap()).unwrap())
+    }).collect();
+    assert!(controller.restore_project_workspace_layouts(&mut fresh).is_err());
+    for ws in fresh.iter() {
+        assert_eq!(snapshot_workspace_layout(ws, &project_workspace(ws).unwrap()).unwrap(), before[&ws.id]);
+    }
+}
+
+#[test]
+fn legacy_project_without_workspace_layouts_keeps_defaults() {
+    use workflow_ide_framework::workspace::{WorkspaceRegistry, DEFAULT_WORKSPACE_ID};
+    let controller = ProjectController::new("org.test", "Test");
+    let mut registry = WorkspaceRegistry::new();
+    let restored = controller.restore_project_workspace_layouts(&mut registry).unwrap();
+    assert!(restored.is_empty());
+    assert!(registry.get(DEFAULT_WORKSPACE_ID).is_some());
+}
