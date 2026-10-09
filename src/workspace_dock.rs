@@ -514,6 +514,13 @@ mod tests {
         let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
         let mut projection = project_workspace(ws).unwrap();
         let dock = projection.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        // Move c out of the root leaf before placing it in the new split.
+        // split_right adds tabs; it does not remove existing occurrences.
+        for node in dock.main_surface_mut().iter_mut() {
+            if let Node::Leaf(leaf) = node {
+                leaf.tabs.retain(|tab| tab.instance_id != c.instance_id);
+            }
+        }
         dock.main_surface_mut().split_right(
             egui_dock::NodeIndex::root(),
             0.4,
