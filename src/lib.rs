@@ -1058,24 +1058,12 @@ impl FrameworkHost {
 
     /// Keep independent live dock trees for each workspace across selection changes.
     fn sync_active_workspace_dock(&mut self) -> Result<(), workspace::WorkspaceError> {
-        let selected = self.workspace_registry.selected_id().to_owned();
-        if selected == self.active_workspace_dock_id {
-            return Ok(());
-        }
-        let next = if let Some(saved) = self.workspace_docks_by_id.get(&selected) {
-            saved.clone()
-        } else {
-            workspace_dock::project_workspace(
-                self.workspace_registry.get(&selected)
-                    .ok_or_else(|| workspace::WorkspaceError::WorkspaceNotFound(selected.clone()))?,
-            )?
-        };
-        self.workspace_docks_by_id.insert(
-            self.active_workspace_dock_id.clone(), self.workspace_docks.clone()
-        );
-        self.workspace_docks = next;
-        self.active_workspace_dock_id = selected;
-        Ok(())
+        workspace_dock::switch_workspace_projection(
+            &self.workspace_registry,
+            &mut self.active_workspace_dock_id,
+            &mut self.workspace_docks,
+            &mut self.workspace_docks_by_id,
+        )
     }
 
     fn capture_project_workspaces(&mut self) -> Result<(), workspace::WorkspaceError> {
