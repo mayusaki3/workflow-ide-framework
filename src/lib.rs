@@ -1047,11 +1047,54 @@ impl FrameworkHost {
         let completed = matches!(result, project_controller::ProjectCommandResult::Completed);
         self.handle_project_result(result, Some(context));
         if completed {
+            self.restore_project_workspaces();
             self.emit_project_event(project_event::ProjectEventKind::Opened);
         }
     }
 
+    /// Capture the live selected dock tree and the registry projections of
+    /// inactive workspaces before writing project settings.
+    fn capture_project_workspaces(&mut self) -> Result<(), workspace::WorkspaceError> {
+        let selected = self.workspace_registry.selected_id().to_owned();
+        let mut projections = std::collections::BTreeMap::new();
+        for workspace in self.workspace_registry.iter() {
+            if workspace.id == selected {
+                continue;
+            }
+            projections.insert(workspace.id.clone(), workspace_dock::project_workspace(workspace)?);
+        }
+        projections.insert(selected, workspace_dock::WorkspaceDockProjection {
+            normal: self.workspace_docks.normal.iter().map(|(id, tree)| (id.clone(), tree.clone())).collect(),
+            floating: self.workspace_docks.floating.clone(),
+        });
+        if let Some(controller) = self.project_controller.as_mut() {
+            controller.capture_workspace_layouts(&self.workspace_registry, &projections)?;
+        }
+        Ok(())
+    }
+
+    fn restore_project_workspaces(&mut self) {
+        let Some(controller) = self.project_controller.as_ref() else {
+            return;
+        };
+        match controller.restore_project_workspace_layouts(&mut self.workspace_registry) {
+            Ok(mut restored) => {
+                let selected = self.workspace_registry.selected_id().to_owned();
+                if let Some(projection) = restored.remove(&selected) {
+                    self.workspace_docks = projection;
+                }
+            }
+            Err(error) => {
+                self.project_ui.message = Some(format!("Workspace layout restore failed: {error:?}"));
+            }
+        }
+    }
+
     fn project_save(&mut self) {
+        if let Err(error) = self.capture_project_workspaces() {
+            self.project_ui.message = Some(format!("Workspace layout capture failed: {error:?}"));
+            return;
+        }
         let (save_id, saved_at) = project_save_stamp();
         let (Some(controller), Some(adapter)) = (
             self.project_controller.as_mut(),
@@ -1090,6 +1133,10 @@ impl FrameworkHost {
         let root = parent.join(&project_name);
         if root.exists() {
             self.project_ui.message = Some(localization::text("project.folder.project_exists"));
+            return;
+        }
+        if let Err(error) = self.capture_project_workspaces() {
+            self.project_ui.message = Some(format!("Workspace layout capture failed: {error:?}"));
             return;
         }
         let (save_id, saved_at) = project_save_stamp();
@@ -1721,6 +1768,7 @@ impl FrameworkHost {
                                     );
                                     self.handle_project_result(outcome, None);
                                     if completed {
+                                        self.restore_project_workspaces();
                                         self.emit_project_event(
                                             project_event::ProjectEventKind::Opened,
                                         );
