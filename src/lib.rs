@@ -1499,6 +1499,42 @@ impl FrameworkHost {
                     self.consumer_menu_items(ui, command::MenuLocation::Help, None);
                 });
 
+                let workspace_response = ui.add(egui::Button::new("Workspace"));
+                egui::Popup::menu(&workspace_response).show(|ui| {
+                    let entries: Vec<(String, String)> = self.workspace_registry
+                        .iter()
+                        .map(|workspace| (workspace.id.clone(), workspace.name.clone()))
+                        .collect();
+                    for (id, name) in entries {
+                        let selected = self.workspace_registry.selected_id() == id;
+                        if ui.selectable_label(selected, name).clicked() {
+                            if let Err(error) = self.workspace_registry.select(&id)
+                                .and_then(|_| self.sync_active_workspace_dock())
+                            {
+                                tracing::warn!(target: "wfide::workspace", ?error, "workspace selection failed");
+                            }
+                            ui.close();
+                        }
+                    }
+                    ui.separator();
+                    if ui.button("Add Workspace").clicked() {
+                        let id = self.workspace_registry.next_user_workspace_id();
+                        let ordinal = id.rsplit('.').next().unwrap_or("1");
+                        let name = format!("Workspace {ordinal}");
+                        if let Err(error) = self.workspace_registry.register(&id, name)
+                            .and_then(|_| self.workspace_registry.select(&id))
+                            .and_then(|_| self.sync_active_workspace_dock())
+                        {
+                            tracing::warn!(target: "wfide::workspace", ?error, "workspace creation failed");
+                        } else if let Some(session) = self.project_controller
+                            .as_mut().and_then(|controller| controller.session.as_mut())
+                        {
+                            session.mark_framework_dirty();
+                        }
+                        ui.close();
+                    }
+                });
+
                 let custom_menus = self
                     .menu_items
                     .iter()
