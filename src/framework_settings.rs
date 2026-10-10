@@ -79,6 +79,9 @@ pub struct FrameworkSettings {
     /// Project-scoped user workspace layouts, keyed by stable Workspace ID.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub workspace_layouts: std::collections::BTreeMap<String, StoredWorkspaceLayout>,
+    /// Last selected workspace for this project; absent in older project files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_workspace_id: Option<String>,
 }
 
 impl Default for FrameworkSettings {
@@ -88,6 +91,7 @@ impl Default for FrameworkSettings {
             save_id: None,
             resources: Vec::new(),
             workspace_layouts: std::collections::BTreeMap::new(),
+            selected_workspace_id: None,
         }
     }
 }
@@ -172,6 +176,7 @@ impl FrameworkSettings {
                 .map(StoredResourceEntry::from_resource)
                 .collect(),
             workspace_layouts: std::collections::BTreeMap::new(),
+            selected_workspace_id: None,
         }
     }
 
