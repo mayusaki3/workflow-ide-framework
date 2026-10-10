@@ -1662,9 +1662,6 @@ impl FrameworkHost {
                                         enabled,
                                         egui::Button::new(label).frame(false),
                                     );
-                                    if response.clicked() && !is_save && kind == ProjectFolderKind::Project {
-                                        navigate_to = Some(path.clone());
-                                    }
                                     if response.double_clicked() {
                                         match kind {
                                             ProjectFolderKind::Folder => {
