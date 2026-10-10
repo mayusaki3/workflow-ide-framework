@@ -121,6 +121,7 @@ impl ProjectController {
             );
         }
         self.framework_settings.workspace_layouts = layouts;
+        self.framework_settings.selected_workspace_id = Some(registry.selected_id().to_owned());
         Ok(())
     }
 
@@ -150,6 +151,11 @@ impl ProjectController {
         for (id, layout) in &self.framework_settings.workspace_layouts {
             let projection = restore_workspace_layout(&mut candidate, id, layout)?;
             restored.insert(id.clone(), projection);
+        }
+        if let Some(id) = self.framework_settings.selected_workspace_id.as_deref() {
+            if candidate.get(id).is_some() {
+                candidate.select(id)?;
+            }
         }
         *registry = candidate;
         Ok(restored)
