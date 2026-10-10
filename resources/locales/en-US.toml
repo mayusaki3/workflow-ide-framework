@@ -1,3 +1,6 @@
+"file.recent_projects" = "Recent Projects"
+"file.recent_empty" = "No recent projects"
+"file.recent_clear" = "Clear History"
 locale = "en-US"
 name = "English"
 
