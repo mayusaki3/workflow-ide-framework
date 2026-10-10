@@ -135,6 +135,18 @@ impl ProjectController {
         // Validate all snapshots on a detached registry before touching the live registry.
         // The live registry is changed only after every workspace succeeds.
         let mut candidate = registry.clone();
+        // UI-created workspaces are project-owned and may not exist in a fresh host.
+        // Recreate them on the detached registry before validating their layouts.
+        // Application-owned workspaces must still be registered by the application.
+        for id in self.framework_settings.workspace_layouts.keys() {
+            if candidate.get(id).is_none() && id.starts_with("user.workspace.") {
+                let ordinal = id.strip_prefix("user.workspace.").unwrap_or_default();
+                if ordinal.is_empty() || !ordinal.chars().all(|ch| ch.is_ascii_digit()) {
+                    return Err(WorkspaceError::WorkspaceNotFound(id.clone()));
+                }
+                candidate.register(id.clone(), format!("Workspace {ordinal}"))?;
+            }
+        }
         for (id, layout) in &self.framework_settings.workspace_layouts {
             let projection = restore_workspace_layout(&mut candidate, id, layout)?;
             restored.insert(id.clone(), projection);
