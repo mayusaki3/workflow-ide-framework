@@ -1486,7 +1486,12 @@ impl FrameworkHost {
                     self.consumer_menu_items(ui, command::MenuLocation::File, None);
                 });
 
+                let workspace_access_key =
+                    ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::W));
                 let workspace_response = ui.add(egui::Button::new(localization::text("workspace.menu")));
+                if workspace_access_key {
+                    egui::Popup::open_id(ui.ctx(), workspace_response.id.with("popup"));
+                }
                 egui::Popup::menu(&workspace_response).show(|ui| {
                     let entries: Vec<(String, String)> = self.workspace_registry
                         .iter()
