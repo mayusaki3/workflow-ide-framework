@@ -1069,7 +1069,7 @@ impl FrameworkHost {
         };
         let result = controller.open(context.clone(), adapter);
         let completed = matches!(result, project_controller::ProjectCommandResult::Completed);
-        self.handle_project_result(result, Some(context));
+        self.handle_project_result(result, Some(context.clone()));
         if completed {
             self.recent_projects.record(context.root().to_path_buf());
             self.save_recent_projects();
