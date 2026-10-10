@@ -309,3 +309,49 @@ fn independent_workspace_splits_and_active_tabs_survive_switch_and_project_resto
         expected_b
     );
 }
+
+#[test]
+fn ui_created_workspace_is_recreated_before_project_layout_restore() {
+    use std::collections::BTreeMap;
+    use workflow_ide_framework::{
+        workspace::{WorkspaceRegistry, DEFAULT_WORKSPACE_ID},
+        workspace_dock::project_workspace,
+    };
+    let mut source = WorkspaceRegistry::new();
+    source.register("user.workspace.1", "Workspace 1").unwrap();
+    let projections: BTreeMap<_, _> = source.iter()
+        .map(|ws| (ws.id.clone(), project_workspace(ws).unwrap()))
+        .collect();
+    let mut controller = ProjectController::new("org.test", "Test");
+    controller.capture_workspace_layouts(&source, &projections).unwrap();
+
+    let mut reopened = WorkspaceRegistry::new();
+    assert!(reopened.get("user.workspace.1").is_none());
+    let restored = controller.restore_project_workspace_layouts(&mut reopened).unwrap();
+    assert!(reopened.get(DEFAULT_WORKSPACE_ID).is_some());
+    assert_eq!(reopened.get("user.workspace.1").unwrap().name, "Workspace 1");
+    assert!(restored.contains_key("user.workspace.1"));
+    reopened.select("user.workspace.1").unwrap();
+}
+
+#[test]
+fn invalid_ui_workspace_layout_does_not_leave_a_partially_created_workspace() {
+    use std::collections::BTreeMap;
+    use workflow_ide_framework::{
+        workspace::WorkspaceRegistry,
+        workspace_dock::project_workspace,
+    };
+    let mut source = WorkspaceRegistry::new();
+    source.register("user.workspace.1", "Workspace 1").unwrap();
+    let projections: BTreeMap<_, _> = source.iter()
+        .map(|ws| (ws.id.clone(), project_workspace(ws).unwrap()))
+        .collect();
+    let mut controller = ProjectController::new("org.test", "Test");
+    controller.capture_workspace_layouts(&source, &projections).unwrap();
+    controller.framework_settings.workspace_layouts.get_mut("user.workspace.1").unwrap()
+        .containers[0].id = "invalid.container".into();
+
+    let mut reopened = WorkspaceRegistry::new();
+    assert!(controller.restore_project_workspace_layouts(&mut reopened).is_err());
+    assert!(reopened.get("user.workspace.1").is_none());
+}
