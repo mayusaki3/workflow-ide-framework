@@ -1655,6 +1655,9 @@ impl FrameworkHost {
                                         enabled,
                                         egui::Button::new(label).frame(false),
                                     );
+                                    if response.clicked() && !is_save && kind == ProjectFolderKind::Project {
+                                        navigate_to = Some(path.clone());
+                                    }
                                     if response.double_clicked() {
                                         match kind {
                                             ProjectFolderKind::Folder => {
@@ -1679,6 +1682,15 @@ impl FrameworkHost {
                         });
                     }
                     ui.horizontal(|ui| {
+                        if !is_save && ui
+                            .add_enabled(
+                                project_folder_kind(&directory, &application_id) == ProjectFolderKind::Project,
+                                egui::Button::new(localization::text("project.folder.open_selected")),
+                            )
+                            .clicked()
+                        {
+                            open_project = Some(directory.clone());
+                        }
                         if is_save {
                             let project_name = self
                                 .project_ui
