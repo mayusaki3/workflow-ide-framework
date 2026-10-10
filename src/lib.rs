@@ -900,6 +900,7 @@ fn show_project_folder_tree(
     selected: &std::path::Path,
     application_id: &str,
     next: &mut Option<std::path::PathBuf>,
+    open_project: &mut Option<std::path::PathBuf>,
     reveal_selection: bool,
 ) {
     let kind = project_folder_kind(path, application_id);
@@ -926,8 +927,12 @@ fn show_project_folder_tree(
         if reveal_selection && path == selected {
             response.scroll_to_me(Some(egui::Align::Center));
         }
-        if response.clicked() && kind == ProjectFolderKind::Project {
-            *next = Some(path.to_path_buf());
+        if kind == ProjectFolderKind::Project {
+            if response.double_clicked() {
+                *open_project = Some(path.to_path_buf());
+            } else if response.clicked() {
+                *next = Some(path.to_path_buf());
+            }
         }
         return;
     }
@@ -944,6 +949,7 @@ fn show_project_folder_tree(
                     selected,
                     application_id,
                     next,
+                    open_project,
                     reveal_selection,
                 );
             }
@@ -1616,6 +1622,7 @@ impl FrameworkHost {
                                         &directory,
                                         &application_id,
                                         &mut navigate_to,
+                                        &mut open_project,
                                         reveal_tree_selection,
                                     );
                                 }
