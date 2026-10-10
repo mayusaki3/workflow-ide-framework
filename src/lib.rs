@@ -13,6 +13,7 @@ pub mod log_viewer;
 pub mod logging;
 pub mod probe;
 pub mod project;
+pub mod recent_projects;
 pub mod project_adapter;
 pub mod project_adapter_erased;
 pub mod project_controller;
@@ -673,6 +674,9 @@ impl Application {
                     )
                 });
 
+                let recent_projects = recent_projects::settings_path(&config.id)
+                    .map(|path| recent_projects::RecentProjects::load(&path))
+                    .unwrap_or_default();
                 Ok(Box::new(FrameworkHost {
                     config,
                     workspace_registry,
@@ -698,6 +702,7 @@ impl Application {
                     application_events,
                     project_events,
                     project_ui: ProjectUiState::default(),
+                    recent_projects,
                     theme_editor: None,
                     fonts_initialized: false,
                     started_emitted: false,
@@ -752,6 +757,7 @@ struct FrameworkHost {
     application_events: application_event::ApplicationEventDispatcher,
     project_events: project_event::ProjectEventDispatcher,
     project_ui: ProjectUiState,
+    recent_projects: recent_projects::RecentProjects,
     theme_editor: Option<theme::ThemeEditor>,
     fonts_initialized: bool,
     started_emitted: bool,
@@ -1045,6 +1051,14 @@ impl FrameworkHost {
         });
     }
 
+    fn save_recent_projects(&self) {
+        if let Some(path) = recent_projects::settings_path(&self.config.id) {
+            if let Err(error) = self.recent_projects.save(&path) {
+                tracing::warn!(%error, "Could not save recent projects");
+            }
+        }
+    }
+
     fn open_project_at(&mut self, root: std::path::PathBuf) {
         let context = project::ProjectContext::new(root);
         let (Some(controller), Some(adapter)) = (
@@ -1057,6 +1071,8 @@ impl FrameworkHost {
         let completed = matches!(result, project_controller::ProjectCommandResult::Completed);
         self.handle_project_result(result, Some(context));
         if completed {
+            self.recent_projects.record(context.root().to_path_buf());
+            self.save_recent_projects();
             self.restore_project_workspaces();
             self.emit_project_event(project_event::ProjectEventKind::Opened);
         }
@@ -1444,6 +1460,26 @@ impl FrameworkHost {
                         ui.close();
                         self.project_open();
                     }
+                    ui.menu_button(localization::text("file.recent_projects"), |ui| {
+                        if self.recent_projects.paths.is_empty() {
+                            ui.add_enabled(false, egui::Label::new(localization::text("file.recent_empty")));
+                        }
+                        for path in self.recent_projects.paths.clone() {
+                            let valid = project_folder_kind(&path, &self.config.id) == ProjectFolderKind::Project;
+                            if ui.add_enabled(valid, egui::Button::new(path.display().to_string())).clicked() {
+                                ui.close();
+                                self.open_project_at(path);
+                            }
+                        }
+                        if !self.recent_projects.paths.is_empty() {
+                            ui.separator();
+                            if ui.button(localization::text("file.recent_clear")).clicked() {
+                                self.recent_projects.clear();
+                                self.save_recent_projects();
+                                ui.close();
+                            }
+                        }
+                    });
                     ui.separator();
                     if Self::project_menu_item(
                         ui,
