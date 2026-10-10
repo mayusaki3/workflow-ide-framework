@@ -355,3 +355,36 @@ fn invalid_ui_workspace_layout_does_not_leave_a_partially_created_workspace() {
     assert!(controller.restore_project_workspace_layouts(&mut reopened).is_err());
     assert!(reopened.get("user.workspace.1").is_none());
 }
+
+#[test]
+fn selected_workspace_is_persisted_and_restored_with_project_layouts() {
+    use std::collections::BTreeMap;
+    use workflow_ide_framework::{
+        workspace::WorkspaceRegistry,
+        workspace_dock::project_workspace,
+    };
+    let mut source = WorkspaceRegistry::new();
+    source.register("user.workspace.1", "Workspace 1").unwrap();
+    source.select("user.workspace.1").unwrap();
+    let projections: BTreeMap<_, _> = source.iter()
+        .map(|ws| (ws.id.clone(), project_workspace(ws).unwrap()))
+        .collect();
+    let mut controller = ProjectController::new("org.test", "Test");
+    controller.capture_workspace_layouts(&source, &projections).unwrap();
+    assert_eq!(controller.framework_settings.selected_workspace_id.as_deref(), Some("user.workspace.1"));
+    let toml = controller.framework_settings.to_toml().unwrap();
+    controller.framework_settings = workflow_ide_framework::framework_settings::FrameworkSettings::from_toml(&toml).unwrap();
+    let mut reopened = WorkspaceRegistry::new();
+    controller.restore_project_workspace_layouts(&mut reopened).unwrap();
+    assert_eq!(reopened.selected_id(), "user.workspace.1");
+}
+
+#[test]
+fn missing_saved_selected_workspace_falls_back_to_default() {
+    use workflow_ide_framework::workspace::{WorkspaceRegistry, DEFAULT_WORKSPACE_ID};
+    let mut controller = ProjectController::new("org.test", "Test");
+    controller.framework_settings.selected_workspace_id = Some("missing.workspace".into());
+    let mut reopened = WorkspaceRegistry::new();
+    controller.restore_project_workspace_layouts(&mut reopened).unwrap();
+    assert_eq!(reopened.selected_id(), DEFAULT_WORKSPACE_ID);
+}
