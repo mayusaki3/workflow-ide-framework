@@ -1391,6 +1391,7 @@ impl FrameworkHost {
                 ui.add_enabled_ui(false, |ui| {
                     egui::MenuBar::new().ui(ui, |ui| {
                         let _ = ui.button(localization::text("file.menu"));
+                        let _ = ui.button(localization::text("workspace.menu"));
                         let _ = ui.button(localization::text("help.menu"));
                     });
                 });
@@ -1485,21 +1486,7 @@ impl FrameworkHost {
                     self.consumer_menu_items(ui, command::MenuLocation::File, None);
                 });
 
-                let help_access_key =
-                    ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::H));
-                let help_response = ui.add(egui::Button::new(localization::text("help.menu")));
-                if help_access_key {
-                    egui::Popup::open_id(ui.ctx(), help_response.id.with("popup"));
-                }
-                egui::Popup::menu(&help_response).show(|ui| {
-                    if Self::project_menu_item(ui, localization::text("help.about"), "", true) {
-                        ui.close();
-                        self.project_ui.show_about = true;
-                    }
-                    self.consumer_menu_items(ui, command::MenuLocation::Help, None);
-                });
-
-                let workspace_response = ui.add(egui::Button::new("Workspace"));
+                let workspace_response = ui.add(egui::Button::new(localization::text("workspace.menu")));
                 egui::Popup::menu(&workspace_response).show(|ui| {
                     let entries: Vec<(String, String)> = self.workspace_registry
                         .iter()
@@ -1517,7 +1504,7 @@ impl FrameworkHost {
                         }
                     }
                     ui.separator();
-                    if ui.button("Add Workspace").clicked() {
+                    if ui.button(localization::text("workspace.add")).clicked() {
                         let id = self.workspace_registry.next_user_workspace_id();
                         let ordinal = id.rsplit('.').next().unwrap_or("1");
                         let name = format!("Workspace {ordinal}");
@@ -1533,6 +1520,20 @@ impl FrameworkHost {
                         }
                         ui.close();
                     }
+                });
+
+                let help_access_key =
+                    ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::H));
+                let help_response = ui.add(egui::Button::new(localization::text("help.menu")));
+                if help_access_key {
+                    egui::Popup::open_id(ui.ctx(), help_response.id.with("popup"));
+                }
+                egui::Popup::menu(&help_response).show(|ui| {
+                    if Self::project_menu_item(ui, localization::text("help.about"), "", true) {
+                        ui.close();
+                        self.project_ui.show_about = true;
+                    }
+                    self.consumer_menu_items(ui, command::MenuLocation::Help, None);
                 });
 
                 let custom_menus = self
