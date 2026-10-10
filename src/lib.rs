@@ -1627,11 +1627,36 @@ impl FrameworkHost {
                                     );
                                 }
                             });
-                        let entries = project_browser_directories(&directory);
+                        let project_details = if !is_save && project_folder_kind(&directory, &application_id) == ProjectFolderKind::Project {
+                            std::fs::read_to_string(directory.join("project.toml"))
+                                .ok()
+                                .and_then(|contents| project::ProjectFile::from_toml(&contents, &application_id).ok())
+                        } else {
+                            None
+                        };
+                        let entries = if project_details.is_some() {
+                            Vec::new()
+                        } else {
+                            project_browser_directories(&directory)
+                        };
                         egui::ScrollArea::vertical()
                             .id_salt("project_browser_contents")
                             .max_height(280.0)
                             .show(&mut columns[1], |ui| {
+                                if let Some(details) = &project_details {
+                                    ui.strong(&details.project.name);
+                                    ui.separator();
+                                    if let Some(description) = &details.project.description {
+                                        ui.label(description);
+                                    }
+                                    ui.label(format!("{}: {}", localization::text("project.new_dialog.language"), details.project.language));
+                                    ui.label(format!("{}: {}", localization::text("project.folder.saved_at"), details.project.saved_at));
+                                    ui.separator();
+                                    ui.label(format!("{}: {}", details.application.name, details.application.id));
+                                    if let Some(description) = &details.application.description {
+                                        ui.label(description);
+                                    }
+                                }
                                 for path in entries {
                                     let kind = project_folder_kind(&path, &application_id);
                                     let name = path
