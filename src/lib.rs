@@ -821,6 +821,8 @@ struct ProjectFolderDialogState {
     project_name: String,
     reveal_tree_selection: bool,
     new_folder_name: String,
+    create_folder_parent: Option<std::path::PathBuf>,
+    delete_folder_pending: Option<std::path::PathBuf>,
 }
 
 #[derive(Default)]
@@ -1086,6 +1088,8 @@ impl FrameworkHost {
             project_name: String::new(),
             reveal_tree_selection: true,
         new_folder_name: String::new(),
+            create_folder_parent: None,
+            delete_folder_pending: None,
         });
     }
 
@@ -1215,6 +1219,8 @@ impl FrameworkHost {
             project_name,
             reveal_tree_selection: true,
         new_folder_name: String::new(),
+            create_folder_parent: None,
+            delete_folder_pending: None,
         });
     }
 
