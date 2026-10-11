@@ -928,7 +928,7 @@ fn project_browser_roots() -> Vec<std::path::PathBuf> {
     {
         (b'A'..=b'Z')
             .filter_map(|letter| {
-                let path = std::path::PathBuf::from(format!("{}:\\\\", letter as char));
+                let path = std::path::PathBuf::from(format!("{}:{}", letter as char, std::path::MAIN_SEPARATOR));
                 path.is_dir().then_some(path)
             })
             .collect()
