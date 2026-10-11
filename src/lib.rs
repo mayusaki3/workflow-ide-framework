@@ -1965,8 +1965,11 @@ impl FrameworkHost {
             if let Some(parent) = context_parent {
                 let mut dismiss_create = false;
                 egui::Window::new(localization::text("project.folder.create_folder"))
+                    .id(egui::Id::new("project_folder_context_create_dialog"))
+                    .order(egui::Order::Foreground)
                     .collapsible(false)
                     .resizable(false)
+                    .default_width(360.0)
                     .show(ctx, |ui| {
                         ui.label(parent.display().to_string());
                         if let Some(state) = self.project_ui.folder_dialog.as_mut() {
