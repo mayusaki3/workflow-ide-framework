@@ -1023,7 +1023,7 @@ fn project_tree_context_menu(
 ) {
     response.context_menu(|ui| {
         let parent = if is_folder { path } else { path.parent().unwrap_or(path) };
-        ui.small(parent.display().to_string());
+        ui.label(format!("TARGET: {}", parent.display()));
         ui.separator();
         if ui.button(localization::text("project.folder.create_folder")).clicked() {
             if create_parent.is_none() {
@@ -1040,7 +1040,7 @@ fn project_tree_context_menu(
         if ui.button(localization::text("project.folder.show_in_file_manager")).clicked() {
             #[cfg(windows)]
             let result = std::process::Command::new("explorer.exe")
-                .arg(parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf()))
+                .arg(parent)
                 .spawn();
             #[cfg(target_os = "macos")]
             let result = std::process::Command::new("open").arg(parent).spawn();
