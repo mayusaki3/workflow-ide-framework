@@ -1023,8 +1023,6 @@ fn project_tree_context_menu(
 ) {
     response.context_menu(|ui| {
         let parent = if is_folder { path } else { path.parent().unwrap_or(path) };
-        ui.label(format!("TARGET: {}", parent.display()));
-        ui.separator();
         if ui.button(localization::text("project.folder.create_folder")).clicked() {
             if create_parent.is_none() {
                 *create_parent = Some(parent.to_path_buf());
@@ -1044,13 +1042,6 @@ fn project_tree_context_menu(
                     parent.to_string_lossy().replacen(":\\\\", ":\\", 1)
                 );
                 let argument = normalized.as_os_str();
-                tracing::info!(
-                    target_path = %parent.display(),
-                    normalized_path = %normalized.display(),
-                    executable = "explorer.exe",
-                    argument = %normalized.display(),
-                    "Project browser: launching Windows Explorer"
-                );
                 std::process::Command::new("explorer.exe")
                     .arg(argument)
                     .spawn()
