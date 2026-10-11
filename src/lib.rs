@@ -985,7 +985,9 @@ fn show_project_folder_tree(
         return;
     }
     let should_open = selected.starts_with(path);
-    let response = egui::CollapsingHeader::new(format!("{name}{suffix}"))
+    let heading = egui::RichText::new(format!("{name}{suffix}"));
+    let heading = if path == selected { heading.strong().background_color(ui.visuals().selection.bg_fill) } else { heading };
+    let response = egui::CollapsingHeader::new(heading)
         .id_salt(path)
         .default_open(should_open)
         .open(should_open.then_some(true))
@@ -1765,6 +1767,14 @@ impl FrameworkHost {
                                 && !name.ends_with('.') && !name.ends_with(' ')
                                 && !name.chars().any(|c| (c == char::from(92) || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|')))
                                 && !create_directory.join(name).exists();
+                            if !name.is_empty() && !valid {
+                                let reason = if create_directory.join(name).exists() {
+                                    localization::text("project.folder.folder_exists")
+                                } else {
+                                    localization::text("project.folder.invalid_folder_name")
+                                };
+                                ui.weak(reason);
+                            }
                             if ui.add_enabled(valid, egui::Button::new(localization::text("project.folder.create_folder"))).clicked() {
                                 create_folder = Some(create_directory.join(name));
                             }
