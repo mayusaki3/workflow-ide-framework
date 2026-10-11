@@ -1784,6 +1784,45 @@ impl FrameworkHost {
                         }
                     });
                     }
+                    let mut dismiss_create = false;
+                    if let Some(parent) = self.project_ui.folder_dialog.as_ref().and_then(|state| state.create_folder_parent.clone()) {
+                        ui.group(|ui| {
+                            ui.strong(localization::text("project.folder.create_folder"));
+                            ui.label(parent.display().to_string());
+                        ui.label(parent.display().to_string());
+                        if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                            ui.text_edit_singleline(&mut state.new_folder_name);
+                            let name = state.new_folder_name.trim();
+                            let invalid_char = name == "." || name == ".."
+                                || name.ends_with('.') || name.ends_with(' ')
+                                || name.chars().any(|c| c == char::from(92)
+                                    || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|'));
+                            let exists = parent.join(name).exists();
+                            if !name.is_empty() && (invalid_char || exists) {
+                                ui.label(localization::text(if exists {
+                                    "project.folder.folder_exists"
+                                } else {
+                                    "project.folder.invalid_folder_name"
+                                }));
+                            }
+                            ui.horizontal(|ui| {
+                                if ui.add_enabled(!name.is_empty() && !invalid_char && !exists,
+                                    egui::Button::new(localization::text("project.folder.create_folder"))).clicked() {
+                                    create_folder = Some(parent.join(name));
+                                }
+                                if ui.button(localization::text("common.cancel")).clicked() {
+                                    dismiss_create = true;
+                                }
+                            });
+                        }
+                        });
+                        if dismiss_create {
+                            if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                                state.create_folder_parent = None;
+                                state.new_folder_name.clear();
+                            }
+                        }
+                    }
                     ui.label(localization::text(if is_save {
                         "project.folder.save_hint"
                     } else {
@@ -1960,51 +1999,6 @@ impl FrameworkHost {
                         }
                     });
                 });
-            let context_parent = self.project_ui.folder_dialog.as_ref()
-                .and_then(|state| state.create_folder_parent.clone());
-            if let Some(parent) = context_parent {
-                let mut dismiss_create = false;
-                egui::Window::new(localization::text("project.folder.create_folder"))
-                    .id(egui::Id::new("project_folder_context_create_dialog"))
-                    .order(egui::Order::Foreground)
-                    .collapsible(false)
-                    .resizable(false)
-                    .default_width(360.0)
-                    .show(ctx, |ui| {
-                        ui.label(parent.display().to_string());
-                        if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                            ui.text_edit_singleline(&mut state.new_folder_name);
-                            let name = state.new_folder_name.trim();
-                            let invalid_char = name == "." || name == ".."
-                                || name.ends_with('.') || name.ends_with(' ')
-                                || name.chars().any(|c| c == char::from(92)
-                                    || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|'));
-                            let exists = parent.join(name).exists();
-                            if !name.is_empty() && (invalid_char || exists) {
-                                ui.label(localization::text(if exists {
-                                    "project.folder.folder_exists"
-                                } else {
-                                    "project.folder.invalid_folder_name"
-                                }));
-                            }
-                            ui.horizontal(|ui| {
-                                if ui.add_enabled(!name.is_empty() && !invalid_char && !exists,
-                                    egui::Button::new(localization::text("project.folder.create_folder"))).clicked() {
-                                    create_folder = Some(parent.join(name));
-                                }
-                                if ui.button(localization::text("common.cancel")).clicked() {
-                                    dismiss_create = true;
-                                }
-                            });
-                        }
-                    });
-                if dismiss_create {
-                    if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                        state.create_folder_parent = None;
-                        state.new_folder_name.clear();
-                    }
-                }
-            }
             if let Some(parent) = context_create_parent {
                 if let Some(state) = self.project_ui.folder_dialog.as_mut() {
                     state.create_folder_parent = Some(parent);
