@@ -37,6 +37,31 @@ impl RecentProjects {
     }
 }
 
+/// Short, stable menu labels; full paths remain available as hover text.
+pub fn display_labels(paths: &[PathBuf]) -> Vec<String> {
+    use std::collections::HashMap;
+    let mut counts = HashMap::<String, usize>::new();
+    for path in paths {
+        let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy().into_owned();
+        *counts.entry(name).or_default() += 1;
+    }
+    paths.iter().map(|path| {
+        let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy().into_owned();
+        if counts.get(&name).copied().unwrap_or(0) > 1 {
+            let parent = path.parent().and_then(Path::file_name)
+                .map(|part| part.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            if parent.is_empty() {
+                name
+            } else {
+                format!("{name} ({parent})")
+            }
+        } else {
+            name
+        }
+    }).collect()
+}
+
 fn config_base() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
@@ -105,6 +130,19 @@ mod tests {
         for invalid in ["", ".", "..", "../other", "a/b", "a\\\\b", "bad:name", "trailing."] {
             assert_eq!(directory_name("org.example.app", Some(invalid)), None);
         }
+    }
+
+    #[test]
+    fn labels_show_project_names_and_disambiguate_duplicates() {
+        let paths = vec![
+            PathBuf::from("root/one/Project"),
+            PathBuf::from("root/two/Project"),
+            PathBuf::from("root/other/Unique"),
+        ];
+        assert_eq!(
+            display_labels(&paths),
+            vec!["Project (one)", "Project (two)", "Unique"]
+        );
     }
 
     #[test]
