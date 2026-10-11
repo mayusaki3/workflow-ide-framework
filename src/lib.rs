@@ -1036,7 +1036,10 @@ fn project_tree_context_menu(
         }
         if ui.button(localization::text("project.folder.show_in_file_manager")).clicked() {
             #[cfg(windows)]
-            let result = std::process::Command::new("explorer").arg(parent).spawn();
+            let result = std::process::Command::new("explorer.exe")
+                .arg("/n,")
+                .arg(parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf()))
+                .spawn();
             #[cfg(target_os = "macos")]
             let result = std::process::Command::new("open").arg(parent).spawn();
             #[cfg(all(not(windows), not(target_os = "macos")))]
