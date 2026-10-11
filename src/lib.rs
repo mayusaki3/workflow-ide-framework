@@ -125,6 +125,7 @@ pub struct ApplicationConfig {
     pub id: String,
     pub name: String,
     pub version: Option<String>,
+    pub user_config_directory_name: Option<String>,
     pub window: WindowConfig,
     pub appearance: AppearanceConfig,
     pub panels: Vec<PanelDefinition>,
@@ -143,6 +144,7 @@ impl ApplicationConfig {
             id: id.into(),
             name: name.into(),
             version: None,
+            user_config_directory_name: None,
             window: WindowConfig::default(),
             appearance: AppearanceConfig::default(),
             panels: Vec::new(),
@@ -351,6 +353,18 @@ impl Application {
     }
 
     /// Set the Consumer/Application version shown by the Framework About dialog.
+    /// Select the application's user settings folder, independent of its stable Application ID.
+    /// Only ASCII letters, digits, hyphens and underscores are accepted.
+    pub fn user_config_directory_name(mut self, name: impl Into<String>) -> Self {
+        let name = name.into();
+        assert!(
+            recent_projects::directory_name(&self.config.id, Some(&name)).is_some(),
+            "invalid user config directory name"
+        );
+        self.config.user_config_directory_name = Some(name);
+        self
+    }
+
     pub fn version(mut self, version: impl Into<String>) -> Self {
         self.config.version = Some(version.into());
         self
@@ -674,7 +688,7 @@ impl Application {
                     )
                 });
 
-                let recent_projects = recent_projects::settings_path(&config.id)
+                let recent_projects = recent_projects::settings_path(&config.id, config.user_config_directory_name.as_deref())
                     .map(|path| recent_projects::RecentProjects::load(&path))
                     .unwrap_or_default();
                 Ok(Box::new(FrameworkHost {
@@ -1052,7 +1066,7 @@ impl FrameworkHost {
     }
 
     fn save_recent_projects(&self) {
-        if let Some(path) = recent_projects::settings_path(&self.config.id) {
+        if let Some(path) = recent_projects::settings_path(&self.config.id, self.config.user_config_directory_name.as_deref()) {
             if let Err(error) = self.recent_projects.save(&path) {
                 tracing::warn!(%error, "Could not save recent projects");
             }
