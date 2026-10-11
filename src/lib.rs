@@ -1725,6 +1725,8 @@ impl FrameworkHost {
             let mut save_name = None;
             let mut cancel = false;
             let mut create_folder = None;
+            let mut context_create_parent = None;
+            let mut context_delete_target = None;
             let state = self
                 .project_ui
                 .folder_dialog
@@ -1757,13 +1759,14 @@ impl FrameworkHost {
                         if let Some(state) = self.project_ui.folder_dialog.as_mut() {
                             ui.text_edit_singleline(&mut state.new_folder_name);
                             let name = state.new_folder_name.trim();
+                            let create_directory = state.create_folder_parent.as_deref().unwrap_or(&directory);
                             let valid = !name.is_empty()
                                 && name != "." && name != ".."
                                 && !name.ends_with('.') && !name.ends_with(' ')
                                 && !name.chars().any(|c| (c == char::from(92) || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|')))
-                                && !directory.join(name).exists();
+                                && !create_directory.join(name).exists();
                             if ui.add_enabled(valid, egui::Button::new(localization::text("project.folder.create_folder"))).clicked() {
-                                create_folder = Some(directory.join(name));
+                                create_folder = Some(create_directory.join(name));
                             }
                         }
                     });
@@ -1789,6 +1792,8 @@ impl FrameworkHost {
                                         &mut navigate_to,
                                         &mut open_project,
                                         reveal_tree_selection,
+                                        &mut context_create_parent,
+                                        &mut context_delete_target,
                                     );
                                 }
                             });
@@ -1852,6 +1857,7 @@ impl FrameworkHost {
                                         enabled,
                                         egui::Button::new(label).frame(false),
                                     );
+                                    project_tree_context_menu(&response, &path, kind == ProjectFolderKind::Folder, &mut context_create_parent, &mut context_delete_target);
                                     if response.double_clicked() {
                                         match kind {
                                             ProjectFolderKind::Folder => {
@@ -1918,11 +1924,23 @@ impl FrameworkHost {
                         }
                     });
                 });
+            if let Some(parent) = context_create_parent {
+                if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                    state.create_folder_parent = Some(parent);
+                    state.new_folder_name.clear();
+                }
+            }
+            if let Some(path) = context_delete_target {
+                if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                    state.delete_folder_pending = Some(path);
+                }
+            }
             if let Some(path) = create_folder {
                 match std::fs::create_dir(&path) {
                     Ok(()) => {
                         if let Some(state) = self.project_ui.folder_dialog.as_mut() {
                             state.new_folder_name.clear();
+                            state.create_folder_parent = None;
                         }
                         navigate_to = Some(path);
                     }
