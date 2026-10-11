@@ -820,6 +820,7 @@ struct ProjectFolderDialogState {
     directory: std::path::PathBuf,
     project_name: String,
     reveal_tree_selection: bool,
+    new_folder_name: String,
 }
 
 #[derive(Default)]
@@ -1084,6 +1085,7 @@ impl FrameworkHost {
             directory: self.initial_project_browser_directory(),
             project_name: String::new(),
             reveal_tree_selection: true,
+        new_folder_name: String::new(),
         });
     }
 
@@ -1212,6 +1214,7 @@ impl FrameworkHost {
             directory: self.initial_project_browser_directory(),
             project_name,
             reveal_tree_selection: true,
+        new_folder_name: String::new(),
         });
     }
 
@@ -1668,6 +1671,7 @@ impl FrameworkHost {
             let mut save_parent = None;
             let mut save_name = None;
             let mut cancel = false;
+            let mut create_folder = None;
             let state = self
                 .project_ui
                 .folder_dialog
@@ -1694,6 +1698,21 @@ impl FrameworkHost {
                             }
                         }
                         ui.monospace(directory.display().to_string());
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(localization::text("project.folder.new_folder"));
+                        if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                            ui.text_edit_singleline(&mut state.new_folder_name);
+                            let name = state.new_folder_name.trim();
+                            let valid = !name.is_empty()
+                                && name != "." && name != ".."
+                                && !name.ends_with('.') && !name.ends_with(' ')
+                                && !name.chars().any(|c| matches!(c, '/' | '\\\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+                                && !directory.join(name).exists();
+                            if ui.add_enabled(valid, egui::Button::new(localization::text("project.folder.create_folder"))).clicked() {
+                                create_folder = Some(directory.join(name));
+                            }
+                        }
                     });
                     ui.label(localization::text(if is_save {
                         "project.folder.save_hint"
@@ -1846,6 +1865,17 @@ impl FrameworkHost {
                         }
                     });
                 });
+            if let Some(path) = create_folder {
+                match std::fs::create_dir(&path) {
+                    Ok(()) => {
+                        if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                            state.new_folder_name.clear();
+                        }
+                        navigate_to = Some(path);
+                    }
+                    Err(error) => self.project_ui.message = Some(error.to_string()),
+                }
+            }
             if let Some(path) = navigate_to {
                 if let Some(state) = self.project_ui.folder_dialog.as_mut() {
                     state.directory = path;
