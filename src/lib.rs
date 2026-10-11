@@ -1872,6 +1872,28 @@ impl FrameworkHost {
                                 }
                             });
                     });
+                    if let Some(path) = self.project_ui.folder_dialog.as_ref().and_then(|state| state.delete_folder_pending.clone()) {
+                        ui.separator();
+                        ui.label(format!("{}: {}", localization::text("project.folder.confirm_delete"), path.display()));
+                        ui.horizontal(|ui| {
+                            if ui.button(localization::text("project.folder.delete_folder")).clicked() {
+                                match std::fs::remove_dir(&path) {
+                                    Ok(()) => {
+                                        navigate_to = path.parent().map(std::path::Path::to_path_buf);
+                                    }
+                                    Err(error) => self.project_ui.message = Some(error.to_string()),
+                                }
+                                if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                                    state.delete_folder_pending = None;
+                                }
+                            }
+                            if ui.button(localization::text("common.cancel")).clicked() {
+                                if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                                    state.delete_folder_pending = None;
+                                }
+                            }
+                        });
+                    }
                     ui.separator();
                     if is_save {
                         ui.horizontal(|ui| {
