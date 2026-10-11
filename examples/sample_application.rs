@@ -184,6 +184,7 @@ fn main() -> eframe::Result<()> {
     };
 
     Application::new("org.workflow-ide-framework.sample", "Workflow IDE Framework Sample Application")
+        .user_config_directory_name("WorkflowIDESample")
         .version(env!("CARGO_PKG_VERSION"))
         .about_renderer(|ctx, framework, open| {
             let mut window_open = *open;
