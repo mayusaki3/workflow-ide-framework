@@ -1026,12 +1026,18 @@ fn project_tree_context_menu(
 ) {
     response.context_menu(|ui| {
         let parent = if is_folder { path } else { path.parent().unwrap_or(path) };
+        ui.small(parent.display().to_string());
+        ui.separator();
         if ui.button(localization::text("project.folder.create_folder")).clicked() {
-            *create_parent = Some(parent.to_path_buf());
+            if create_parent.is_none() {
+                *create_parent = Some(parent.to_path_buf());
+            }
             ui.close();
         }
         if is_folder && ui.button(localization::text("project.folder.delete_folder")).clicked() {
-            *delete_target = Some(path.to_path_buf());
+            if delete_target.is_none() {
+                *delete_target = Some(path.to_path_buf());
+            }
             ui.close();
         }
         if ui.button(localization::text("project.folder.show_in_file_manager")).clicked() {
