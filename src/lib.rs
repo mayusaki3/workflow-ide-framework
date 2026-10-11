@@ -986,33 +986,30 @@ fn show_project_folder_tree(
     }
     let should_open = selected.starts_with(path);
     let heading = egui::RichText::new(format!("{name}{suffix}"));
-    let heading = if path == selected { heading.strong().background_color(ui.visuals().selection.bg_fill) } else { heading };
+    let heading = if path == selected {
+        heading.strong().background_color(ui.visuals().selection.bg_fill)
+    } else {
+        heading
+    };
+    let id = ui.make_persistent_id(("project_folder_tree", path));
     let response = egui::CollapsingHeader::new(heading)
-        .id_salt(path)
+        .id_salt(id)
         .default_open(should_open)
         .open(should_open.then_some(true))
         .show(ui, |ui| {
             for child in project_browser_directories(path) {
                 show_project_folder_tree(
-                    ui,
-                    &child,
-                    selected,
-                    application_id,
-                    next,
-                    open_project,
-                    reveal_selection,
-                    create_parent,
-                    delete_target,
+                    ui, &child, selected, application_id, next, open_project,
+                    reveal_selection, create_parent, delete_target,
                 );
             }
         });
-    project_tree_context_menu(&response.header_response, path, true, create_parent, delete_target);
+    let header = response.header_response;
+    project_tree_context_menu(&header, path, true, create_parent, delete_target);
     if reveal_selection && path == selected {
-        response
-            .header_response
-            .scroll_to_me(Some(egui::Align::Center));
+        header.scroll_to_me(Some(egui::Align::Center));
     }
-    if response.header_response.clicked() {
+    if header.clicked() {
         *next = Some(path.to_path_buf());
     }
 }
