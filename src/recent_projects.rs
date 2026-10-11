@@ -37,29 +37,38 @@ impl RecentProjects {
     }
 }
 
-/// Short, stable menu labels; full paths remain available as hover text.
-pub fn display_labels(paths: &[PathBuf]) -> Vec<String> {
-    use std::collections::HashMap;
-    let mut counts = HashMap::<String, usize>::new();
-    for path in paths {
-        let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy().into_owned();
-        *counts.entry(name).or_default() += 1;
-    }
-    paths.iter().map(|path| {
-        let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy().into_owned();
-        if counts.get(&name).copied().unwrap_or(0) > 1 {
-            let parent = path.parent().and_then(Path::file_name)
-                .map(|part| part.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            if parent.is_empty() {
-                name
-            } else {
-                format!("{name} ({parent})")
-            }
-        } else {
-            name
-        }
-    }).collect()
+/// Read the project's persisted save timestamp, not the history access time.
+pub fn saved_at_label(path: &Path, application_id: &str) -> String {
+    use chrono::{Local, TimeZone};
+    let Some(saved_at) = std::fs::read_to_string(path.join("project.toml"))
+        .ok()
+        .and_then(|content| crate::project::ProjectFile::from_toml(&content, application_id).ok())
+        .map(|file| file.project.saved_at)
+    else {
+        return "—".to_owned();
+    };
+    let Some(value) = saved_at.strip_prefix("unix:") else {
+        return "—".to_owned();
+    };
+    let (seconds, fraction) = value.split_once('.').unwrap_or((value, ""));
+    let Ok(seconds) = seconds.parse::<i64>() else {
+        return "—".to_owned();
+    };
+    let nanos = if fraction.is_empty() {
+        0
+    } else if fraction.len() <= 9 && fraction.bytes().all(|byte| byte.is_ascii_digit()) {
+        let padded = format!("{fraction:0<9}");
+        let Ok(nanos) = padded.parse::<u32>() else {
+            return "—".to_owned();
+        };
+        nanos
+    } else {
+        return "—".to_owned();
+    };
+    Local.timestamp_opt(seconds, nanos)
+        .single()
+        .map(|time| time.format("%Y-%m-%d %H:%M").to_string())
+        .unwrap_or_else(|| "—".to_owned())
 }
 
 fn config_base() -> Option<PathBuf> {
@@ -130,19 +139,6 @@ mod tests {
         for invalid in ["", ".", "..", "../other", "a/b", "a\\\\b", "bad:name", "trailing."] {
             assert_eq!(directory_name("org.example.app", Some(invalid)), None);
         }
-    }
-
-    #[test]
-    fn labels_show_project_names_and_disambiguate_duplicates() {
-        let paths = vec![
-            PathBuf::from("root/one/Project"),
-            PathBuf::from("root/two/Project"),
-            PathBuf::from("root/other/Unique"),
-        ];
-        assert_eq!(
-            display_labels(&paths),
-            vec!["Project (one)", "Project (two)", "Unique"]
-        );
     }
 
     #[test]
