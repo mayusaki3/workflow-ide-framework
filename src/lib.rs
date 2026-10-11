@@ -947,6 +947,8 @@ fn show_project_folder_tree(
     next: &mut Option<std::path::PathBuf>,
     open_project: &mut Option<std::path::PathBuf>,
     reveal_selection: bool,
+    create_parent: &mut Option<std::path::PathBuf>,
+    delete_target: &mut Option<std::path::PathBuf>,
 ) {
     let kind = project_folder_kind(path, application_id);
     let name = path
@@ -969,6 +971,7 @@ fn show_project_folder_tree(
     };
     if kind != ProjectFolderKind::Folder {
         let response = ui.selectable_label(path == selected, format!("{name}{suffix}"));
+        project_tree_context_menu(&response, path, false, create_parent, delete_target);
         if reveal_selection && path == selected {
             response.scroll_to_me(Some(egui::Align::Center));
         }
@@ -996,9 +999,12 @@ fn show_project_folder_tree(
                     next,
                     open_project,
                     reveal_selection,
+                    create_parent,
+                    delete_target,
                 );
             }
         });
+    project_tree_context_menu(&response.header_response, path, true, create_parent, delete_target);
     if reveal_selection && path == selected {
         response
             .header_response
@@ -1007,6 +1013,38 @@ fn show_project_folder_tree(
     if response.header_response.clicked() {
         *next = Some(path.to_path_buf());
     }
+}
+
+fn project_tree_context_menu(
+    response: &egui::Response,
+    path: &std::path::Path,
+    is_folder: bool,
+    create_parent: &mut Option<std::path::PathBuf>,
+    delete_target: &mut Option<std::path::PathBuf>,
+) {
+    response.context_menu(|ui| {
+        let parent = if is_folder { path } else { path.parent().unwrap_or(path) };
+        if ui.button(localization::text("project.folder.create_folder")).clicked() {
+            *create_parent = Some(parent.to_path_buf());
+            ui.close();
+        }
+        if is_folder && ui.button(localization::text("project.folder.delete_folder")).clicked() {
+            *delete_target = Some(path.to_path_buf());
+            ui.close();
+        }
+        if ui.button(localization::text("project.folder.show_in_file_manager")).clicked() {
+            #[cfg(windows)]
+            let result = std::process::Command::new("explorer").arg(parent).spawn();
+            #[cfg(target_os = "macos")]
+            let result = std::process::Command::new("open").arg(parent).spawn();
+            #[cfg(all(not(windows), not(target_os = "macos")))]
+            let result = std::process::Command::new("xdg-open").arg(parent).spawn();
+            if let Err(error) = result {
+                ui.label(error.to_string());
+            }
+            ui.close();
+        }
+    });
 }
 
 impl FrameworkHost {
