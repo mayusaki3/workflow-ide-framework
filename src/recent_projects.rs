@@ -56,21 +56,30 @@ fn config_base() -> Option<PathBuf> {
     }
 }
 
-pub fn settings_path(application_id: &str) -> Option<PathBuf> {
+/// Resolve an application-owned settings directory name.
+pub fn directory_name(application_id: &str, configured_name: Option<&str>) -> Option<String> {
+    if let Some(name) = configured_name {
+        if name.is_empty()
+            || name == "."
+            || name == ".."
+            || name.ends_with('.')
+            || name.ends_with(' ')
+            || name.chars().any(|c| !c.is_ascii_alphanumeric() && c != '-' && c != '_')
+        {
+            return None;
+        }
+        return Some(name.to_owned());
+    }
     let safe_id: String = application_id
         .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                c
-            } else {
-                '_'
-            }
-        })
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
         .collect();
-    if safe_id.is_empty() {
-        return None;
-    }
-    config_base().map(|base| base.join(safe_id).join("recent_projects.toml"))
+    (!safe_id.is_empty()).then_some(safe_id)
+}
+
+pub fn settings_path(application_id: &str, configured_name: Option<&str>) -> Option<PathBuf> {
+    let name = directory_name(application_id, configured_name)?;
+    config_base().map(|base| base.join(name).join("recent_projects.toml"))
 }
 
 #[cfg(test)]
@@ -87,6 +96,15 @@ mod tests {
         assert_eq!(history.paths.len(), 10);
         assert_eq!(history.paths[0], PathBuf::from("project-5"));
         assert_eq!(history.paths.iter().filter(|p| **p == PathBuf::from("project-5")).count(), 1);
+    }
+
+    #[test]
+    fn explicit_directory_name_and_invalid_names() {
+        assert_eq!(directory_name("org.example.app", Some("ExampleApp")).as_deref(), Some("ExampleApp"));
+        assert_eq!(directory_name("org.example.app", None).as_deref(), Some("org_example_app"));
+        for invalid in ["", ".", "..", "../other", "a/b", "a\\\\b", "bad:name", "trailing."] {
+            assert_eq!(directory_name("org.example.app", Some(invalid)), None);
+        }
     }
 
     #[test]
