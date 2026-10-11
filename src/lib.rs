@@ -1073,6 +1073,19 @@ impl FrameworkHost {
         }
     }
 
+    fn record_current_project_in_history(&mut self) {
+        let root = self
+            .project_controller
+            .as_ref()
+            .and_then(|controller| controller.session.as_ref())
+            .and_then(|session| session.context())
+            .map(|context| context.root().to_path_buf());
+        if let Some(root) = root {
+            self.recent_projects.record(root);
+            self.save_recent_projects();
+        }
+    }
+
     fn open_project_at(&mut self, root: std::path::PathBuf) {
         let context = project::ProjectContext::new(root);
         let (Some(controller), Some(adapter)) = (
@@ -1160,6 +1173,7 @@ impl FrameworkHost {
         let completed = matches!(result, project_controller::ProjectCommandResult::Completed);
         self.handle_project_result(result, None);
         if completed {
+            self.record_current_project_in_history();
             self.emit_project_event(project_event::ProjectEventKind::Saved);
         }
     }
@@ -1210,6 +1224,7 @@ impl FrameworkHost {
         let completed = matches!(result, project_controller::ProjectCommandResult::Completed);
         self.handle_project_result(result, None);
         if completed {
+            self.record_current_project_in_history();
             self.emit_project_event(project_event::ProjectEventKind::SavedAs);
         }
     }
