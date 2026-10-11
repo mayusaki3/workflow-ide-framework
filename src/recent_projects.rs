@@ -37,12 +37,40 @@ impl RecentProjects {
     }
 }
 
+fn config_base() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("APPDATA").map(PathBuf::from)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var_os("HOME")
+            .map(|home| PathBuf::from(home).join("Library").join("Application Support"))
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        std::env::var_os("XDG_CONFIG_HOME")
+            .filter(|value| Path::new(value).is_absolute())
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
+    }
+}
+
 pub fn settings_path(application_id: &str) -> Option<PathBuf> {
-    let base = std::env::var_os("APPDATA")
-        .or_else(|| std::env::var_os("XDG_CONFIG_HOME"))
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config").into_os_string()))?;
-    let safe_id: String = application_id.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect();
-    Some(PathBuf::from(base).join("workflow-ide-framework").join(safe_id).join("recent_projects.toml"))
+    let safe_id: String = application_id
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if safe_id.is_empty() {
+        return None;
+    }
+    config_base().map(|base| base.join(safe_id).join("recent_projects.toml"))
 }
 
 #[cfg(test)]
