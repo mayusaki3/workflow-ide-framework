@@ -1512,12 +1512,18 @@ impl FrameworkHost {
                         self.project_open();
                     }
                     ui.menu_button(localization::text("file.recent_projects"), |ui| {
+                        // A compact, stable menu width avoids inheriting the first long path's width.
+                        ui.set_min_width(240.0);
                         if self.recent_projects.paths.is_empty() {
                             ui.add_enabled(false, egui::Label::new(localization::text("file.recent_empty")));
                         }
-                        for path in self.recent_projects.paths.clone() {
+                        let paths = self.recent_projects.paths.clone();
+                        let labels = recent_projects::display_labels(&paths);
+                        for (path, label) in paths.into_iter().zip(labels) {
                             let valid = project_folder_kind(&path, &self.config.id) == ProjectFolderKind::Project;
-                            if ui.add_enabled(valid, egui::Button::new(path.display().to_string())).clicked() {
+                            let response = ui.add_enabled(valid, egui::Button::new(label))
+                                .on_hover_text(path.display().to_string());
+                            if response.clicked() {
                                 ui.close();
                                 self.open_project_at(path);
                             }
