@@ -120,6 +120,28 @@ impl PanelDefinition {
     }
 }
 
+fn project_window_title(application_title: &str, project_name: &str, dirty: bool) -> String {
+    format!(
+        "{application_title} - {project_name}{}",
+        if dirty { " *" } else { "" }
+    )
+}
+
+#[cfg(test)]
+mod project_title_tests {
+    use super::project_window_title;
+
+    #[test]
+    fn dirty_project_has_unsaved_marker() {
+        assert_eq!(project_window_title("App", "Project", true), "App - Project *");
+    }
+
+    #[test]
+    fn saved_project_has_no_unsaved_marker() {
+        assert_eq!(project_window_title("App", "Project", false), "App - Project");
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ApplicationConfig {
     pub id: String,
@@ -2118,8 +2140,15 @@ impl eframe::App for FrameworkHost {
         let window_title = self
             .project_controller
             .as_ref()
-            .and_then(|controller| controller.project_name())
-            .map(|project_name| format!("{application_title} - {project_name}"))
+            .and_then(|controller| {
+                controller.project_name().map(|project_name| {
+                    let dirty = controller
+                        .session
+                        .as_ref()
+                        .is_some_and(|session| session.dirty.is_dirty());
+                    project_window_title(application_title, project_name, dirty)
+                })
+            })
             .unwrap_or_else(|| application_title.to_owned());
         ui.ctx()
             .send_viewport_cmd(egui::ViewportCommand::Title(window_title));
