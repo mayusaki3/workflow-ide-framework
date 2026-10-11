@@ -1707,7 +1707,7 @@ impl FrameworkHost {
                             let valid = !name.is_empty()
                                 && name != "." && name != ".."
                                 && !name.ends_with('.') && !name.ends_with(' ')
-                                && !name.chars().any(|c| matches!(c, '/' | '\\\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+                                && !name.chars().any(|c| (c == char::from(92) || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|')))
                                 && !directory.join(name).exists();
                             if ui.add_enabled(valid, egui::Button::new(localization::text("project.folder.create_folder"))).clicked() {
                                 create_folder = Some(directory.join(name));
