@@ -1515,21 +1515,30 @@ impl FrameworkHost {
                         self.project_open();
                     }
                     ui.menu_button(localization::text("file.recent_projects"), |ui| {
-                        // A compact, stable menu width avoids inheriting the first long path's width.
-                        ui.set_min_width(240.0);
+                        ui.set_min_width(420.0);
                         if self.recent_projects.paths.is_empty() {
                             ui.add_enabled(false, egui::Label::new(localization::text("file.recent_empty")));
                         }
-                        let paths = self.recent_projects.paths.clone();
-                        let labels = recent_projects::display_labels(&paths);
-                        for (path, label) in paths.into_iter().zip(labels) {
+                        for path in self.recent_projects.paths.clone() {
                             let valid = project_folder_kind(&path, &self.config.id) == ProjectFolderKind::Project;
-                            let response = ui.add_enabled(valid, egui::Button::new(label))
-                                .on_hover_text(path.display().to_string());
-                            if response.clicked() {
-                                ui.close();
-                                self.open_project_at(path);
-                            }
+                            let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
+                            let name: String = if name.chars().count() > 30 {
+                                format!("{}…", name.chars().take(29).collect::<String>())
+                            } else {
+                                name.into_owned()
+                            };
+                            let saved_at = recent_projects::saved_at_label(&path, &self.config.id);
+                            ui.horizontal(|ui| {
+                                let response = ui.add_enabled(
+                                    valid,
+                                    egui::Button::new(name).min_size(egui::vec2(248.0, 22.0)),
+                                ).on_hover_text(path.display().to_string());
+                                ui.label(saved_at);
+                                if response.clicked() {
+                                    ui.close();
+                                    self.open_project_at(path);
+                                }
+                            });
                         }
                         if !self.recent_projects.paths.is_empty() {
                             ui.separator();
