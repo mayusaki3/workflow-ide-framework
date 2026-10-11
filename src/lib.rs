@@ -1040,15 +1040,19 @@ fn project_tree_context_menu(
         if ui.button(localization::text("project.folder.show_in_file_manager")).clicked() {
             #[cfg(windows)]
             let result = {
-                let argument = format!("/e,{}", parent.display());
+                let normalized = std::path::PathBuf::from(
+                    parent.to_string_lossy().replacen(":\\\\", ":\\", 1)
+                );
+                let argument = normalized.as_os_str();
                 tracing::info!(
                     target_path = %parent.display(),
+                    normalized_path = %normalized.display(),
                     executable = "explorer.exe",
-                    argument = %argument,
+                    argument = %normalized.display(),
                     "Project browser: launching Windows Explorer"
                 );
                 std::process::Command::new("explorer.exe")
-                    .arg(&argument)
+                    .arg(argument)
                     .spawn()
             };
             #[cfg(target_os = "macos")]
