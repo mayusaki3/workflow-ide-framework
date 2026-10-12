@@ -1768,33 +1768,7 @@ impl FrameworkHost {
                         }
                         ui.monospace(directory.display().to_string());
                     });
-                    if self.project_ui.folder_dialog.as_ref().and_then(|state| state.create_folder_parent.as_ref()).is_none() {
-                    ui.horizontal(|ui| {
-                        ui.label(localization::text("project.folder.new_folder"));
-                        if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                            ui.text_edit_singleline(&mut state.new_folder_name);
-                            let name = state.new_folder_name.trim();
-                            let create_directory = state.create_folder_parent.as_deref().unwrap_or(&directory);
-                            let valid = !name.is_empty()
-                                && name != "." && name != ".."
-                                && !name.ends_with('.') && !name.ends_with(' ')
-                                && !name.chars().any(|c| (c == char::from(92) || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|')))
-                                && !create_directory.join(name).exists();
-                            if !name.is_empty() && !valid {
-                                let reason = if create_directory.join(name).exists() {
-                                    localization::text("project.folder.folder_exists")
-                                } else {
-                                    localization::text("project.folder.invalid_folder_name")
-                                };
-                                ui.weak(reason);
-                            }
-                            if ui.add_enabled(valid, egui::Button::new(localization::text("project.folder.create_folder"))).clicked() {
-                                create_folder = Some(create_directory.join(name));
-                            }
-                        }
-                    });
-                    }
-                    ui.label(localization::text(if is_save {
+                        ui.label(localization::text(if is_save {
                         "project.folder.save_hint"
                     } else {
                         "project.folder.open_hint"
