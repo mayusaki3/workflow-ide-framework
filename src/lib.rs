@@ -1868,6 +1868,18 @@ impl FrameworkHost {
                                         }
                                     }
                                 }
+                                // The unused area belongs to the current directory, not to
+                                // the last listed folder. Give it its own context menu.
+                                let background = ui.allocate_response(
+                                    egui::vec2(ui.available_width(), 100.0),
+                                    egui::Sense::click(),
+                                );
+                                background.context_menu(|ui| {
+                                    if ui.button(localization::text("project.folder.create_folder")).clicked() {
+                                        context_create_parent = Some(directory.clone());
+                                        ui.close();
+                                    }
+                                });
                             });
                     });
                     let mut dismiss_create = false;
