@@ -2002,7 +2002,18 @@ impl FrameworkHost {
                                     Ok(()) => navigate_to = path.parent().map(std::path::Path::to_path_buf),
                                     Err(error) => {
                                         if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                                            state.delete_folder_error = Some(format!("{}: {}", path.display(), error));
+                                            let reason = if error.kind() == std::io::ErrorKind::DirectoryNotEmpty {
+                                                localization::text("project.folder.delete_not_empty")
+                                            } else {
+                                                localization::text("project.folder.delete_failed")
+                                            };
+                                            state.delete_folder_error = Some(format!(
+                                                "{}\n{}\n{}: {}",
+                                                path.display(),
+                                                reason,
+                                                localization::text("project.folder.os_error"),
+                                                error
+                                            ));
                                         }
                                     }
                                 }
