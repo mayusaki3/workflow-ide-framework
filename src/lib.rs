@@ -823,6 +823,7 @@ struct ProjectFolderDialogState {
     new_folder_name: String,
     create_folder_parent: Option<std::path::PathBuf>,
     delete_folder_pending: Option<std::path::PathBuf>,
+    delete_folder_error: Option<String>,
 }
 
 #[derive(Default)]
@@ -1139,6 +1140,7 @@ impl FrameworkHost {
         new_folder_name: String::new(),
             create_folder_parent: None,
             delete_folder_pending: None,
+            delete_folder_error: None,
         });
     }
 
@@ -1270,6 +1272,7 @@ impl FrameworkHost {
         new_folder_name: String::new(),
             create_folder_parent: None,
             delete_folder_pending: None,
+            delete_folder_error: None,
         });
     }
 
@@ -1893,28 +1896,6 @@ impl FrameworkHost {
                                 }
                             });
                     });
-                    if let Some(path) = self.project_ui.folder_dialog.as_ref().and_then(|state| state.delete_folder_pending.clone()) {
-                        ui.separator();
-                        ui.label(format!("{}: {}", localization::text("project.folder.confirm_delete"), path.display()));
-                        ui.horizontal(|ui| {
-                            if ui.button(localization::text("project.folder.delete_folder")).clicked() {
-                                match std::fs::remove_dir(&path) {
-                                    Ok(()) => {
-                                        navigate_to = path.parent().map(std::path::Path::to_path_buf);
-                                    }
-                                    Err(error) => self.project_ui.message = Some(error.to_string()),
-                                }
-                                if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                                    state.delete_folder_pending = None;
-                                }
-                            }
-                            if ui.button(localization::text("common.cancel")).clicked() {
-                                if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                                    state.delete_folder_pending = None;
-                                }
-                            }
-                        });
-                    }
                     let mut dismiss_create = false;
                     if let Some(parent) = self.project_ui.folder_dialog.as_ref().and_then(|state| state.create_folder_parent.clone()) {
                         ui.group(|ui| {
@@ -2005,6 +1986,55 @@ impl FrameworkHost {
                         }
                     });
                 });
+            if let Some(path) = self.project_ui.folder_dialog.as_ref()
+                .and_then(|state| state.delete_folder_pending.clone())
+            {
+                egui::Window::new(localization::text("project.folder.confirm_delete"))
+                    .id(egui::Id::new("project_folder_delete_confirm"))
+                    .collapsible(false)
+                    .resizable(false)
+                    .order(egui::Order::Foreground)
+                    .show(ctx, |ui| {
+                        ui.label(path.display().to_string());
+                        ui.horizontal(|ui| {
+                            if ui.button(localization::text("project.folder.delete_folder")).clicked() {
+                                match std::fs::remove_dir(&path) {
+                                    Ok(()) => navigate_to = path.parent().map(std::path::Path::to_path_buf),
+                                    Err(error) => {
+                                        if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                                            state.delete_folder_error = Some(format!("{}: {}", path.display(), error));
+                                        }
+                                    }
+                                }
+                                if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                                    state.delete_folder_pending = None;
+                                }
+                            }
+                            if ui.button(localization::text("common.cancel")).clicked() {
+                                if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                                    state.delete_folder_pending = None;
+                                }
+                            }
+                        });
+                    });
+            }
+            if let Some(error) = self.project_ui.folder_dialog.as_ref()
+                .and_then(|state| state.delete_folder_error.clone())
+            {
+                egui::Window::new(localization::text("project.folder.delete_error"))
+                    .id(egui::Id::new("project_folder_delete_error"))
+                    .collapsible(false)
+                    .resizable(false)
+                    .order(egui::Order::Foreground)
+                    .show(ctx, |ui| {
+                        ui.label(error);
+                        if ui.button(localization::text("common.ok")).clicked() {
+                            if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                                state.delete_folder_error = None;
+                            }
+                        }
+                    });
+            }
             if let Some(parent) = context_create_parent {
                 if let Some(state) = self.project_ui.folder_dialog.as_mut() {
                     state.create_folder_parent = Some(parent);
