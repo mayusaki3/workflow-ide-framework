@@ -1949,7 +1949,7 @@ impl FrameworkHost {
                             ui.text_edit_singleline(&mut state.new_folder_name);
                             let name = state.new_folder_name.as_str();
                             let invalid_char = name == "." || name == ".."
-                                || name.ends_with('.') || name.ends_with(' ')
+                                || name.starts_with(' ') || name.ends_with('.') || name.ends_with(' ')
                                 || name.chars().any(|c| c == char::from(92)
                                     || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|'));
                             let exists = parent.join(name).exists();
