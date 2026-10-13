@@ -13,3 +13,6 @@ name = "English"
 "sample.about.description" = "Consumer-defined About content"
 "sample.about.framework" = "Framework"
 "sample.about.framework_version" = "Framework version"
+
+"sample.menu.i18n_title" = "Localization Test"
+"sample.menu.i18n_probe" = "Run Menu Test"
