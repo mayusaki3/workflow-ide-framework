@@ -1852,15 +1852,15 @@ impl FrameworkHost {
                                         egui::Button::new(label).frame(false),
                                     );
                                     project_tree_context_menu(&response, &path, kind == ProjectFolderKind::Folder, &mut context_create_parent, &mut context_delete_target);
-                                    if response.double_clicked() {
-                                        match kind {
-                                            ProjectFolderKind::Folder => {
-                                                navigate_to = Some(path.clone())
-                                            }
-                                            ProjectFolderKind::Project if !is_save => {
-                                                open_project = Some(path.clone())
-                                            }
-                                            _ => {}
+                                    if kind == ProjectFolderKind::Folder
+                                        && (response.clicked() || response.double_clicked())
+                                    {
+                                        navigate_to = Some(path.clone());
+                                    } else if kind == ProjectFolderKind::Project && !is_save {
+                                        if response.double_clicked() {
+                                            open_project = Some(path.clone());
+                                        } else if response.clicked() {
+                                            navigate_to = Some(path.clone());
                                         }
                                     }
                                 }
