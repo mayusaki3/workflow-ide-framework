@@ -151,3 +151,23 @@ impl MenuItemDefinition {
         }
     }
 }
+
+#[cfg(test)]
+mod localized_menu_tests {
+    use super::{CommandDefinition, MenuItemDefinition};
+
+    #[test]
+    fn command_label_key_is_stored_without_early_translation() {
+        let command = CommandDefinition::new("sample.open", "Open", || {})
+            .label_key("sample.menu.open");
+        assert_eq!(command.label, "sample.menu.open");
+    }
+
+    #[test]
+    fn custom_menu_title_key_is_stored_without_early_translation() {
+        let item = MenuItemDefinition::custom_key(
+            "sample", "sample.menu.title", "sample.open",
+        );
+        assert_eq!(item.menu_label, "sample.menu.title");
+    }
+}
