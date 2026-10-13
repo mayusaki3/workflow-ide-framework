@@ -879,12 +879,8 @@ fn project_folder_kind(path: &std::path::Path, application_id: &str) -> ProjectF
 }
 
 fn project_browser_visible_directory(path: &std::path::Path) -> bool {
-    let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
-        return true;
-    };
-    if name.starts_with('.') {
-        return false;
-    }
+    // Leading dots are valid folder-name characters (e.g. ".A").
+    // On Windows, hide only directories explicitly marked hidden/system.
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
