@@ -1035,10 +1035,12 @@ fn project_tree_context_menu(
             ui.close();
         }
         if ui.button(localization::text("project.folder.show_in_file_manager")).clicked() {
+            // Project directories are folders too, even when not ordinary folders.
+            let open_path = if path.is_dir() { path } else { path.parent().unwrap_or(path) };
             #[cfg(windows)]
             let result = {
                 let normalized = std::path::PathBuf::from(
-                    parent.to_string_lossy().replacen(":\\\\", ":\\", 1)
+                    open_path.to_string_lossy().replacen(":\\\\", ":\\", 1)
                 );
                 let argument = normalized.as_os_str();
                 std::process::Command::new("explorer.exe")
@@ -1046,7 +1048,7 @@ fn project_tree_context_menu(
                     .spawn()
             };
             #[cfg(target_os = "macos")]
-            let result = std::process::Command::new("open").arg(parent).spawn();
+            let result = std::process::Command::new("open").arg(open_path).spawn();
             #[cfg(all(not(windows), not(target_os = "macos")))]
             let result = std::process::Command::new("xdg-open").arg(parent).spawn();
             if let Err(error) = result {
