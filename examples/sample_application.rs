@@ -1,5 +1,6 @@
 use workflow_ide_framework::{
     Application, LayoutConfig, PanelDefinition, PanelKind,
+    command::{CommandDefinition, MenuItemDefinition},
     controller_panel::{
         ControllerElement, ControllerElementKind, ControllerMode, ControllerModel, LineShape,
     },
@@ -186,6 +187,13 @@ fn main() -> eframe::Result<()> {
     Application::new("org.workflow-ide-framework.sample", "Workflow IDE Framework Sample Application")
         .user_config_directory_name("WorkflowIDESample")
         .version(env!("CARGO_PKG_VERSION"))
+        // MENU-I18N-002: verify labels change with the Language panel.
+        .command(CommandDefinition::new("sample.i18n_probe", "Probe", || {
+            tracing::info!("sample localized menu command invoked");
+        }).label_key("sample.menu.i18n_probe"))
+        .menu_item(MenuItemDefinition::custom_key(
+            "sample.i18n", "sample.menu.i18n_title", "sample.i18n_probe",
+        ))
         .about_renderer(|ctx, framework, open| {
             let mut window_open = *open;
             eframe::egui::Window::new(localization::text("sample.about.title"))
