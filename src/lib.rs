@@ -973,12 +973,8 @@ fn show_project_folder_tree(
         if reveal_selection && path == selected {
             response.scroll_to_me(Some(egui::Align::Center));
         }
-        if kind == ProjectFolderKind::Project {
-            if response.double_clicked() {
-                *open_project = Some(path.to_path_buf());
-            } else if response.clicked() {
-                *next = Some(path.to_path_buf());
-            }
+        if response.clicked() {
+            *next = Some(path.to_path_buf());
         }
         return;
     }
@@ -1875,7 +1871,7 @@ impl FrameworkHost {
                                     if response.double_clicked() {
                                         match kind {
                                             ProjectFolderKind::Folder => navigate_to = Some(path.clone()),
-                                            ProjectFolderKind::Project if !is_save => open_project = Some(path.clone()),
+                                            ProjectFolderKind::Project if !is_save => navigate_to = Some(path.clone()),
                                             _ => {}
                                         }
                                     }
