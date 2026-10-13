@@ -1497,7 +1497,7 @@ impl FrameworkHost {
             let Some(command) = self.commands.get(&item.command_id) else {
                 continue;
             };
-            let label = command.label.clone();
+            let label = localization::text(&command.label);
             let shortcut = command.shortcut.clone().unwrap_or_default();
             let enabled = command.enabled;
             if Self::project_menu_item(ui, label, &shortcut, enabled) {
@@ -1751,7 +1751,7 @@ impl FrameworkHost {
                         acc
                     });
                 for (menu_id, menu_label) in custom_menus {
-                    let response = ui.add(egui::Button::new(menu_label));
+                    let response = ui.add(egui::Button::new(localization::text(&menu_label)));
                     egui::Popup::menu(&response).show(|ui| {
                         self.consumer_menu_items(ui, command::MenuLocation::Custom, Some(&menu_id))
                     });
