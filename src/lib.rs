@@ -1876,6 +1876,7 @@ impl FrameworkHost {
                                         match kind {
                                             ProjectFolderKind::Folder => navigate_to = Some(path.clone()),
                                             ProjectFolderKind::Project if !is_save => open_project = Some(path.clone()),
+                                            ProjectFolderKind::OtherApplicationProject(_) if !is_save => navigate_to = Some(path.clone()),
                                             _ => {}
                                         }
                                     }
