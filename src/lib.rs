@@ -1881,7 +1881,11 @@ impl FrameworkHost {
                                     egui::Sense::click(),
                                 );
                                 background.context_menu(|ui| {
-                                    if project_folder_kind(&directory, &application_id) == ProjectFolderKind::Folder && ui.button(localization::text("project.folder.create_folder")).clicked() {
+                                    if project_folder_kind(&directory, &application_id) == ProjectFolderKind::Folder
+                                        && self.project_ui.folder_dialog.as_ref()
+                                            .and_then(|state| state.selected_entry.as_ref())
+                                            .is_none_or(|selected| project_folder_kind(selected, &application_id) == ProjectFolderKind::Folder)
+                                        && ui.button(localization::text("project.folder.create_folder")).clicked() {
                                         context_create_parent = Some(directory.clone());
                                         ui.close();
                                     }
