@@ -13,3 +13,6 @@ name = "日本語"
 "sample.about.description" = "アプリケーション独自のバージョン情報"
 "sample.about.framework" = "Framework"
 "sample.about.framework_version" = "Frameworkバージョン"
+
+"sample.menu.i18n_title" = "翻訳テスト"
+"sample.menu.i18n_probe" = "メニューテスト実行"
