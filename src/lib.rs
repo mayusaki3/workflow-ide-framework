@@ -820,6 +820,7 @@ struct ProjectFolderDialogState {
     directory: std::path::PathBuf,
     project_name: String,
     reveal_tree_selection: bool,
+    selected_entry: Option<std::path::PathBuf>,
     new_folder_name: String,
     create_folder_parent: Option<std::path::PathBuf>,
     delete_folder_pending: Option<std::path::PathBuf>,
@@ -1133,6 +1134,7 @@ impl FrameworkHost {
             directory: self.initial_project_browser_directory(),
             project_name: String::new(),
             reveal_tree_selection: true,
+            selected_entry: None,
         new_folder_name: String::new(),
             create_folder_parent: None,
             delete_folder_pending: None,
@@ -1265,6 +1267,7 @@ impl FrameworkHost {
             directory: self.initial_project_browser_directory(),
             project_name,
             reveal_tree_selection: true,
+            selected_entry: None,
         new_folder_name: String::new(),
             create_folder_parent: None,
             delete_folder_pending: None,
@@ -1847,20 +1850,24 @@ impl FrameworkHost {
                                         ),
                                     };
                                     let enabled = !is_save || kind == ProjectFolderKind::Folder;
+                                    let selected = self.project_ui.folder_dialog.as_ref()
+                                        .and_then(|state| state.selected_entry.as_ref())
+                                        .is_some_and(|selected| selected == &path);
                                     let response = ui.add_enabled(
                                         enabled,
-                                        egui::Button::new(label).frame(false),
+                                        egui::SelectableLabel::new(selected, label),
                                     );
                                     project_tree_context_menu(&response, &path, kind == ProjectFolderKind::Folder, &mut context_create_parent, &mut context_delete_target);
-                                    if kind == ProjectFolderKind::Folder
-                                        && (response.clicked() || response.double_clicked())
-                                    {
-                                        navigate_to = Some(path.clone());
-                                    } else if kind == ProjectFolderKind::Project && !is_save {
-                                        if response.double_clicked() {
-                                            open_project = Some(path.clone());
-                                        } else if response.clicked() {
-                                            navigate_to = Some(path.clone());
+                                    if response.clicked() {
+                                        if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                                            state.selected_entry = Some(path.clone());
+                                        }
+                                    }
+                                    if response.double_clicked() {
+                                        match kind {
+                                            ProjectFolderKind::Folder => navigate_to = Some(path.clone()),
+                                            ProjectFolderKind::Project if !is_save => open_project = Some(path.clone()),
+                                            _ => {}
                                         }
                                     }
                                 }
@@ -2060,6 +2067,7 @@ impl FrameworkHost {
             if let Some(path) = navigate_to {
                 if let Some(state) = self.project_ui.folder_dialog.as_mut() {
                     state.directory = path;
+                    state.selected_entry = None;
                     state.reveal_tree_selection = true;
                 }
             } else if let Some(state) = self.project_ui.folder_dialog.as_mut() {
