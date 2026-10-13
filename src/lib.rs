@@ -1,5 +1,6 @@
 use eframe::egui;
 pub mod application_event;
+pub mod unsaved_notification;
 pub mod command;
 pub mod controller_panel;
 pub mod file_resource_selector;
@@ -230,6 +231,7 @@ struct ControllerPropertyLink {
 }
 
 pub struct Application {
+    unsaved_notification: unsaved_notification::UnsavedNotification,
     config: ApplicationConfig,
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
@@ -257,6 +259,7 @@ impl Application {
 
     pub fn with_config(config: ApplicationConfig) -> Self {
         Self {
+            unsaved_notification: unsaved_notification::UnsavedNotification::default(),
             config,
             text_editors: std::collections::HashMap::new(),
             text_editor_options: std::collections::HashMap::new(),
@@ -276,6 +279,11 @@ impl Application {
             application_events: application_event::ApplicationEventDispatcher::default(),
             project_events: project_event::ProjectEventDispatcher::default(),
         }
+    }
+
+    /// Cloneable notification handle for consumer-owned editors and panels.
+    pub fn unsaved_notification(&self) -> unsaved_notification::UnsavedNotification {
+        self.unsaved_notification.clone()
     }
 
     pub fn text_editor_panel(
@@ -516,6 +524,7 @@ impl Application {
 
     pub fn run(self) -> eframe::Result<()> {
         let mut config = self.config;
+        let unsaved_notification = self.unsaved_notification;
         let text_editors = self.text_editors;
         let text_editor_options = self.text_editor_options;
         let log_viewers = self.log_viewers;
@@ -715,6 +724,8 @@ impl Application {
                     .unwrap_or_default();
                 Ok(Box::new(FrameworkHost {
                     config,
+                    unsaved_revision_seen: unsaved_notification.revision(),
+                    unsaved_notification,
                     workspace_registry,
                     workspace_docks,
                     workspace_docks_by_id: std::collections::BTreeMap::new(),
@@ -769,6 +780,8 @@ fn apply_theme_mode(ctx: &egui::Context, selected: theme::Theme) {
 }
 
 struct FrameworkHost {
+    unsaved_notification: unsaved_notification::UnsavedNotification,
+    unsaved_revision_seen: u64,
     config: ApplicationConfig,
     workspace_registry: workspace::WorkspaceRegistry,
     workspace_docks: workspace_dock::WorkspaceDockProjection,
@@ -1240,7 +1253,18 @@ impl FrameworkHost {
         }
     }
 
+    fn sync_unsaved_notifications(&mut self) {
+        let revision = self.unsaved_notification.revision();
+        if revision != self.unsaved_revision_seen {
+            self.unsaved_revision_seen = revision;
+            if let Some(controller) = self.project_controller.as_mut() {
+                controller.mark_unsaved();
+            }
+        }
+    }
+
     fn project_save(&mut self) {
+        self.sync_unsaved_notifications();
         if let Err(error) = self.capture_project_workspaces() {
             self.project_ui.message = Some(format!("Workspace layout capture failed: {error:?}"));
             return;
@@ -2322,6 +2346,7 @@ impl FrameworkHost {
 
 impl eframe::App for FrameworkHost {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        self.sync_unsaved_notifications();
         if let Err(error) = self.sync_active_workspace_dock() {
             tracing::warn!(target: "wfide::workspace", ?error, "workspace dock switch rejected");
         }
