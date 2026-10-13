@@ -1816,7 +1816,7 @@ impl FrameworkHost {
                             project_browser_directories(&directory)
                         };
                         egui::ScrollArea::vertical()
-                            .id_salt("project_browser_contents")
+                            .id_salt(("project_browser_contents", &directory))
                             .max_height(280.0)
                             .show(&mut columns[1], |ui| {
                                 if let Some(details) = &project_details {
@@ -2081,7 +2081,8 @@ impl FrameworkHost {
                 if let Some(state) = self.project_ui.folder_dialog.as_mut() {
                     state.directory = path;
                     state.selected_entry = None;
-                    state.reveal_tree_selection = true;
+                    // User-initiated selection must not auto-scroll the tree.
+                    state.reveal_tree_selection = false;
                 }
             } else if let Some(state) = self.project_ui.folder_dialog.as_mut() {
                 state.reveal_tree_selection = false;
