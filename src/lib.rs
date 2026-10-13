@@ -1871,7 +1871,7 @@ impl FrameworkHost {
                                 // The unused area belongs to the current directory, not to
                                 // the last listed folder. Give it its own context menu.
                                 let background = ui.allocate_response(
-                                    egui::vec2(ui.available_width(), 100.0),
+                                    egui::vec2(ui.available_width().max(1.0), ui.available_height().max(280.0)),
                                     egui::Sense::click(),
                                 );
                                 background.context_menu(|ui| {
