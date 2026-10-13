@@ -973,7 +973,9 @@ fn show_project_folder_tree(
         if reveal_selection && path == selected {
             response.scroll_to_me(Some(egui::Align::Center));
         }
-        if response.clicked() {
+        if kind == ProjectFolderKind::Project && response.double_clicked() {
+            *open_project = Some(path.to_path_buf());
+        } else if response.clicked() {
             *next = Some(path.to_path_buf());
         }
         return;
@@ -1130,7 +1132,12 @@ impl FrameworkHost {
     fn project_open(&mut self) {
         self.project_ui.folder_dialog = Some(ProjectFolderDialogState {
             mode: ProjectFolderDialogMode::Open,
-            directory: self.initial_project_browser_directory(),
+            directory: self.project_controller.as_ref()
+                .and_then(|controller| controller.session.as_ref())
+                .and_then(|session| session.context())
+                .map(|context| context.root().to_path_buf())
+                .or_else(|| self.recent_projects.paths.first().filter(|path| path.is_dir()).cloned())
+                .unwrap_or_else(|| self.initial_project_browser_directory()),
             project_name: String::new(),
             reveal_tree_selection: true,
             selected_entry: None,
@@ -1793,10 +1800,13 @@ impl FrameworkHost {
                                     );
                                 }
                             });
-                        let project_details = if !is_save && project_folder_kind(&directory, &application_id) == ProjectFolderKind::Project {
+                        let project_details = if !is_save && matches!(
+                            project_folder_kind(&directory, &application_id),
+                            ProjectFolderKind::Project | ProjectFolderKind::OtherApplicationProject(_)
+                        ) {
                             std::fs::read_to_string(directory.join("project.toml"))
                                 .ok()
-                                .and_then(|contents| project::ProjectFile::from_toml(&contents, &application_id).ok())
+                                .and_then(|contents| toml::from_str::<project::ProjectFile>(&contents).ok())
                         } else {
                             None
                         };
