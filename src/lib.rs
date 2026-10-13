@@ -1954,10 +1954,10 @@ impl FrameworkHost {
                                     || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|'));
                             let exists = parent.join(name).exists();
                             if !name.is_empty() && (invalid_char || exists) {
-                                ui.label(localization::text(if exists {
-                                    "project.folder.folder_exists"
-                                } else {
+                                ui.label(localization::text(if invalid_char {
                                     "project.folder.invalid_folder_name"
+                                } else {
+                                    "project.folder.folder_exists"
                                 }));
                             }
                             ui.horizontal(|ui| {
