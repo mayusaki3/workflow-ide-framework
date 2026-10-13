@@ -1947,7 +1947,7 @@ impl FrameworkHost {
                         ui.label(parent.display().to_string());
                         if let Some(state) = self.project_ui.folder_dialog.as_mut() {
                             ui.text_edit_singleline(&mut state.new_folder_name);
-                            let name = state.new_folder_name.trim();
+                            let name = state.new_folder_name.as_str();
                             let invalid_char = name == "." || name == ".."
                                 || name.ends_with('.') || name.ends_with(' ')
                                 || name.chars().any(|c| c == char::from(92)
