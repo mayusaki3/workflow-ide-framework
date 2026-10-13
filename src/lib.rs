@@ -969,7 +969,7 @@ fn show_project_folder_tree(
     };
     if kind != ProjectFolderKind::Folder {
         let response = ui.selectable_label(path == selected, format!("{name}{suffix}"));
-        project_tree_context_menu(&response, path, false, create_parent, delete_target);
+        project_tree_context_menu(&response, path, false, false, create_parent, delete_target);
         if reveal_selection && path == selected {
             response.scroll_to_me(Some(egui::Align::Center));
         }
@@ -1003,7 +1003,7 @@ fn show_project_folder_tree(
             }
         });
     let header = response.header_response;
-    project_tree_context_menu(&header, path, true, create_parent, delete_target);
+    project_tree_context_menu(&header, path, true, true, create_parent, delete_target);
     if reveal_selection && path == selected {
         header.scroll_to_me(Some(egui::Align::Center));
     }
@@ -1016,12 +1016,13 @@ fn project_tree_context_menu(
     response: &egui::Response,
     path: &std::path::Path,
     is_folder: bool,
+    allow_create: bool,
     create_parent: &mut Option<std::path::PathBuf>,
     delete_target: &mut Option<std::path::PathBuf>,
 ) {
     response.context_menu(|ui| {
         let parent = if is_folder { path } else { path.parent().unwrap_or(path) };
-        if ui.button(localization::text("project.folder.create_folder")).clicked() {
+        if allow_create && ui.button(localization::text("project.folder.create_folder")).clicked() {
             if create_parent.is_none() {
                 *create_parent = Some(parent.to_path_buf());
             }
@@ -1857,7 +1858,7 @@ impl FrameworkHost {
                                         enabled,
                                         egui::SelectableLabel::new(selected, label),
                                     );
-                                    project_tree_context_menu(&response, &path, kind == ProjectFolderKind::Folder, &mut context_create_parent, &mut context_delete_target);
+                                    project_tree_context_menu(&response, &path, kind == ProjectFolderKind::Folder, kind == ProjectFolderKind::Folder, &mut context_create_parent, &mut context_delete_target);
                                     if response.clicked() {
                                         if let Some(state) = self.project_ui.folder_dialog.as_mut() {
                                             state.selected_entry = Some(path.clone());
@@ -1878,7 +1879,7 @@ impl FrameworkHost {
                                     egui::Sense::click(),
                                 );
                                 background.context_menu(|ui| {
-                                    if ui.button(localization::text("project.folder.create_folder")).clicked() {
+                                    if project_folder_kind(&directory, &application_id) == ProjectFolderKind::Folder && ui.button(localization::text("project.folder.create_folder")).clicked() {
                                         context_create_parent = Some(directory.clone());
                                         ui.close();
                                     }
