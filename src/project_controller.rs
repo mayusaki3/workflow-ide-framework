@@ -238,6 +238,18 @@ impl ProjectController {
         ProjectCommandResult::Completed
     }
 
+    /// Shared unsaved-change notification for framework and application edits.
+    /// Repeated notifications are harmless. Without an open project this is a no-op.
+    pub fn mark_unsaved(&mut self) {
+        if let Some(session) = self.session.as_mut() {
+            session.mark_application_dirty();
+        }
+    }
+
+    pub fn has_unsaved_changes(&self) -> bool {
+        self.session.as_ref().is_some_and(|session| session.dirty.is_dirty())
+    }
+
     pub fn is_open(&self) -> bool {
         self.session.is_some()
     }
@@ -300,5 +312,28 @@ impl ProjectController {
                 data_version: None,
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod unsaved_notification_tests {
+    use super::ProjectController;
+    use crate::project_lifecycle::ProjectSession;
+
+    #[test]
+    fn notification_without_open_project_is_noop() {
+        let mut controller = ProjectController::new("sample", "Sample");
+        controller.mark_unsaved();
+        assert!(!controller.has_unsaved_changes());
+    }
+
+    #[test]
+    fn notification_is_idempotent() {
+        let mut controller = ProjectController::new("sample", "Sample");
+        controller.session = Some(ProjectSession::default());
+        assert!(!controller.has_unsaved_changes());
+        controller.mark_unsaved();
+        controller.mark_unsaved();
+        assert!(controller.has_unsaved_changes());
     }
 }
