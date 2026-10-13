@@ -1657,6 +1657,28 @@ impl FrameworkHost {
                     self.consumer_menu_items(ui, command::MenuLocation::File, None);
                 });
 
+                let custom_menus = self
+                    .menu_items
+                    .iter()
+                    .filter(|item| item.location == command::MenuLocation::Custom)
+                    .map(|item| (item.menu_id.clone(), item.menu_label.clone()))
+                    .fold(Vec::<(String, String)>::new(), |mut acc, item| {
+                        if !acc.iter().any(|x| x.0 == item.0) {
+                            acc.push(item);
+                        }
+                        acc
+                    });
+                for (menu_id, menu_label) in custom_menus {
+                    let access_key = menu_id == "data" && ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::D));
+                    let response = ui.add(egui::Button::new(menu_label));
+                    if access_key {
+                        egui::Popup::open_id(ui.ctx(), response.id.with("popup"));
+                    }
+                    egui::Popup::menu(&response).show(|ui| {
+                        self.consumer_menu_items(ui, command::MenuLocation::Custom, Some(&menu_id))
+                    });
+                }
+
                 let workspace_access_key =
                     ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::W));
                 let workspace_response = ui.add(egui::Button::new(localization::text("workspace.menu")));
@@ -1712,23 +1734,7 @@ impl FrameworkHost {
                     self.consumer_menu_items(ui, command::MenuLocation::Help, None);
                 });
 
-                let custom_menus = self
-                    .menu_items
-                    .iter()
-                    .filter(|item| item.location == command::MenuLocation::Custom)
-                    .map(|item| (item.menu_id.clone(), item.menu_label.clone()))
-                    .fold(Vec::<(String, String)>::new(), |mut acc, item| {
-                        if !acc.iter().any(|x| x.0 == item.0) {
-                            acc.push(item);
-                        }
-                        acc
-                    });
-                for (menu_id, menu_label) in custom_menus {
-                    let response = ui.add(egui::Button::new(menu_label));
-                    egui::Popup::menu(&response).show(|ui| {
-                        self.consumer_menu_items(ui, command::MenuLocation::Custom, Some(&menu_id))
-                    });
-                }
+
             });
         });
     }
