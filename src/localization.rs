@@ -41,7 +41,14 @@ struct LocalizationState {
 static STATE: OnceLock<RwLock<LocalizationState>> = OnceLock::new();
 
 pub fn init(config: &LocalizationConfig) {
-    let mut resources = load_resources(&config.resource_directory);
+    // Built-in framework translations are available independently of the consumer working directory.
+    let mut resources = HashMap::new();
+    for source in [include_str!("../resources/locales/en-US.toml"), include_str!("../resources/locales/ja-JP.toml")] {
+        if let Ok(resource) = toml::from_str::<LocaleResource>(source) {
+            resources.insert(resource.locale.clone(), resource);
+        }
+    }
+    merge_resources(&mut resources, load_resources(&config.resource_directory));
     for directory in &config.application_resource_directories {
         merge_resources(&mut resources, load_resources(directory));
     }
