@@ -36,6 +36,13 @@ impl CommandDefinition {
         self.enabled = enabled;
         self
     }
+
+    /// Use a localization key as the command label.
+    /// The host resolves it on every menu render, so locale changes need no callback.
+    pub fn label_key(mut self, key: impl Into<String>) -> Self {
+        self.label = key.into();
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,6 +129,15 @@ impl MenuItemDefinition {
             command_id: command_id.into(),
         }
     }
+    /// Register a custom menu using a localization key for its title.
+    pub fn custom_key(
+        menu_id: impl Into<String>,
+        menu_label_key: impl Into<String>,
+        command_id: impl Into<String>,
+    ) -> Self {
+        Self::custom(menu_id, menu_label_key, command_id)
+    }
+
     pub fn custom(
         menu_id: impl Into<String>,
         menu_label: impl Into<String>,
