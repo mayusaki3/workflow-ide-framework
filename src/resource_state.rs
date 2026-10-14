@@ -32,8 +32,9 @@ impl ResourceRoots {
 
     pub fn state(&self, reference: &ResourceReference) -> ResourceState {
         if let Some(status) = self.root_status(reference.scope)
-            && status != ResourceRootStatus::Available {
-                return ResourceState::RootUnavailable;
+            && status != ResourceRootStatus::Available
+        {
+            return ResourceState::RootUnavailable;
         }
         let resolved = self.resolve(reference);
         match fs::metadata(resolved) {

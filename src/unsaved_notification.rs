@@ -1,6 +1,9 @@
 //! Shared change notification handle for framework and consumer-owned editors.
 //! The caller decides whether an edit changes project-persisted data.
-use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct UnsavedNotification {

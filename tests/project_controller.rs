@@ -149,7 +149,10 @@ fn project_properties_update_framework_metadata_and_mark_dirty() {
 fn project_workspace_layout_capture_and_restore_round_trip() {
     use std::collections::BTreeMap;
     use workflow_ide_framework::{
-        workspace::{PanelInstanceId, WorkspaceRegistry, FloatingGeometry, DEFAULT_WORKSPACE_ID, DEFAULT_CONTAINER_ID},
+        workspace::{
+            DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID, FloatingGeometry, PanelInstanceId,
+            WorkspaceRegistry,
+        },
         workspace_dock::{project_workspace, snapshot_workspace_layout},
     };
     let mut source = WorkspaceRegistry::new();
@@ -157,17 +160,31 @@ fn project_workspace_layout_capture_and_restore_round_trip() {
     for id in ["a", "b", "c"] {
         let panel = PanelInstanceId::new("editor", id);
         source.register_panel(panel.clone());
-        source.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+        source
+            .place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID)
+            .unwrap();
     }
-    source.float_panel(DEFAULT_WORKSPACE_ID, &PanelInstanceId::new("editor", "b"),
-        FloatingGeometry { position: [10.0, 20.0], size: [300.0, 200.0] }).unwrap();
-    source.hide_panel(DEFAULT_WORKSPACE_ID, &PanelInstanceId::new("editor", "c")).unwrap();
+    source
+        .float_panel(
+            DEFAULT_WORKSPACE_ID,
+            &PanelInstanceId::new("editor", "b"),
+            FloatingGeometry {
+                position: [10.0, 20.0],
+                size: [300.0, 200.0],
+            },
+        )
+        .unwrap();
+    source
+        .hide_panel(DEFAULT_WORKSPACE_ID, &PanelInstanceId::new("editor", "c"))
+        .unwrap();
     let mut projections = BTreeMap::new();
     for ws in source.iter() {
         projections.insert(ws.id.clone(), project_workspace(ws).unwrap());
     }
     let mut controller = ProjectController::new("org.test", "Test");
-    controller.capture_workspace_layouts(&source, &projections).unwrap();
+    controller
+        .capture_workspace_layouts(&source, &projections)
+        .unwrap();
     assert_eq!(controller.framework_settings.workspace_layouts.len(), 2);
     let saved = controller.framework_settings.workspace_layouts.clone();
     let mut fresh = WorkspaceRegistry::new();
@@ -175,10 +192,15 @@ fn project_workspace_layout_capture_and_restore_round_trip() {
     for id in ["a", "b", "c"] {
         fresh.register_panel(PanelInstanceId::new("editor", id));
     }
-    let restored = controller.restore_project_workspace_layouts(&mut fresh).unwrap();
+    let restored = controller
+        .restore_project_workspace_layouts(&mut fresh)
+        .unwrap();
     assert_eq!(restored.len(), 2);
     for (id, projection) in &restored {
-        assert_eq!(snapshot_workspace_layout(fresh.get(id).unwrap(), projection).unwrap(), saved[id]);
+        assert_eq!(
+            snapshot_workspace_layout(fresh.get(id).unwrap(), projection).unwrap(),
+            saved[id]
+        );
     }
 }
 
@@ -186,53 +208,80 @@ fn project_workspace_layout_capture_and_restore_round_trip() {
 fn project_workspace_layout_restore_is_atomic_across_workspaces() {
     use std::collections::BTreeMap;
     use workflow_ide_framework::{
-        workspace::{PanelInstanceId, WorkspaceRegistry, DEFAULT_WORKSPACE_ID, DEFAULT_CONTAINER_ID},
+        workspace::{
+            DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID, PanelInstanceId, WorkspaceRegistry,
+        },
         workspace_dock::{project_workspace, snapshot_workspace_layout},
     };
     let mut source = WorkspaceRegistry::new();
     source.register("custom", "Custom").unwrap();
     let panel = PanelInstanceId::new("editor", "a");
     source.register_panel(panel.clone());
-    source.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+    source
+        .place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID)
+        .unwrap();
     let mut projections = BTreeMap::new();
     for ws in source.iter() {
         projections.insert(ws.id.clone(), project_workspace(ws).unwrap());
     }
     let mut controller = ProjectController::new("org.test", "Test");
-    controller.capture_workspace_layouts(&source, &projections).unwrap();
-    controller.framework_settings.workspace_layouts.get_mut("custom").unwrap()
-        .containers[0].id = "invalid.container".into();
+    controller
+        .capture_workspace_layouts(&source, &projections)
+        .unwrap();
+    controller
+        .framework_settings
+        .workspace_layouts
+        .get_mut("custom")
+        .unwrap()
+        .containers[0]
+        .id = "invalid.container".into();
     let mut fresh = WorkspaceRegistry::new();
     fresh.register("custom", "Custom").unwrap();
     fresh.register_panel(panel);
-    let before: BTreeMap<_, _> = fresh.iter().map(|ws| {
-        (ws.id.clone(), snapshot_workspace_layout(ws, &project_workspace(ws).unwrap()).unwrap())
-    }).collect();
-    assert!(controller.restore_project_workspace_layouts(&mut fresh).is_err());
+    let before: BTreeMap<_, _> = fresh
+        .iter()
+        .map(|ws| {
+            (
+                ws.id.clone(),
+                snapshot_workspace_layout(ws, &project_workspace(ws).unwrap()).unwrap(),
+            )
+        })
+        .collect();
+    assert!(
+        controller
+            .restore_project_workspace_layouts(&mut fresh)
+            .is_err()
+    );
     for ws in fresh.iter() {
-        assert_eq!(snapshot_workspace_layout(ws, &project_workspace(ws).unwrap()).unwrap(), before[&ws.id]);
+        assert_eq!(
+            snapshot_workspace_layout(ws, &project_workspace(ws).unwrap()).unwrap(),
+            before[&ws.id]
+        );
     }
 }
 
 #[test]
 fn legacy_project_without_workspace_layouts_keeps_defaults() {
-    use workflow_ide_framework::workspace::{WorkspaceRegistry, DEFAULT_WORKSPACE_ID};
+    use workflow_ide_framework::workspace::{DEFAULT_WORKSPACE_ID, WorkspaceRegistry};
     let controller = ProjectController::new("org.test", "Test");
     let mut registry = WorkspaceRegistry::new();
-    let restored = controller.restore_project_workspace_layouts(&mut registry).unwrap();
+    let restored = controller
+        .restore_project_workspace_layouts(&mut registry)
+        .unwrap();
     assert!(restored.is_empty());
     assert!(registry.get(DEFAULT_WORKSPACE_ID).is_some());
 }
 
 #[test]
 fn independent_workspace_splits_and_active_tabs_survive_switch_and_project_restore() {
-    use std::collections::BTreeMap;
     use egui_dock::{Node, NodeIndex, TabIndex};
+    use std::collections::BTreeMap;
     use workflow_ide_framework::{
-        workspace::{PanelInstanceId, WorkspaceRegistry, DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID},
+        workspace::{
+            DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID, PanelInstanceId, WorkspaceRegistry,
+        },
         workspace_dock::{
-            project_workspace, snapshot_workspace_layout, switch_workspace_projection,
-            DockPanelKey,
+            DockPanelKey, project_workspace, snapshot_workspace_layout, switch_workspace_projection,
         },
     };
 
@@ -242,7 +291,9 @@ fn independent_workspace_splits_and_active_tabs_survive_switch_and_project_resto
         let panel = PanelInstanceId::new("editor", id);
         registry.register_panel(panel.clone());
         for workspace_id in [DEFAULT_WORKSPACE_ID, "second"] {
-            registry.place_panel(workspace_id, &panel, DEFAULT_CONTAINER_ID).unwrap();
+            registry
+                .place_panel(workspace_id, &panel, DEFAULT_CONTAINER_ID)
+                .unwrap();
         }
     }
 
@@ -253,14 +304,22 @@ fn independent_workspace_splits_and_active_tabs_survive_switch_and_project_resto
 
     // Workspace A: a | (b,c), with c selected.
     {
-        let dock = live.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        let dock = live
+            .normal
+            .get_mut(DEFAULT_CONTAINER_ID)
+            .unwrap()
+            .as_mut()
+            .unwrap();
         for node in dock.main_surface_mut().iter_mut() {
             if let Node::Leaf(leaf) = node {
                 leaf.tabs.retain(|tab| tab.instance_id == "a");
             }
         }
-        dock.main_surface_mut().split_right(NodeIndex::root(), 0.4, vec![key("b"), key("c")]);
-        dock.main_surface_mut().set_active_tab(NodeIndex(2), TabIndex(1)).unwrap();
+        dock.main_surface_mut()
+            .split_right(NodeIndex::root(), 0.4, vec![key("b"), key("c")]);
+        dock.main_surface_mut()
+            .set_active_tab(NodeIndex(2), TabIndex(1))
+            .unwrap();
     }
     let expected_a = snapshot_workspace_layout(registry.get(&active).unwrap(), &live).unwrap();
 
@@ -269,39 +328,61 @@ fn independent_workspace_splits_and_active_tabs_survive_switch_and_project_resto
 
     // Workspace B: (a,b) / c, with b selected.
     {
-        let dock = live.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        let dock = live
+            .normal
+            .get_mut(DEFAULT_CONTAINER_ID)
+            .unwrap()
+            .as_mut()
+            .unwrap();
         for node in dock.main_surface_mut().iter_mut() {
             if let Node::Leaf(leaf) = node {
                 leaf.tabs.retain(|tab| tab.instance_id != "c");
             }
         }
-        dock.main_surface_mut().split_below(NodeIndex::root(), 0.65, vec![key("c")]);
-        dock.main_surface_mut().set_active_tab(NodeIndex(1), TabIndex(1)).unwrap();
+        dock.main_surface_mut()
+            .split_below(NodeIndex::root(), 0.65, vec![key("c")]);
+        dock.main_surface_mut()
+            .set_active_tab(NodeIndex(1), TabIndex(1))
+            .unwrap();
     }
     let expected_b = snapshot_workspace_layout(registry.get(&active).unwrap(), &live).unwrap();
     assert_ne!(expected_a, expected_b);
 
     registry.select(DEFAULT_WORKSPACE_ID).unwrap();
     switch_workspace_projection(&registry, &mut active, &mut live, &mut cached).unwrap();
-    assert_eq!(snapshot_workspace_layout(registry.get(&active).unwrap(), &live).unwrap(), expected_a);
+    assert_eq!(
+        snapshot_workspace_layout(registry.get(&active).unwrap(), &live).unwrap(),
+        expected_a
+    );
     registry.select("second").unwrap();
     switch_workspace_projection(&registry, &mut active, &mut live, &mut cached).unwrap();
-    assert_eq!(snapshot_workspace_layout(registry.get(&active).unwrap(), &live).unwrap(), expected_b);
+    assert_eq!(
+        snapshot_workspace_layout(registry.get(&active).unwrap(), &live).unwrap(),
+        expected_b
+    );
 
     // Capture the active projection and the independent cached projection.
     let mut projections = cached;
     projections.insert(active.clone(), live);
     let mut controller = ProjectController::new("org.test", "Test");
-    controller.capture_workspace_layouts(&registry, &projections).unwrap();
+    controller
+        .capture_workspace_layouts(&registry, &projections)
+        .unwrap();
 
     let mut fresh = WorkspaceRegistry::new();
     fresh.register("second", "Second").unwrap();
     for id in ["a", "b", "c"] {
         fresh.register_panel(PanelInstanceId::new("editor", id));
     }
-    let restored = controller.restore_project_workspace_layouts(&mut fresh).unwrap();
+    let restored = controller
+        .restore_project_workspace_layouts(&mut fresh)
+        .unwrap();
     assert_eq!(
-        snapshot_workspace_layout(fresh.get(DEFAULT_WORKSPACE_ID).unwrap(), &restored[DEFAULT_WORKSPACE_ID]).unwrap(),
+        snapshot_workspace_layout(
+            fresh.get(DEFAULT_WORKSPACE_ID).unwrap(),
+            &restored[DEFAULT_WORKSPACE_ID]
+        )
+        .unwrap(),
         expected_a
     );
     assert_eq!(
@@ -314,22 +395,30 @@ fn independent_workspace_splits_and_active_tabs_survive_switch_and_project_resto
 fn ui_created_workspace_is_recreated_before_project_layout_restore() {
     use std::collections::BTreeMap;
     use workflow_ide_framework::{
-        workspace::{WorkspaceRegistry, DEFAULT_WORKSPACE_ID},
+        workspace::{DEFAULT_WORKSPACE_ID, WorkspaceRegistry},
         workspace_dock::project_workspace,
     };
     let mut source = WorkspaceRegistry::new();
     source.register("user.workspace.1", "Workspace 1").unwrap();
-    let projections: BTreeMap<_, _> = source.iter()
+    let projections: BTreeMap<_, _> = source
+        .iter()
         .map(|ws| (ws.id.clone(), project_workspace(ws).unwrap()))
         .collect();
     let mut controller = ProjectController::new("org.test", "Test");
-    controller.capture_workspace_layouts(&source, &projections).unwrap();
+    controller
+        .capture_workspace_layouts(&source, &projections)
+        .unwrap();
 
     let mut reopened = WorkspaceRegistry::new();
     assert!(reopened.get("user.workspace.1").is_none());
-    let restored = controller.restore_project_workspace_layouts(&mut reopened).unwrap();
+    let restored = controller
+        .restore_project_workspace_layouts(&mut reopened)
+        .unwrap();
     assert!(reopened.get(DEFAULT_WORKSPACE_ID).is_some());
-    assert_eq!(reopened.get("user.workspace.1").unwrap().name, "Workspace 1");
+    assert_eq!(
+        reopened.get("user.workspace.1").unwrap().name,
+        "Workspace 1"
+    );
     assert!(restored.contains_key("user.workspace.1"));
     reopened.select("user.workspace.1").unwrap();
 }
@@ -337,54 +426,74 @@ fn ui_created_workspace_is_recreated_before_project_layout_restore() {
 #[test]
 fn invalid_ui_workspace_layout_does_not_leave_a_partially_created_workspace() {
     use std::collections::BTreeMap;
-    use workflow_ide_framework::{
-        workspace::WorkspaceRegistry,
-        workspace_dock::project_workspace,
-    };
+    use workflow_ide_framework::{workspace::WorkspaceRegistry, workspace_dock::project_workspace};
     let mut source = WorkspaceRegistry::new();
     source.register("user.workspace.1", "Workspace 1").unwrap();
-    let projections: BTreeMap<_, _> = source.iter()
+    let projections: BTreeMap<_, _> = source
+        .iter()
         .map(|ws| (ws.id.clone(), project_workspace(ws).unwrap()))
         .collect();
     let mut controller = ProjectController::new("org.test", "Test");
-    controller.capture_workspace_layouts(&source, &projections).unwrap();
-    controller.framework_settings.workspace_layouts.get_mut("user.workspace.1").unwrap()
-        .containers[0].id = "invalid.container".into();
+    controller
+        .capture_workspace_layouts(&source, &projections)
+        .unwrap();
+    controller
+        .framework_settings
+        .workspace_layouts
+        .get_mut("user.workspace.1")
+        .unwrap()
+        .containers[0]
+        .id = "invalid.container".into();
 
     let mut reopened = WorkspaceRegistry::new();
-    assert!(controller.restore_project_workspace_layouts(&mut reopened).is_err());
+    assert!(
+        controller
+            .restore_project_workspace_layouts(&mut reopened)
+            .is_err()
+    );
     assert!(reopened.get("user.workspace.1").is_none());
 }
 
 #[test]
 fn selected_workspace_is_persisted_and_restored_with_project_layouts() {
     use std::collections::BTreeMap;
-    use workflow_ide_framework::{
-        workspace::WorkspaceRegistry,
-        workspace_dock::project_workspace,
-    };
+    use workflow_ide_framework::{workspace::WorkspaceRegistry, workspace_dock::project_workspace};
     let mut source = WorkspaceRegistry::new();
     source.register("user.workspace.1", "Workspace 1").unwrap();
     source.select("user.workspace.1").unwrap();
-    let projections: BTreeMap<_, _> = source.iter()
+    let projections: BTreeMap<_, _> = source
+        .iter()
         .map(|ws| (ws.id.clone(), project_workspace(ws).unwrap()))
         .collect();
     let mut controller = ProjectController::new("org.test", "Test");
-    controller.capture_workspace_layouts(&source, &projections).unwrap();
-    assert_eq!(controller.framework_settings.selected_workspace_id.as_deref(), Some("user.workspace.1"));
+    controller
+        .capture_workspace_layouts(&source, &projections)
+        .unwrap();
+    assert_eq!(
+        controller
+            .framework_settings
+            .selected_workspace_id
+            .as_deref(),
+        Some("user.workspace.1")
+    );
     let toml = controller.framework_settings.to_toml().unwrap();
-    controller.framework_settings = workflow_ide_framework::framework_settings::FrameworkSettings::from_toml(&toml).unwrap();
+    controller.framework_settings =
+        workflow_ide_framework::framework_settings::FrameworkSettings::from_toml(&toml).unwrap();
     let mut reopened = WorkspaceRegistry::new();
-    controller.restore_project_workspace_layouts(&mut reopened).unwrap();
+    controller
+        .restore_project_workspace_layouts(&mut reopened)
+        .unwrap();
     assert_eq!(reopened.selected_id(), "user.workspace.1");
 }
 
 #[test]
 fn missing_saved_selected_workspace_falls_back_to_default() {
-    use workflow_ide_framework::workspace::{WorkspaceRegistry, DEFAULT_WORKSPACE_ID};
+    use workflow_ide_framework::workspace::{DEFAULT_WORKSPACE_ID, WorkspaceRegistry};
     let mut controller = ProjectController::new("org.test", "Test");
     controller.framework_settings.selected_workspace_id = Some("missing.workspace".into());
     let mut reopened = WorkspaceRegistry::new();
-    controller.restore_project_workspace_layouts(&mut reopened).unwrap();
+    controller
+        .restore_project_workspace_layouts(&mut reopened)
+        .unwrap();
     assert_eq!(reopened.selected_id(), DEFAULT_WORKSPACE_ID);
 }

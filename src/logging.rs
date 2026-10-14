@@ -220,8 +220,9 @@ pub fn set_level(level: LogLevel) -> Result<(), &'static str> {
         .reload(level.filter())
         .map_err(|_| "failed to reload WFIDE log level")?;
     if let Some(current) = CURRENT_LEVEL.get()
-        && let Ok(mut current) = current.lock() {
-            *current = level;
+        && let Ok(mut current) = current.lock()
+    {
+        *current = level;
     }
 
     Ok(())

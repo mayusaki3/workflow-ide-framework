@@ -1,8 +1,5 @@
-use std::collections::BTreeMap;
 use crate::{
     framework_settings::FrameworkSettings,
-    workspace::{WorkspaceRegistry, WorkspaceError},
-    workspace_dock::{WorkspaceDockProjection, snapshot_workspace_layout, restore_workspace_layout},
     project::{
         ApplicationMetadata, PROJECT_FORMAT_VERSION, ProjectContext, ProjectFile, ProjectMetadata,
     },
@@ -15,7 +12,12 @@ use crate::{
     project_resource::NewProjectStoragePolicy,
     project_save::save_project,
     project_save_as::save_project_as,
+    workspace::{WorkspaceError, WorkspaceRegistry},
+    workspace_dock::{
+        WorkspaceDockProjection, restore_workspace_layout, snapshot_workspace_layout,
+    },
 };
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProjectCommandResult {
@@ -61,8 +63,9 @@ impl ProjectController {
             Err(_) => return ProjectCommandResult::NeedsSaveLocation,
         };
         if let Some(context) = session.context()
-            && let Err(error) = application.initialize_project(context) {
-                return ProjectCommandResult::Failed(error);
+            && let Err(error) = application.initialize_project(context)
+        {
+            return ProjectCommandResult::Failed(error);
         }
         self.project_file = Some(self.project_template(name, language, description));
         self.framework_settings = FrameworkSettings::default();
@@ -112,7 +115,8 @@ impl ProjectController {
     ) -> Result<(), WorkspaceError> {
         let mut layouts = BTreeMap::new();
         for workspace in registry.iter() {
-            let projection = projections.get(&workspace.id)
+            let projection = projections
+                .get(&workspace.id)
                 .ok_or(WorkspaceError::InvalidContainerTarget)?;
             layouts.insert(
                 workspace.id.clone(),
@@ -152,8 +156,9 @@ impl ProjectController {
             restored.insert(id.clone(), projection);
         }
         if let Some(id) = self.framework_settings.selected_workspace_id.as_deref()
-            && candidate.get(id).is_some() {
-                candidate.select(id)?;
+            && candidate.get(id).is_some()
+        {
+            candidate.select(id)?;
         }
         *registry = candidate;
         Ok(restored)
@@ -245,7 +250,9 @@ impl ProjectController {
     }
 
     pub fn has_unsaved_changes(&self) -> bool {
-        self.session.as_ref().is_some_and(|session| session.dirty.is_dirty())
+        self.session
+            .as_ref()
+            .is_some_and(|session| session.dirty.is_dirty())
     }
 
     pub fn is_open(&self) -> bool {

@@ -1,6 +1,5 @@
 use eframe::egui;
 pub mod application_event;
-pub mod unsaved_notification;
 pub mod command;
 pub mod controller_panel;
 pub mod file_resource_selector;
@@ -14,7 +13,6 @@ pub mod log_viewer;
 pub mod logging;
 pub mod probe;
 pub mod project;
-pub mod recent_projects;
 pub mod project_adapter;
 pub mod project_adapter_erased;
 pub mod project_controller;
@@ -27,6 +25,7 @@ pub mod project_resource;
 pub mod project_save;
 pub mod project_save_as;
 pub mod property_panel;
+pub mod recent_projects;
 pub mod resource_journal;
 pub mod resource_operation;
 pub mod resource_registry;
@@ -37,6 +36,7 @@ pub mod table;
 pub mod text_editor;
 pub mod theme;
 pub mod tree_viewer;
+pub mod unsaved_notification;
 pub mod workspace;
 pub mod workspace_dock;
 pub use layout::{LayoutConfig, LayoutSplit, SplitDirection};
@@ -134,12 +134,18 @@ mod project_title_tests {
 
     #[test]
     fn dirty_project_has_unsaved_marker() {
-        assert_eq!(project_window_title("App", "Project", true), "App - Project *");
+        assert_eq!(
+            project_window_title("App", "Project", true),
+            "App - Project *"
+        );
     }
 
     #[test]
     fn saved_project_has_no_unsaved_marker() {
-        assert_eq!(project_window_title("App", "Project", false), "App - Project");
+        assert_eq!(
+            project_window_title("App", "Project", false),
+            "App - Project"
+        );
     }
 }
 
@@ -719,9 +725,12 @@ impl Application {
                     )
                 });
 
-                let recent_projects = recent_projects::settings_path(&config.id, config.user_config_directory_name.as_deref())
-                    .map(|path| recent_projects::RecentProjects::load(&path))
-                    .unwrap_or_default();
+                let recent_projects = recent_projects::settings_path(
+                    &config.id,
+                    config.user_config_directory_name.as_deref(),
+                )
+                .map(|path| recent_projects::RecentProjects::load(&path))
+                .unwrap_or_default();
                 Ok(Box::new(FrameworkHost {
                     config,
                     unsaved_revision_seen: unsaved_notification.revision(),
@@ -785,7 +794,8 @@ struct FrameworkHost {
     config: ApplicationConfig,
     workspace_registry: workspace::WorkspaceRegistry,
     workspace_docks: workspace_dock::WorkspaceDockProjection,
-    workspace_docks_by_id: std::collections::BTreeMap<String, workspace_dock::WorkspaceDockProjection>,
+    workspace_docks_by_id:
+        std::collections::BTreeMap<String, workspace_dock::WorkspaceDockProjection>,
     active_workspace_dock_id: String,
     text_editors: std::collections::HashMap<String, text_editor::TextDocument>,
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
@@ -939,7 +949,11 @@ fn project_browser_roots() -> Vec<std::path::PathBuf> {
     {
         (b'A'..=b'Z')
             .filter_map(|letter| {
-                let path = std::path::PathBuf::from(format!("{}:{}", letter as char, std::path::MAIN_SEPARATOR));
+                let path = std::path::PathBuf::from(format!(
+                    "{}:{}",
+                    letter as char,
+                    std::path::MAIN_SEPARATOR
+                ));
                 path.is_dir().then_some(path)
             })
             .collect()
@@ -996,7 +1010,9 @@ fn show_project_folder_tree(
     let should_open = selected.starts_with(path);
     let heading = egui::RichText::new(format!("{name}{suffix}"));
     let heading = if path == selected {
-        heading.strong().background_color(ui.visuals().selection.bg_fill)
+        heading
+            .strong()
+            .background_color(ui.visuals().selection.bg_fill)
     } else {
         heading
     };
@@ -1008,8 +1024,15 @@ fn show_project_folder_tree(
         .show(ui, |ui| {
             for child in project_browser_directories(path) {
                 show_project_folder_tree(
-                    ui, &child, selected, application_id, next, open_project,
-                    reveal_selection, create_parent, delete_target,
+                    ui,
+                    &child,
+                    selected,
+                    application_id,
+                    next,
+                    open_project,
+                    reveal_selection,
+                    create_parent,
+                    delete_target,
                 );
             }
         });
@@ -1032,26 +1055,45 @@ fn project_tree_context_menu(
     delete_target: &mut Option<std::path::PathBuf>,
 ) {
     response.context_menu(|ui| {
-        let parent = if is_folder { path } else { path.parent().unwrap_or(path) };
-        if allow_create && ui.button(localization::text("project.folder.create_folder")).clicked() {
+        let parent = if is_folder {
+            path
+        } else {
+            path.parent().unwrap_or(path)
+        };
+        if allow_create
+            && ui
+                .button(localization::text("project.folder.create_folder"))
+                .clicked()
+        {
             if create_parent.is_none() {
                 *create_parent = Some(parent.to_path_buf());
             }
             ui.close();
         }
-        if is_folder && ui.button(localization::text("project.folder.delete_folder")).clicked() {
+        if is_folder
+            && ui
+                .button(localization::text("project.folder.delete_folder"))
+                .clicked()
+        {
             if delete_target.is_none() {
                 *delete_target = Some(path.to_path_buf());
             }
             ui.close();
         }
-        if ui.button(localization::text("project.folder.show_in_file_manager")).clicked() {
+        if ui
+            .button(localization::text("project.folder.show_in_file_manager"))
+            .clicked()
+        {
             // Project directories are folders too, even when not ordinary folders.
-            let open_path = if path.is_dir() { path } else { path.parent().unwrap_or(path) };
+            let open_path = if path.is_dir() {
+                path
+            } else {
+                path.parent().unwrap_or(path)
+            };
             #[cfg(windows)]
             let result = {
                 let normalized = std::path::PathBuf::from(
-                    open_path.to_string_lossy().replacen(":\\\\", ":\\", 1)
+                    open_path.to_string_lossy().replacen(":\\\\", ":\\", 1),
                 );
                 let argument = normalized.as_os_str();
                 std::process::Command::new("explorer.exe")
@@ -1145,16 +1187,24 @@ impl FrameworkHost {
     fn project_open(&mut self) {
         self.project_ui.folder_dialog = Some(ProjectFolderDialogState {
             mode: ProjectFolderDialogMode::Open,
-            directory: self.project_controller.as_ref()
+            directory: self
+                .project_controller
+                .as_ref()
                 .and_then(|controller| controller.session.as_ref())
                 .and_then(|session| session.context())
                 .map(|context| context.root().to_path_buf())
-                .or_else(|| self.recent_projects.paths.first().filter(|path| path.is_dir()).cloned())
+                .or_else(|| {
+                    self.recent_projects
+                        .paths
+                        .first()
+                        .filter(|path| path.is_dir())
+                        .cloned()
+                })
                 .unwrap_or_else(|| self.initial_project_browser_directory()),
             project_name: String::new(),
             reveal_tree_selection: true,
             selected_entry: None,
-        new_folder_name: String::new(),
+            new_folder_name: String::new(),
             create_folder_parent: None,
             delete_folder_pending: None,
             delete_folder_error: None,
@@ -1162,7 +1212,10 @@ impl FrameworkHost {
     }
 
     fn save_recent_projects(&self) {
-        if let Some(path) = recent_projects::settings_path(&self.config.id, self.config.user_config_directory_name.as_deref()) {
+        if let Some(path) = recent_projects::settings_path(
+            &self.config.id,
+            self.config.user_config_directory_name.as_deref(),
+        ) {
             if let Err(error) = self.recent_projects.save(&path) {
                 tracing::warn!(%error, "Could not save recent projects");
             }
@@ -1248,7 +1301,8 @@ impl FrameworkHost {
                 self.active_workspace_dock_id = selected;
             }
             Err(error) => {
-                self.project_ui.message = Some(format!("Workspace layout restore failed: {error:?}"));
+                self.project_ui.message =
+                    Some(format!("Workspace layout restore failed: {error:?}"));
             }
         }
     }
@@ -1298,7 +1352,7 @@ impl FrameworkHost {
             project_name,
             reveal_tree_selection: true,
             selected_entry: None,
-        new_folder_name: String::new(),
+            new_folder_name: String::new(),
             create_folder_parent: None,
             delete_folder_pending: None,
             delete_folder_error: None,
@@ -1426,12 +1480,16 @@ impl FrameworkHost {
                     ui.allocate_ui_with_layout(
                         egui::vec2(shortcut_width, 22.0),
                         egui::Layout::right_to_left(egui::Align::Center),
-                        |ui| { ui.weak(shortcut); },
+                        |ui| {
+                            ui.weak(shortcut);
+                        },
                     );
                     label_response.clicked()
                 },
-            ).inner
-        }).inner
+            )
+            .inner
+        })
+        .inner
     }
 
     /// Avoid triggering application commands while an editor or IME owns keyboard focus.
@@ -1444,7 +1502,10 @@ impl FrameworkHost {
         let modifiers = shortcut.modifiers;
         (modifiers.ctrl || modifiers.command)
             && !modifiers.alt
-            && matches!(shortcut.logical_key, egui::Key::N | egui::Key::O | egui::Key::S)
+            && matches!(
+                shortcut.logical_key,
+                egui::Key::N | egui::Key::O | egui::Key::S
+            )
     }
 
     fn project_shortcuts(&mut self, ui: &egui::Ui) {
@@ -1503,30 +1564,50 @@ impl FrameworkHost {
     }
 
     fn consumer_menu_items_between(
-        &mut self, ui: &mut egui::Ui, location: command::MenuLocation,
-        menu_id: Option<&str>, previous: Option<&str>, next: Option<&str>,
+        &mut self,
+        ui: &mut egui::Ui,
+        location: command::MenuLocation,
+        menu_id: Option<&str>,
+        previous: Option<&str>,
+        next: Option<&str>,
     ) {
         let framework: &[&str] = match location {
             command::MenuLocation::File => &[
-                "file.new_project", "file.open_project", "file.recent_projects",
-                "file.save", "file.save_as", "file.project_properties",
-                "file.close_project", "file.exit",
+                "file.new_project",
+                "file.open_project",
+                "file.recent_projects",
+                "file.save",
+                "file.save_as",
+                "file.project_properties",
+                "file.close_project",
+                "file.exit",
             ],
             command::MenuLocation::Help => &["help.about"],
             command::MenuLocation::Custom => &[],
         };
-        let items = self.menu_items.iter()
+        let items = self
+            .menu_items
+            .iter()
             .filter(|item| item.location == location && menu_id.is_none_or(|id| item.menu_id == id))
-            .cloned().collect::<Vec<_>>();
+            .cloned()
+            .collect::<Vec<_>>();
         let order = command::resolve_menu_order(framework, &items);
-        let begin = previous.and_then(|id| order.iter().position(|x| x == id))
+        let begin = previous
+            .and_then(|id| order.iter().position(|x| x == id))
             .map_or(0, |i| i + 1);
-        let end = next.and_then(|id| order.iter().position(|x| x == id))
+        let end = next
+            .and_then(|id| order.iter().position(|x| x == id))
             .unwrap_or(order.len());
-        if begin > end { return; }
+        if begin > end {
+            return;
+        }
         for id in &order[begin..end] {
-            let Some(item) = items.iter().find(|item| &item.command_id == id) else { continue; };
-            let Some(command) = self.commands.get(&item.command_id) else { continue; };
+            let Some(item) = items.iter().find(|item| &item.command_id == id) else {
+                continue;
+            };
+            let Some(command) = self.commands.get(&item.command_id) else {
+                continue;
+            };
             let label = localization::text(&command.label);
             let shortcut = command.shortcut.clone().unwrap_or_default();
             let enabled = command.enabled;
@@ -1595,9 +1676,16 @@ impl FrameworkHost {
         // Consumer shortcuts are handled after the framework's reserved shortcuts.
         // Do not steal keys from active text widgets or IME composition.
         if !Self::shortcuts_blocked(ui.ctx()) {
-            let shortcuts: Vec<_> = self.commands.iter()
+            let shortcuts: Vec<_> = self
+                .commands
+                .iter()
                 .filter(|command| command.enabled)
-                .filter_map(|command| command.shortcut.as_deref().and_then(command::parse_shortcut))
+                .filter_map(|command| {
+                    command
+                        .shortcut
+                        .as_deref()
+                        .and_then(command::parse_shortcut)
+                })
                 .filter(|shortcut| !Self::is_reserved_project_shortcut(shortcut))
                 .collect();
             for shortcut in shortcuts {
@@ -1822,22 +1910,45 @@ impl FrameworkHost {
         });
     }
 
-    fn render_custom_menus_at(&mut self, ui: &mut egui::Ui, order: &[String], previous: Option<&str>, next: Option<&str>) {
-        let begin = previous.and_then(|id| order.iter().position(|x| x == id)).map_or(0, |i| i + 1);
-        let end = next.and_then(|id| order.iter().position(|x| x == id)).unwrap_or(order.len());
-        if begin > end { return; }
+    fn render_custom_menus_at(
+        &mut self,
+        ui: &mut egui::Ui,
+        order: &[String],
+        previous: Option<&str>,
+        next: Option<&str>,
+    ) {
+        let begin = previous
+            .and_then(|id| order.iter().position(|x| x == id))
+            .map_or(0, |i| i + 1);
+        let end = next
+            .and_then(|id| order.iter().position(|x| x == id))
+            .unwrap_or(order.len());
+        if begin > end {
+            return;
+        }
         for id in &order[begin..end] {
-            if matches!(id.as_str(), "menu.file" | "menu.workspace" | "menu.help") { continue; }
-            let Some(item) = self.menu_items.iter().find(|item| item.location == command::MenuLocation::Custom && item.menu_id == *id) else { continue; };
+            if matches!(id.as_str(), "menu.file" | "menu.workspace" | "menu.help") {
+                continue;
+            }
+            let Some(item) = self
+                .menu_items
+                .iter()
+                .find(|item| item.location == command::MenuLocation::Custom && item.menu_id == *id)
+            else {
+                continue;
+            };
             let menu_id = item.menu_id.clone();
             let menu_label = item.menu_label.clone();
-            let access_key_pressed = item.access_key
+            let access_key_pressed = item
+                .access_key
                 .and_then(|letter| egui::Key::from_name(&letter.to_string()))
                 .is_some_and(|key| {
-                    ui.input(|input| input.modifiers.alt
-                        && !input.modifiers.ctrl
-                        && !input.modifiers.shift
-                        && input.key_pressed(key))
+                    ui.input(|input| {
+                        input.modifiers.alt
+                            && !input.modifiers.ctrl
+                            && !input.modifiers.shift
+                            && input.key_pressed(key)
+                    })
                 });
             let mut display_label = localization::text(&menu_label).to_string();
             if let Some(key) = item.access_key {
@@ -1848,7 +1959,13 @@ impl FrameworkHost {
                 egui::Popup::open_id(ui.ctx(), response.id.with("popup"));
             }
             egui::Popup::menu(&response).show(|ui| {
-                self.consumer_menu_items_between(ui, command::MenuLocation::Custom, Some(&menu_id), None, None);
+                self.consumer_menu_items_between(
+                    ui,
+                    command::MenuLocation::Custom,
+                    Some(&menu_id),
+                    None,
+                    None,
+                );
             });
         }
     }
@@ -1890,7 +2007,7 @@ impl FrameworkHost {
                         }
                         ui.monospace(directory.display().to_string());
                     });
-                        ui.label(localization::text(if is_save {
+                    ui.label(localization::text(if is_save {
                         "project.folder.save_hint"
                     } else {
                         "project.folder.open_hint"
@@ -1917,13 +2034,17 @@ impl FrameworkHost {
                                     );
                                 }
                             });
-                        let project_details = if !is_save && matches!(
-                            project_folder_kind(&directory, &application_id),
-                            ProjectFolderKind::Project | ProjectFolderKind::OtherApplicationProject(_)
-                        ) {
+                        let project_details = if !is_save
+                            && matches!(
+                                project_folder_kind(&directory, &application_id),
+                                ProjectFolderKind::Project
+                                    | ProjectFolderKind::OtherApplicationProject(_)
+                            ) {
                             std::fs::read_to_string(directory.join("project.toml"))
                                 .ok()
-                                .and_then(|contents| toml::from_str::<project::ProjectFile>(&contents).ok())
+                                .and_then(|contents| {
+                                    toml::from_str::<project::ProjectFile>(&contents).ok()
+                                })
                         } else {
                             None
                         };
@@ -1942,10 +2063,21 @@ impl FrameworkHost {
                                     if let Some(description) = &details.project.description {
                                         ui.label(description);
                                     }
-                                    ui.label(format!("{}: {}", localization::text("project.new_dialog.language"), details.project.language));
-                                    ui.label(format!("{}: {}", localization::text("project.folder.saved_at"), details.project.saved_at));
+                                    ui.label(format!(
+                                        "{}: {}",
+                                        localization::text("project.new_dialog.language"),
+                                        details.project.language
+                                    ));
+                                    ui.label(format!(
+                                        "{}: {}",
+                                        localization::text("project.folder.saved_at"),
+                                        details.project.saved_at
+                                    ));
                                     ui.separator();
-                                    ui.label(format!("{}: {}", details.application.name, details.application.id));
+                                    ui.label(format!(
+                                        "{}: {}",
+                                        details.application.name, details.application.id
+                                    ));
                                     if let Some(description) = &details.application.description {
                                         ui.label(description);
                                     }
@@ -1976,24 +2108,43 @@ impl FrameworkHost {
                                         ),
                                     };
                                     let enabled = !is_save || kind == ProjectFolderKind::Folder;
-                                    let selected = self.project_ui.folder_dialog.as_ref()
+                                    let selected = self
+                                        .project_ui
+                                        .folder_dialog
+                                        .as_ref()
                                         .and_then(|state| state.selected_entry.as_ref())
                                         .is_some_and(|selected| selected == &path);
                                     let response = ui.add_enabled(
                                         enabled,
                                         egui::Button::selectable(selected, label),
                                     );
-                                    project_tree_context_menu(&response, &path, kind == ProjectFolderKind::Folder, kind == ProjectFolderKind::Folder, &mut context_create_parent, &mut context_delete_target);
+                                    project_tree_context_menu(
+                                        &response,
+                                        &path,
+                                        kind == ProjectFolderKind::Folder,
+                                        kind == ProjectFolderKind::Folder,
+                                        &mut context_create_parent,
+                                        &mut context_delete_target,
+                                    );
                                     if response.clicked() {
-                                        if let Some(state) = self.project_ui.folder_dialog.as_mut() {
+                                        if let Some(state) = self.project_ui.folder_dialog.as_mut()
+                                        {
                                             state.selected_entry = Some(path.clone());
                                         }
                                     }
                                     if response.double_clicked() {
                                         match kind {
-                                            ProjectFolderKind::Folder => navigate_to = Some(path.clone()),
-                                            ProjectFolderKind::Project if !is_save => open_project = Some(path.clone()),
-                                            ProjectFolderKind::OtherApplicationProject(_) if !is_save => navigate_to = Some(path.clone()),
+                                            ProjectFolderKind::Folder => {
+                                                navigate_to = Some(path.clone())
+                                            }
+                                            ProjectFolderKind::Project if !is_save => {
+                                                open_project = Some(path.clone())
+                                            }
+                                            ProjectFolderKind::OtherApplicationProject(_)
+                                                if !is_save =>
+                                            {
+                                                navigate_to = Some(path.clone())
+                                            }
                                             _ => {}
                                         }
                                     }
@@ -2001,15 +2152,30 @@ impl FrameworkHost {
                                 // The unused area belongs to the current directory, not to
                                 // the last listed folder. Give it its own context menu.
                                 let background = ui.allocate_response(
-                                    egui::vec2(ui.available_width().max(1.0), ui.available_height().max(1.0)),
+                                    egui::vec2(
+                                        ui.available_width().max(1.0),
+                                        ui.available_height().max(1.0),
+                                    ),
                                     egui::Sense::click(),
                                 );
                                 background.context_menu(|ui| {
-                                    if project_folder_kind(&directory, &application_id) == ProjectFolderKind::Folder
-                                        && self.project_ui.folder_dialog.as_ref()
+                                    if project_folder_kind(&directory, &application_id)
+                                        == ProjectFolderKind::Folder
+                                        && self
+                                            .project_ui
+                                            .folder_dialog
+                                            .as_ref()
                                             .and_then(|state| state.selected_entry.as_ref())
-                                            .is_none_or(|selected| project_folder_kind(selected, &application_id) == ProjectFolderKind::Folder)
-                                        && ui.button(localization::text("project.folder.create_folder")).clicked() {
+                                            .is_none_or(|selected| {
+                                                project_folder_kind(selected, &application_id)
+                                                    == ProjectFolderKind::Folder
+                                            })
+                                        && ui
+                                            .button(localization::text(
+                                                "project.folder.create_folder",
+                                            ))
+                                            .clicked()
+                                    {
                                         context_create_parent = Some(directory.clone());
                                         ui.close();
                                     }
@@ -2026,12 +2192,16 @@ impl FrameworkHost {
                         });
                     }
                     ui.horizontal(|ui| {
-                        if !is_save && ui
-                            .add_enabled(
-                                project_folder_kind(&directory, &application_id) == ProjectFolderKind::Project,
-                                egui::Button::new(localization::text("project.folder.open_selected")),
-                            )
-                            .clicked()
+                        if !is_save
+                            && ui
+                                .add_enabled(
+                                    project_folder_kind(&directory, &application_id)
+                                        == ProjectFolderKind::Project,
+                                    egui::Button::new(localization::text(
+                                        "project.folder.open_selected",
+                                    )),
+                                )
+                                .clicked()
                         {
                             open_project = Some(directory.clone());
                         }
@@ -2068,7 +2238,10 @@ impl FrameworkHost {
                         }
                     });
                 });
-            if let Some(parent) = self.project_ui.folder_dialog.as_ref()
+            if let Some(parent) = self
+                .project_ui
+                .folder_dialog
+                .as_ref()
                 .and_then(|state| state.create_folder_parent.clone())
             {
                 let mut dismiss_create = false;
@@ -2082,10 +2255,18 @@ impl FrameworkHost {
                         if let Some(state) = self.project_ui.folder_dialog.as_mut() {
                             ui.text_edit_singleline(&mut state.new_folder_name);
                             let name = state.new_folder_name.as_str();
-                            let invalid_char = name == "." || name == ".."
-                                || name.starts_with(' ') || name.ends_with('.') || name.ends_with(' ')
-                                || name.chars().any(|c| c == char::from(92)
-                                    || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|'));
+                            let invalid_char = name == "."
+                                || name == ".."
+                                || name.starts_with(' ')
+                                || name.ends_with('.')
+                                || name.ends_with(' ')
+                                || name.chars().any(|c| {
+                                    c == char::from(92)
+                                        || matches!(
+                                            c,
+                                            '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|'
+                                        )
+                                });
                             let exists = parent.join(name).exists();
                             if !name.is_empty() && (invalid_char || exists) {
                                 ui.label(localization::text(if invalid_char {
@@ -2095,8 +2276,15 @@ impl FrameworkHost {
                                 }));
                             }
                             ui.horizontal(|ui| {
-                                if ui.add_enabled(!name.is_empty() && !invalid_char && !exists,
-                                    egui::Button::new(localization::text("project.folder.create_folder"))).clicked() {
+                                if ui
+                                    .add_enabled(
+                                        !name.is_empty() && !invalid_char && !exists,
+                                        egui::Button::new(localization::text(
+                                            "project.folder.create_folder",
+                                        )),
+                                    )
+                                    .clicked()
+                                {
                                     create_folder = Some(parent.join(name));
                                 }
                                 if ui.button(localization::text("common.cancel")).clicked() {
@@ -2112,7 +2300,10 @@ impl FrameworkHost {
                     }
                 }
             }
-            if let Some(path) = self.project_ui.folder_dialog.as_ref()
+            if let Some(path) = self
+                .project_ui
+                .folder_dialog
+                .as_ref()
                 .and_then(|state| state.delete_folder_pending.clone())
             {
                 egui::Window::new(localization::text("project.folder.confirm_delete"))
@@ -2123,13 +2314,24 @@ impl FrameworkHost {
                     .show(ctx, |ui| {
                         ui.label(path.display().to_string());
                         ui.horizontal(|ui| {
-                            if ui.button(localization::text("project.folder.delete_folder")).clicked() {
+                            if ui
+                                .button(localization::text("project.folder.delete_folder"))
+                                .clicked()
+                            {
                                 match std::fs::remove_dir(&path) {
-                                    Ok(()) => navigate_to = path.parent().map(std::path::Path::to_path_buf),
+                                    Ok(()) => {
+                                        navigate_to =
+                                            path.parent().map(std::path::Path::to_path_buf)
+                                    }
                                     Err(error) => {
-                                        if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                                            let reason = if error.kind() == std::io::ErrorKind::DirectoryNotEmpty {
-                                                localization::text("project.folder.delete_not_empty")
+                                        if let Some(state) = self.project_ui.folder_dialog.as_mut()
+                                        {
+                                            let reason = if error.kind()
+                                                == std::io::ErrorKind::DirectoryNotEmpty
+                                            {
+                                                localization::text(
+                                                    "project.folder.delete_not_empty",
+                                                )
                                             } else {
                                                 localization::text("project.folder.delete_failed")
                                             };
@@ -2155,7 +2357,10 @@ impl FrameworkHost {
                         });
                     });
             }
-            if let Some(error) = self.project_ui.folder_dialog.as_ref()
+            if let Some(error) = self
+                .project_ui
+                .folder_dialog
+                .as_ref()
                 .and_then(|state| state.delete_folder_error.clone())
             {
                 egui::Window::new(localization::text("project.folder.delete_error"))

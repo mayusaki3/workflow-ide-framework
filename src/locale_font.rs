@@ -13,13 +13,14 @@ pub fn install_for_locale(
     let mut loaded = Vec::new();
 
     if let Some(path) = application_font
-        && let Err(error) = install_font(&mut fonts, "wfide_application_font", path, true) {
-            tracing::warn!(
-                target: "wfide::font",
-                path = %path.display(),
-                %error,
-                "application font unavailable; continuing with OS fallback"
-            );
+        && let Err(error) = install_font(&mut fonts, "wfide_application_font", path, true)
+    {
+        tracing::warn!(
+            target: "wfide::font",
+            path = %path.display(),
+            %error,
+            "application font unavailable; continuing with OS fallback"
+        );
     }
 
     if let Some(path) = find_os_fallback_font() {
@@ -28,9 +29,10 @@ pub fn install_for_locale(
     }
 
     if let Some(path) = find_locale_font(locale)
-        && !loaded.contains(&path) {
-            install_font(&mut fonts, LOCALE_FONT_NAME, &path, false)?;
-            loaded.push(path);
+        && !loaded.contains(&path)
+    {
+        install_font(&mut fonts, LOCALE_FONT_NAME, &path, false)?;
+        loaded.push(path);
     }
 
     ctx.set_fonts(fonts);

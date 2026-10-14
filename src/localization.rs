@@ -98,8 +98,14 @@ fn select_initial_locale<'a>(
 fn embedded_framework_resources() -> HashMap<String, LocaleResource> {
     let mut resources = HashMap::new();
     for (source, content) in [
-        ("en-US.toml", include_str!("../resources/locales/en-US.toml")),
-        ("ja-JP.toml", include_str!("../resources/locales/ja-JP.toml")),
+        (
+            "en-US.toml",
+            include_str!("../resources/locales/en-US.toml"),
+        ),
+        (
+            "ja-JP.toml",
+            include_str!("../resources/locales/ja-JP.toml"),
+        ),
     ] {
         let resource: LocaleResource = toml::from_str(content)
             .unwrap_or_else(|error| panic!("invalid embedded FW locale {source}: {error}"));
@@ -250,7 +256,7 @@ pub fn text(key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{embedded_framework_resources, select_initial_locale, EN_US, JA_JP};
+    use super::{EN_US, JA_JP, embedded_framework_resources, select_initial_locale};
 
     #[test]
     fn embedded_framework_locales_are_available() {
@@ -258,7 +264,11 @@ mod tests {
         assert!(resources.contains_key(EN_US));
         assert!(resources.contains_key(JA_JP));
         for locale in [EN_US, JA_JP] {
-            assert!(resources[locale].strings.contains_key("framework.product_name"));
+            assert!(
+                resources[locale]
+                    .strings
+                    .contains_key("framework.product_name")
+            );
         }
     }
 

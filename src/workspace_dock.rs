@@ -53,7 +53,8 @@ pub fn switch_workspace_projection(
         saved
     } else {
         project_workspace(
-            registry.get(selected)
+            registry
+                .get(selected)
                 .ok_or_else(|| WorkspaceError::WorkspaceNotFound(selected.to_owned()))?,
         )?
     };
@@ -248,10 +249,11 @@ pub fn restore_workspace_layout(
     workspace_id: &str,
     stored: &StoredWorkspaceLayout,
 ) -> Result<WorkspaceDockProjection, WorkspaceError> {
-    use std::collections::{BTreeMap, BTreeSet};
     use crate::workspace::{Container, PreviousPlacement};
+    use std::collections::{BTreeMap, BTreeSet};
 
-    let mut candidate = registry.get(workspace_id)
+    let mut candidate = registry
+        .get(workspace_id)
         .ok_or_else(|| WorkspaceError::WorkspaceNotFound(workspace_id.into()))?
         .clone();
     let mut containers = BTreeMap::new();
@@ -264,7 +266,9 @@ pub fn restore_workspace_layout(
             return Err(WorkspaceError::InvalidContainerTarget);
         }
         let (kind, panels) = if entry.floating {
-            let geometry = entry.geometry.as_ref()
+            let geometry = entry
+                .geometry
+                .as_ref()
                 .ok_or(WorkspaceError::InvalidContainerTarget)?;
             validate_stored_geometry(geometry)?;
             let Some(StoredDockNode::Tabs { panels, active: 0 }) = &entry.tree else {
@@ -273,11 +277,17 @@ pub fn restore_workspace_layout(
             if panels.len() != 1 {
                 return Err(WorkspaceError::InvalidContainerTarget);
             }
-            floating_geometry.insert(entry.id.clone(), FloatingGeometry {
-                position: geometry.position,
-                size: geometry.size,
-            });
-            (ContainerKind::Floating, panels.iter().map(stored_identity).collect::<Vec<_>>())
+            floating_geometry.insert(
+                entry.id.clone(),
+                FloatingGeometry {
+                    position: geometry.position,
+                    size: geometry.size,
+                },
+            );
+            (
+                ContainerKind::Floating,
+                panels.iter().map(stored_identity).collect::<Vec<_>>(),
+            )
         } else {
             if entry.geometry.is_some() {
                 return Err(WorkspaceError::InvalidContainerTarget);
@@ -293,14 +303,19 @@ pub fn restore_workspace_layout(
                 return Err(WorkspaceError::InvalidContainerTarget);
             }
         }
-        containers.insert(entry.id.clone(), Container {
-            id: entry.id.clone(),
-            kind,
-            panels,
-        });
+        containers.insert(
+            entry.id.clone(),
+            Container {
+                id: entry.id.clone(),
+                kind,
+                panels,
+            },
+        );
     }
-    if !containers.get(crate::workspace::DEFAULT_CONTAINER_ID)
-        .is_some_and(|c| c.kind == ContainerKind::Normal) {
+    if !containers
+        .get(crate::workspace::DEFAULT_CONTAINER_ID)
+        .is_some_and(|c| c.kind == ContainerKind::Normal)
+    {
         return Err(WorkspaceError::InvalidContainerTarget);
     }
     for hidden in &stored.hidden_panels {
@@ -309,8 +324,13 @@ pub fn restore_workspace_layout(
             return Err(WorkspaceError::InvalidContainerTarget);
         }
         let previous = match (&hidden.normal_container, &hidden.floating_geometry) {
-            (Some(id), None) if containers.get(id).is_some_and(|c| c.kind == ContainerKind::Normal) =>
-                PreviousPlacement::Normal(id.clone()),
+            (Some(id), None)
+                if containers
+                    .get(id)
+                    .is_some_and(|c| c.kind == ContainerKind::Normal) =>
+            {
+                PreviousPlacement::Normal(id.clone())
+            }
             (None, Some(geometry)) => {
                 validate_stored_geometry(geometry)?;
                 PreviousPlacement::Floating(FloatingGeometry {
@@ -336,7 +356,11 @@ fn stored_identity(panel: &StoredPanelIdentity) -> PanelInstanceId {
 
 fn validate_stored_geometry(geometry: &StoredFloatingGeometry) -> Result<(), WorkspaceError> {
     if geometry.position.iter().all(|value| value.is_finite())
-        && geometry.size.iter().all(|value| value.is_finite() && *value > 0.0) {
+        && geometry
+            .size
+            .iter()
+            .all(|value| value.is_finite() && *value > 0.0)
+    {
         Ok(())
     } else {
         Err(WorkspaceError::InvalidFloatingGeometry)
@@ -358,15 +382,21 @@ pub fn restore_workspace_projection(
     }
     let mut observed = BTreeSet::new();
     for container in &stored.containers {
-        let source = workspace.containers.get(&container.id)
+        let source = workspace
+            .containers
+            .get(&container.id)
             .ok_or(WorkspaceError::InvalidContainerTarget)?;
         if container.floating != (source.kind == ContainerKind::Floating) {
             return Err(WorkspaceError::InvalidContainerTarget);
         }
         if container.floating {
-            let geometry = container.geometry.as_ref()
+            let geometry = container
+                .geometry
+                .as_ref()
                 .ok_or(WorkspaceError::InvalidContainerTarget)?;
-            let expected = workspace.floating_geometry.get(&container.id)
+            let expected = workspace
+                .floating_geometry
+                .get(&container.id)
                 .ok_or(WorkspaceError::InvalidContainerTarget)?;
             if geometry.position != expected.position || geometry.size != expected.size {
                 return Err(WorkspaceError::InvalidContainerTarget);
@@ -417,11 +447,15 @@ pub fn restore_workspace_projection(
             return Err(WorkspaceError::InvalidContainerTarget);
         };
         let matches = match previous {
-            crate::workspace::PreviousPlacement::Normal(id) =>
-                hidden.normal_container.as_ref() == Some(id) && hidden.floating_geometry.is_none(),
-            crate::workspace::PreviousPlacement::Floating(geometry) =>
-                hidden.normal_container.is_none() && hidden.floating_geometry.as_ref().is_some_and(|stored|
-                    stored.position == geometry.position && stored.size == geometry.size),
+            crate::workspace::PreviousPlacement::Normal(id) => {
+                hidden.normal_container.as_ref() == Some(id) && hidden.floating_geometry.is_none()
+            }
+            crate::workspace::PreviousPlacement::Floating(geometry) => {
+                hidden.normal_container.is_none()
+                    && hidden.floating_geometry.as_ref().is_some_and(|stored| {
+                        stored.position == geometry.position && stored.size == geometry.size
+                    })
+            }
         };
         if !matches {
             return Err(WorkspaceError::InvalidContainerTarget);
@@ -439,12 +473,16 @@ fn restore_dock_node(
 ) -> Result<DockState<DockPanelKey>, WorkspaceError> {
     let mut leaves = Vec::new();
     collect_stored_leaves(node, &mut leaves)?;
-    let first = leaves.first().ok_or(WorkspaceError::InvalidContainerTarget)?;
+    let first = leaves
+        .first()
+        .ok_or(WorkspaceError::InvalidContainerTarget)?;
     let mut dock = DockState::new(first.0.clone());
     restore_tree_branch(dock.main_surface_mut(), egui_dock::NodeIndex::root(), node)?;
     for (tabs, _) in leaves {
-        panels.extend(tabs.into_iter().map(|key|
-            PanelInstanceId::new(key.definition_id, key.instance_id)));
+        panels.extend(
+            tabs.into_iter()
+                .map(|key| PanelInstanceId::new(key.definition_id, key.instance_id)),
+        );
     }
     Ok(dock)
 }
@@ -458,12 +496,23 @@ fn collect_stored_leaves(
             if panels.is_empty() || *active >= panels.len() {
                 return Err(WorkspaceError::InvalidContainerTarget);
             }
-            leaves.push((panels.iter().map(|panel| DockPanelKey {
-                definition_id: panel.definition_id.clone(),
-                instance_id: panel.instance_id.clone(),
-            }).collect(), *active));
+            leaves.push((
+                panels
+                    .iter()
+                    .map(|panel| DockPanelKey {
+                        definition_id: panel.definition_id.clone(),
+                        instance_id: panel.instance_id.clone(),
+                    })
+                    .collect(),
+                *active,
+            ));
         }
-        StoredDockNode::Split { fraction, first, second, .. } => {
+        StoredDockNode::Split {
+            fraction,
+            first,
+            second,
+            ..
+        } => {
             if !fraction.is_finite() || !(0.0..=1.0).contains(fraction) {
                 return Err(WorkspaceError::InvalidContainerTarget);
             }
@@ -476,10 +525,13 @@ fn collect_stored_leaves(
 
 fn first_leaf_tabs(node: &StoredDockNode) -> Vec<DockPanelKey> {
     match node {
-        StoredDockNode::Tabs { panels, .. } => panels.iter().map(|panel| DockPanelKey {
-            definition_id: panel.definition_id.clone(),
-            instance_id: panel.instance_id.clone(),
-        }).collect(),
+        StoredDockNode::Tabs { panels, .. } => panels
+            .iter()
+            .map(|panel| DockPanelKey {
+                definition_id: panel.definition_id.clone(),
+                instance_id: panel.instance_id.clone(),
+            })
+            .collect(),
         StoredDockNode::Split { first, .. } => first_leaf_tabs(first),
     }
 }
@@ -490,15 +542,23 @@ fn restore_tree_branch(
     node: &StoredDockNode,
 ) -> Result<(), WorkspaceError> {
     match node {
-        StoredDockNode::Tabs { active, .. } => {
-            tree.set_active_tab(index, egui_dock::TabIndex(*active))
-                .map_err(|_| WorkspaceError::InvalidContainerTarget)
-        }
-        StoredDockNode::Split { axis, fraction, first, second } => {
+        StoredDockNode::Tabs { active, .. } => tree
+            .set_active_tab(index, egui_dock::TabIndex(*active))
+            .map_err(|_| WorkspaceError::InvalidContainerTarget),
+        StoredDockNode::Split {
+            axis,
+            fraction,
+            first,
+            second,
+        } => {
             let right = first_leaf_tabs(second);
             match axis {
-                StoredSplitAxis::Horizontal => { tree.split_right(index, *fraction, right); }
-                StoredSplitAxis::Vertical => { tree.split_below(index, *fraction, right); }
+                StoredSplitAxis::Horizontal => {
+                    tree.split_right(index, *fraction, right);
+                }
+                StoredSplitAxis::Vertical => {
+                    tree.split_below(index, *fraction, right);
+                }
             }
             let left_index = egui_dock::NodeIndex(index.0 * 2 + 1);
             let right_index = egui_dock::NodeIndex(index.0 * 2 + 2);
@@ -805,7 +865,12 @@ mod tests {
         }
         let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
         let mut projection = project_workspace(ws).unwrap();
-        let dock = projection.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        let dock = projection
+            .normal
+            .get_mut(DEFAULT_CONTAINER_ID)
+            .unwrap()
+            .as_mut()
+            .unwrap();
         // Move c out of the root leaf before placing it in the new split.
         // split_right adds tabs; it does not remove existing occurrences.
         for node in dock.main_surface_mut().iter_mut() {
@@ -825,7 +890,12 @@ mod tests {
             .find(|container| container.id == DEFAULT_CONTAINER_ID)
             .unwrap();
         match container.tree.as_ref().unwrap() {
-            StoredDockNode::Split { fraction, first, second, .. } => {
+            StoredDockNode::Split {
+                fraction,
+                first,
+                second,
+                ..
+            } => {
                 assert_eq!(*fraction, 0.4);
                 assert!(matches!(first.as_ref(), StoredDockNode::Tabs { .. }));
                 assert!(matches!(second.as_ref(), StoredDockNode::Tabs { .. }));
@@ -840,24 +910,38 @@ mod tests {
         for id in ["a", "b", "c", "d"] {
             let panel = PanelInstanceId::new("editor", id);
             registry.register_panel(panel.clone());
-            registry.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+            registry
+                .place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID)
+                .unwrap();
         }
         let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
         let mut projection = project_workspace(ws).unwrap();
-        let dock = projection.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        let dock = projection
+            .normal
+            .get_mut(DEFAULT_CONTAINER_ID)
+            .unwrap()
+            .as_mut()
+            .unwrap();
         let tree = dock.main_surface_mut();
         for node in tree.iter_mut() {
             if let Node::Leaf(leaf) = node {
-                leaf.tabs.retain(|key| key.instance_id == "a" || key.instance_id == "b");
+                leaf.tabs
+                    .retain(|key| key.instance_id == "a" || key.instance_id == "b");
             }
         }
-        tree.split_right(egui_dock::NodeIndex::root(), 0.4, vec![
-            DockPanelKey::from(&PanelInstanceId::new("editor", "c")),
-            DockPanelKey::from(&PanelInstanceId::new("editor", "d")),
-        ]);
-        tree.split_below(egui_dock::NodeIndex(1), 0.3, vec![
-            DockPanelKey::from(&PanelInstanceId::new("editor", "b")),
-        ]);
+        tree.split_right(
+            egui_dock::NodeIndex::root(),
+            0.4,
+            vec![
+                DockPanelKey::from(&PanelInstanceId::new("editor", "c")),
+                DockPanelKey::from(&PanelInstanceId::new("editor", "d")),
+            ],
+        );
+        tree.split_below(
+            egui_dock::NodeIndex(1),
+            0.3,
+            vec![DockPanelKey::from(&PanelInstanceId::new("editor", "b"))],
+        );
         for node in tree.iter_mut() {
             if let Node::Leaf(leaf) = node {
                 if leaf.tabs.len() > 1 {
@@ -865,7 +949,8 @@ mod tests {
                 }
             }
         }
-        tree.set_active_tab(egui_dock::NodeIndex(2), egui_dock::TabIndex(1)).unwrap();
+        tree.set_active_tab(egui_dock::NodeIndex(2), egui_dock::TabIndex(1))
+            .unwrap();
         let stored = snapshot_workspace_layout(ws, &projection).unwrap();
         let restored = restore_workspace_projection(ws, &stored).unwrap();
         let again = snapshot_workspace_layout(ws, &restored).unwrap();
@@ -878,33 +963,56 @@ mod tests {
         for id in ["a", "b"] {
             let panel = PanelInstanceId::new("editor", id);
             registry.register_panel(panel.clone());
-            registry.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+            registry
+                .place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID)
+                .unwrap();
         }
         let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
         let valid = snapshot_workspace_layout(ws, &project_workspace(ws).unwrap()).unwrap();
         let mut invalid = valid.clone();
         invalid.containers[0].tree = Some(StoredDockNode::Tabs {
             panels: vec![
-                StoredPanelIdentity { definition_id: "editor".into(), instance_id: "a".into() },
-                StoredPanelIdentity { definition_id: "editor".into(), instance_id: "b".into() },
+                StoredPanelIdentity {
+                    definition_id: "editor".into(),
+                    instance_id: "a".into(),
+                },
+                StoredPanelIdentity {
+                    definition_id: "editor".into(),
+                    instance_id: "b".into(),
+                },
             ],
             active: 2,
         });
-        assert!(matches!(restore_workspace_projection(ws, &invalid), Err(WorkspaceError::InvalidContainerTarget)));
+        assert!(matches!(
+            restore_workspace_projection(ws, &invalid),
+            Err(WorkspaceError::InvalidContainerTarget)
+        ));
         invalid.containers[0].tree = Some(StoredDockNode::Split {
             axis: StoredSplitAxis::Horizontal,
             fraction: f32::NAN,
             first: Box::new(StoredDockNode::Tabs {
-                panels: vec![StoredPanelIdentity { definition_id: "editor".into(), instance_id: "a".into() }],
+                panels: vec![StoredPanelIdentity {
+                    definition_id: "editor".into(),
+                    instance_id: "a".into(),
+                }],
                 active: 0,
             }),
             second: Box::new(StoredDockNode::Tabs {
-                panels: vec![StoredPanelIdentity { definition_id: "editor".into(), instance_id: "b".into() }],
+                panels: vec![StoredPanelIdentity {
+                    definition_id: "editor".into(),
+                    instance_id: "b".into(),
+                }],
                 active: 0,
             }),
         });
-        assert!(matches!(restore_workspace_projection(ws, &invalid), Err(WorkspaceError::InvalidContainerTarget)));
-        assert_eq!(snapshot_workspace_layout(ws, &project_workspace(ws).unwrap()).unwrap(), valid);
+        assert!(matches!(
+            restore_workspace_projection(ws, &invalid),
+            Err(WorkspaceError::InvalidContainerTarget)
+        ));
+        assert_eq!(
+            snapshot_workspace_layout(ws, &project_workspace(ws).unwrap()).unwrap(),
+            valid
+        );
     }
 
     #[test]
@@ -913,18 +1021,36 @@ mod tests {
         for id in ["a", "b", "c"] {
             let panel = PanelInstanceId::new("editor", id);
             registry.register_panel(panel.clone());
-            registry.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+            registry
+                .place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID)
+                .unwrap();
         }
-        let geometry = FloatingGeometry { position: [12.0, 34.0], size: [320.0, 240.0] };
-        registry.float_panel(DEFAULT_WORKSPACE_ID, &PanelInstanceId::new("editor", "b"), geometry).unwrap();
-        registry.hide_panel(DEFAULT_WORKSPACE_ID, &PanelInstanceId::new("editor", "c")).unwrap();
+        let geometry = FloatingGeometry {
+            position: [12.0, 34.0],
+            size: [320.0, 240.0],
+        };
+        registry
+            .float_panel(
+                DEFAULT_WORKSPACE_ID,
+                &PanelInstanceId::new("editor", "b"),
+                geometry,
+            )
+            .unwrap();
+        registry
+            .hide_panel(DEFAULT_WORKSPACE_ID, &PanelInstanceId::new("editor", "c"))
+            .unwrap();
         let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
         let projection = project_workspace(ws).unwrap();
         let stored = snapshot_workspace_layout(ws, &projection).unwrap();
         let restored = restore_workspace_projection(ws, &stored).unwrap();
         assert_eq!(snapshot_workspace_layout(ws, &restored).unwrap(), stored);
         assert_eq!(stored.hidden_panels.len(), 1);
-        assert!(stored.containers.iter().any(|container| container.floating && container.geometry.is_some()));
+        assert!(
+            stored
+                .containers
+                .iter()
+                .any(|container| container.floating && container.geometry.is_some())
+        );
     }
 
     #[test]
@@ -933,14 +1059,23 @@ mod tests {
         for id in ["a", "b", "c"] {
             let panel = PanelInstanceId::new("editor", id);
             original.register_panel(panel.clone());
-            original.place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID).unwrap();
+            original
+                .place_panel(DEFAULT_WORKSPACE_ID, &panel, DEFAULT_CONTAINER_ID)
+                .unwrap();
         }
-        original.float_panel(
-            DEFAULT_WORKSPACE_ID,
-            &PanelInstanceId::new("editor", "b"),
-            FloatingGeometry { position: [10.0, 20.0], size: [200.0, 100.0] },
-        ).unwrap();
-        original.hide_panel(DEFAULT_WORKSPACE_ID, &PanelInstanceId::new("editor", "c")).unwrap();
+        original
+            .float_panel(
+                DEFAULT_WORKSPACE_ID,
+                &PanelInstanceId::new("editor", "b"),
+                FloatingGeometry {
+                    position: [10.0, 20.0],
+                    size: [200.0, 100.0],
+                },
+            )
+            .unwrap();
+        original
+            .hide_panel(DEFAULT_WORKSPACE_ID, &PanelInstanceId::new("editor", "c"))
+            .unwrap();
         let source = original.get(DEFAULT_WORKSPACE_ID).unwrap();
         let saved = snapshot_workspace_layout(source, &project_workspace(source).unwrap()).unwrap();
 
@@ -956,7 +1091,10 @@ mod tests {
         invalid.hidden_panels[0].panel.instance_id = "b".into();
         assert!(restore_workspace_layout(&mut fresh, DEFAULT_WORKSPACE_ID, &invalid).is_err());
         let unchanged = fresh.get(DEFAULT_WORKSPACE_ID).unwrap();
-        assert_eq!(snapshot_workspace_layout(unchanged, &restored).unwrap(), saved);
+        assert_eq!(
+            snapshot_workspace_layout(unchanged, &restored).unwrap(),
+            saved
+        );
     }
 
     #[test]
@@ -971,7 +1109,12 @@ mod tests {
         }
         let ws = registry.get(DEFAULT_WORKSPACE_ID).unwrap();
         let mut projection = project_workspace(ws).unwrap();
-        let dock = projection.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        let dock = projection
+            .normal
+            .get_mut(DEFAULT_CONTAINER_ID)
+            .unwrap()
+            .as_mut()
+            .unwrap();
         for node in dock.main_surface_mut().iter_mut() {
             if let Node::Leaf(leaf) = node {
                 leaf.tabs[1] = leaf.tabs[0].clone();
@@ -1119,17 +1262,28 @@ mod tests {
         let b = PanelInstanceId::new("editor", "b");
         for panel in [&a, &b] {
             registry.register_panel(panel.clone());
-            registry.place_panel(DEFAULT_WORKSPACE_ID, panel, DEFAULT_CONTAINER_ID).unwrap();
+            registry
+                .place_panel(DEFAULT_WORKSPACE_ID, panel, DEFAULT_CONTAINER_ID)
+                .unwrap();
         }
-        let mut projection = project_workspace(registry.get(DEFAULT_WORKSPACE_ID).unwrap()).unwrap();
-        let tree = projection.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        let mut projection =
+            project_workspace(registry.get(DEFAULT_WORKSPACE_ID).unwrap()).unwrap();
+        let tree = projection
+            .normal
+            .get_mut(DEFAULT_CONTAINER_ID)
+            .unwrap()
+            .as_mut()
+            .unwrap();
         for node in tree.main_surface_mut().iter_mut() {
             if let egui_dock::Node::Leaf(leaf) = node {
                 leaf.tabs.reverse();
             }
         }
         sync_normal_tab_order(&mut registry, DEFAULT_WORKSPACE_ID, &projection).unwrap();
-        assert_eq!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers[DEFAULT_CONTAINER_ID].panels, vec![b, a]);
+        assert_eq!(
+            registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers[DEFAULT_CONTAINER_ID].panels,
+            vec![b, a]
+        );
     }
 
     // WS-021: an invalid dock tree cannot partially mutate panel placement.
@@ -1140,17 +1294,31 @@ mod tests {
         let b = PanelInstanceId::new("editor", "b");
         for panel in [&a, &b] {
             registry.register_panel(panel.clone());
-            registry.place_panel(DEFAULT_WORKSPACE_ID, panel, DEFAULT_CONTAINER_ID).unwrap();
+            registry
+                .place_panel(DEFAULT_WORKSPACE_ID, panel, DEFAULT_CONTAINER_ID)
+                .unwrap();
         }
-        let mut projection = project_workspace(registry.get(DEFAULT_WORKSPACE_ID).unwrap()).unwrap();
-        let tree = projection.normal.get_mut(DEFAULT_CONTAINER_ID).unwrap().as_mut().unwrap();
+        let mut projection =
+            project_workspace(registry.get(DEFAULT_WORKSPACE_ID).unwrap()).unwrap();
+        let tree = projection
+            .normal
+            .get_mut(DEFAULT_CONTAINER_ID)
+            .unwrap()
+            .as_mut()
+            .unwrap();
         for node in tree.main_surface_mut().iter_mut() {
             if let egui_dock::Node::Leaf(leaf) = node {
                 leaf.tabs[1] = leaf.tabs[0].clone();
             }
         }
-        assert_eq!(sync_normal_tab_order(&mut registry, DEFAULT_WORKSPACE_ID, &projection), Err(WorkspaceError::InvalidContainerTarget));
-        assert_eq!(registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers[DEFAULT_CONTAINER_ID].panels, vec![a, b]);
+        assert_eq!(
+            sync_normal_tab_order(&mut registry, DEFAULT_WORKSPACE_ID, &projection),
+            Err(WorkspaceError::InvalidContainerTarget)
+        );
+        assert_eq!(
+            registry.get(DEFAULT_WORKSPACE_ID).unwrap().containers[DEFAULT_CONTAINER_ID].panels,
+            vec![a, b]
+        );
     }
 
     #[test]
@@ -1188,10 +1356,19 @@ mod workspace_projection_switch_tests {
         let mut active = DEFAULT_WORKSPACE_ID.to_owned();
         let mut live = project_workspace(registry.get(&active).unwrap()).unwrap();
         let mut cache = BTreeMap::new();
-        let first = live.normal.get_mut(crate::workspace::DEFAULT_CONTAINER_ID).unwrap();
+        let first = live
+            .normal
+            .get_mut(crate::workspace::DEFAULT_CONTAINER_ID)
+            .unwrap();
         *first = Some(DockState::new(vec![
-            DockPanelKey { definition_id: "a".into(), instance_id: "1".into() },
-            DockPanelKey { definition_id: "b".into(), instance_id: "2".into() },
+            DockPanelKey {
+                definition_id: "a".into(),
+                instance_id: "1".into(),
+            },
+            DockPanelKey {
+                definition_id: "b".into(),
+                instance_id: "2".into(),
+            },
         ]));
         registry.select("second").unwrap();
         switch_workspace_projection(&registry, &mut active, &mut live, &mut cache).unwrap();
@@ -1199,7 +1376,12 @@ mod workspace_projection_switch_tests {
         assert!(live.normal.values().all(Option::is_none));
         registry.select(DEFAULT_WORKSPACE_ID).unwrap();
         switch_workspace_projection(&registry, &mut active, &mut live, &mut cache).unwrap();
-        let restored = live.normal.get(crate::workspace::DEFAULT_CONTAINER_ID).unwrap().as_ref().unwrap();
+        let restored = live
+            .normal
+            .get(crate::workspace::DEFAULT_CONTAINER_ID)
+            .unwrap()
+            .as_ref()
+            .unwrap();
         assert_eq!(restored.iter_all_tabs().count(), 2);
     }
 

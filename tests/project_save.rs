@@ -255,21 +255,26 @@ fn legacy_framework_settings_without_workspace_layouts_defaults_to_empty() {
 fn workspace_layouts_survive_real_project_files_and_reopen() {
     use workflow_ide_framework::{
         project_controller::ProjectController,
-        project_open::{open_project, ApplicationProjectInspector, FrameworkSettingsOpen},
+        project_open::{ApplicationProjectInspector, FrameworkSettingsOpen, open_project},
         project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
-        workspace::{PanelInstanceId, WorkspaceRegistry, DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID},
+        workspace::{
+            DEFAULT_CONTAINER_ID, DEFAULT_WORKSPACE_ID, PanelInstanceId, WorkspaceRegistry,
+        },
         workspace_dock::{project_workspace, snapshot_workspace_layout},
     };
     struct CompatibleInspector;
     impl ApplicationProjectInspector for CompatibleInspector {
         type Error = &'static str;
         fn inspect_project_data(
-            &mut self, _: &ProjectContext, _: Option<&str>,
+            &mut self,
+            _: &ProjectContext,
+            _: Option<&str>,
         ) -> Result<ProjectDataCompatibility, Self::Error> {
             Ok(ProjectDataCompatibility::Compatible)
         }
         fn check_project_consistency(
-            &mut self, _: &ProjectContext,
+            &mut self,
+            _: &ProjectContext,
         ) -> Result<ProjectDataConsistency, Self::Error> {
             Ok(ProjectDataConsistency::Consistent)
         }
@@ -286,24 +291,38 @@ fn workspace_layouts_survive_real_project_files_and_reopen() {
         for id in ids {
             let panel = PanelInstanceId::new("editor", id);
             source.register_panel(panel.clone());
-            source.place_panel(workspace, &panel, DEFAULT_CONTAINER_ID).unwrap();
+            source
+                .place_panel(workspace, &panel, DEFAULT_CONTAINER_ID)
+                .unwrap();
         }
     }
-    let projections: BTreeMap<_, _> = source.iter()
+    let projections: BTreeMap<_, _> = source
+        .iter()
         .map(|ws| (ws.id.clone(), project_workspace(ws).unwrap()))
         .collect();
     let mut controller = ProjectController::new("org.example.test", "Test");
-    controller.capture_workspace_layouts(&source, &projections).unwrap();
+    controller
+        .capture_workspace_layouts(&source, &projections)
+        .unwrap();
     let expected = controller.framework_settings.workspace_layouts.clone();
 
     let mut session = ProjectSession::default();
     session.mark_framework_dirty();
     let mut file = project_file();
-    let mut saver = Saver { fail: false, calls: 0 };
+    let mut saver = Saver {
+        fail: false,
+        calls: 0,
+    };
     save_project(
-        &mut session, &context, &mut file, &controller.framework_settings,
-        &mut saver, "workspace-save-1", "2026-10-09T16:00:00+09:00",
-    ).unwrap();
+        &mut session,
+        &context,
+        &mut file,
+        &controller.framework_settings,
+        &mut saver,
+        "workspace-save-1",
+        "2026-10-09T16:00:00+09:00",
+    )
+    .unwrap();
 
     let reopened = open_project(&context, "org.example.test", &mut CompatibleInspector).unwrap();
     let FrameworkSettingsOpen::Loaded(disk_settings) = reopened.framework_settings else {
@@ -319,7 +338,9 @@ fn workspace_layouts_survive_real_project_files_and_reopen() {
     for id in ["a", "b", "c"] {
         fresh.register_panel(PanelInstanceId::new("editor", id));
     }
-    let restored = restored_controller.restore_project_workspace_layouts(&mut fresh).unwrap();
+    let restored = restored_controller
+        .restore_project_workspace_layouts(&mut fresh)
+        .unwrap();
     for (id, layout) in expected {
         assert_eq!(
             snapshot_workspace_layout(fresh.get(&id).unwrap(), &restored[&id]).unwrap(),

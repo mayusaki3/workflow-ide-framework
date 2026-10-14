@@ -11,24 +11,29 @@ pub fn parse_shortcut(value: &str) -> Option<egui::KeyboardShortcut> {
     let mut key = None;
     for token in value.split('+').map(str::trim) {
         let token = token.to_ascii_uppercase();
-        if token.is_empty() { return None; }
+        if token.is_empty() {
+            return None;
+        }
         match token.as_str() {
             "CTRL" | "CONTROL" => modifiers.ctrl = true,
             "CMD" | "COMMAND" => modifiers.command = true,
             "ALT" => modifiers.alt = true,
             "SHIFT" => modifiers.shift = true,
             _ => {
-                if key.is_some() { return None; }
+                if key.is_some() {
+                    return None;
+                }
                 key = egui::Key::from_name(&token);
                 key?;
             }
         }
     }
     let key = key?;
-    if modifiers == egui::Modifiers::NONE { return None; }
+    if modifiers == egui::Modifiers::NONE {
+        return None;
+    }
     Some(egui::KeyboardShortcut::new(modifiers, key))
 }
-
 
 pub struct CommandDefinition {
     pub id: String,
@@ -55,7 +60,10 @@ impl CommandDefinition {
 
     pub fn shortcut(mut self, shortcut: impl Into<String>) -> Self {
         let shortcut = shortcut.into();
-        assert!(parse_shortcut(&shortcut).is_some(), "invalid command shortcut: {shortcut}");
+        assert!(
+            parse_shortcut(&shortcut).is_some(),
+            "invalid command shortcut: {shortcut}"
+        );
         self.shortcut = Some(shortcut);
         self
     }
@@ -88,12 +96,22 @@ pub struct CommandRegistry {
 impl CommandRegistry {
     /// Dispatch the most recently registered enabled command matching the shortcut.
     pub fn dispatch_shortcut(&mut self, shortcut: &egui::KeyboardShortcut) -> Option<String> {
-        let id = self.order.iter().rev().find(|id| {
-            self.commands.get(*id).is_some_and(|command| {
-                command.enabled && command.shortcut.as_deref()
-                    .and_then(parse_shortcut).as_ref() == Some(shortcut)
-            })
-        })?.clone();
+        let id = self
+            .order
+            .iter()
+            .rev()
+            .find(|id| {
+                self.commands.get(*id).is_some_and(|command| {
+                    command.enabled
+                        && command
+                            .shortcut
+                            .as_deref()
+                            .and_then(parse_shortcut)
+                            .as_ref()
+                            == Some(shortcut)
+                })
+            })?
+            .clone();
         let _ = self.dispatch(&id);
         Some(id)
     }
@@ -243,7 +261,7 @@ impl MenuItemDefinition {
 
 #[cfg(test)]
 mod localized_menu_tests {
-    use super::{parse_shortcut, CommandDefinition, MenuItemDefinition};
+    use super::{CommandDefinition, MenuItemDefinition, parse_shortcut};
 
     #[test]
     fn shortcut_parser_rejects_invalid_values() {
@@ -253,7 +271,6 @@ mod localized_menu_tests {
         assert!(parse_shortcut("Ctrl+").is_none());
         assert!(parse_shortcut("E").is_none());
     }
-
 
     #[test]
     fn duplicate_shortcuts_use_last_enabled_registration() {
@@ -266,9 +283,14 @@ mod localized_menu_tests {
         for id in ["first", "second", "third"] {
             let log = Rc::clone(&invoked);
             let name = id.to_owned();
-            registry.register(CommandDefinition::new(id, id, move || {
-                log.borrow_mut().push(name.clone());
-            }).shortcut("Ctrl+E")).unwrap();
+            registry
+                .register(
+                    CommandDefinition::new(id, id, move || {
+                        log.borrow_mut().push(name.clone());
+                    })
+                    .shortcut("Ctrl+E"),
+                )
+                .unwrap();
         }
         let key = parse_shortcut("Ctrl+E").unwrap();
         assert_eq!(registry.dispatch_shortcut(&key).as_deref(), Some("third"));
@@ -283,9 +305,15 @@ mod localized_menu_tests {
     fn disabled_shortcuts_are_not_dispatched() {
         use super::CommandRegistry;
         let mut registry = CommandRegistry::default();
-        registry.register(CommandDefinition::new("disabled", "Disabled", || {
-            panic!("disabled callback must not execute");
-        }).shortcut("Ctrl+E").enabled(false)).unwrap();
+        registry
+            .register(
+                CommandDefinition::new("disabled", "Disabled", || {
+                    panic!("disabled callback must not execute");
+                })
+                .shortcut("Ctrl+E")
+                .enabled(false),
+            )
+            .unwrap();
         let key = parse_shortcut("Ctrl+E").unwrap();
         assert_eq!(registry.dispatch_shortcut(&key), None);
     }
@@ -294,16 +322,24 @@ mod localized_menu_tests {
     fn unrelated_shortcuts_do_not_dispatch() {
         use super::CommandRegistry;
         let mut registry = CommandRegistry::default();
-        registry.register(CommandDefinition::new("export", "Export", || {
-            panic!("unrelated shortcut must not execute");
-        }).shortcut("Ctrl+E")).unwrap();
-        assert_eq!(registry.dispatch_shortcut(&parse_shortcut("Ctrl+R").unwrap()), None);
+        registry
+            .register(
+                CommandDefinition::new("export", "Export", || {
+                    panic!("unrelated shortcut must not execute");
+                })
+                .shortcut("Ctrl+E"),
+            )
+            .unwrap();
+        assert_eq!(
+            registry.dispatch_shortcut(&parse_shortcut("Ctrl+R").unwrap()),
+            None
+        );
     }
 
     #[test]
     fn command_label_key_is_stored_without_early_translation() {
-        let command = CommandDefinition::new("sample.open", "Open", || {})
-            .label_key("sample.menu.open");
+        let command =
+            CommandDefinition::new("sample.open", "Open", || {}).label_key("sample.menu.open");
         assert_eq!(command.label, "sample.menu.open");
     }
 
@@ -315,9 +351,7 @@ mod localized_menu_tests {
 
     #[test]
     fn custom_menu_title_key_is_stored_without_early_translation() {
-        let item = MenuItemDefinition::custom_key(
-            "sample", "sample.menu.title", "sample.open",
-        );
+        let item = MenuItemDefinition::custom_key("sample", "sample.menu.title", "sample.open");
         assert_eq!(item.menu_label, "sample.menu.title");
     }
 }
@@ -326,10 +360,7 @@ mod localized_menu_tests {
  * Unknown anchors fall back to the end; cyclic anchors also remain visible.
  * Framework command IDs are supplied as the initial order.
  */
-pub fn resolve_menu_order(
-    framework_ids: &[&str],
-    items: &[MenuItemDefinition],
-) -> Vec<String> {
+pub fn resolve_menu_order(framework_ids: &[&str], items: &[MenuItemDefinition]) -> Vec<String> {
     let mut order: Vec<String> = framework_ids.iter().map(|id| (*id).to_owned()).collect();
     let mut pending: Vec<&MenuItemDefinition> = items.iter().collect();
     // Iterative resolution supports anchors that refer to other consumer commands.
@@ -370,7 +401,7 @@ pub fn resolve_menu_order(
 
 #[cfg(test)]
 mod menu_order_tests {
-    use super::{resolve_menu_order, MenuItemDefinition};
+    use super::{MenuItemDefinition, resolve_menu_order};
 
     #[test]
     fn positions_before_and_after_framework_commands() {
@@ -378,7 +409,10 @@ mod menu_order_tests {
             MenuItemDefinition::file("export").after("save"),
             MenuItemDefinition::file("import").before("save"),
         ];
-        assert_eq!(resolve_menu_order(&["new", "save"], &items), ["new", "import", "save", "export"]);
+        assert_eq!(
+            resolve_menu_order(&["new", "save"], &items),
+            ["new", "import", "save", "export"]
+        );
     }
 
     #[test]
@@ -397,6 +431,9 @@ mod menu_order_tests {
             MenuItemDefinition::file("b").after("c"),
             MenuItemDefinition::file("c").after("b"),
         ];
-        assert_eq!(resolve_menu_order(&["save"], &items), ["save", "a", "b", "c"]);
+        assert_eq!(
+            resolve_menu_order(&["save"], &items),
+            ["save", "a", "b", "c"]
+        );
     }
 }

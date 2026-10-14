@@ -205,7 +205,9 @@ impl WorkspaceRegistry {
         if !self.workspaces.contains_key(id) || workspace.id != id {
             return Err(WorkspaceError::WorkspaceNotFound(id.into()));
         }
-        workspace.next_floating_id = workspace.containers.keys()
+        workspace.next_floating_id = workspace
+            .containers
+            .keys()
             .filter_map(|key| key.strip_prefix("framework.container.floating."))
             .filter_map(|suffix| suffix.parse::<u64>().ok())
             .max()
@@ -641,7 +643,13 @@ mod workspace_ui_creation_tests {
         registry.register(&id, "Workspace 1").unwrap();
         registry.select(&id).unwrap();
         assert_eq!(registry.selected_id(), id);
-        assert!(registry.get(&id).unwrap().containers.contains_key(DEFAULT_CONTAINER_ID));
+        assert!(
+            registry
+                .get(&id)
+                .unwrap()
+                .containers
+                .contains_key(DEFAULT_CONTAINER_ID)
+        );
         assert_eq!(registry.next_user_workspace_id(), "user.workspace.2");
     }
 

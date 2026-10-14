@@ -65,7 +65,8 @@ pub fn saved_at_label(path: &Path, application_id: &str) -> String {
     } else {
         return "—".to_owned();
     };
-    Local.timestamp_opt(seconds, nanos)
+    Local
+        .timestamp_opt(seconds, nanos)
         .single()
         .map(|time| time.format("%Y-%m-%d %H:%M").to_string())
         .unwrap_or_else(|| "—".to_owned())
@@ -78,8 +79,11 @@ fn config_base() -> Option<PathBuf> {
     }
     #[cfg(target_os = "macos")]
     {
-        std::env::var_os("HOME")
-            .map(|home| PathBuf::from(home).join("Library").join("Application Support"))
+        std::env::var_os("HOME").map(|home| {
+            PathBuf::from(home)
+                .join("Library")
+                .join("Application Support")
+        })
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
@@ -98,7 +102,9 @@ pub fn directory_name(application_id: &str, configured_name: Option<&str>) -> Op
             || name == ".."
             || name.ends_with('.')
             || name.ends_with(' ')
-            || name.chars().any(|c| !c.is_ascii_alphanumeric() && c != '-' && c != '_')
+            || name
+                .chars()
+                .any(|c| !c.is_ascii_alphanumeric() && c != '-' && c != '_')
         {
             return None;
         }
@@ -106,7 +112,13 @@ pub fn directory_name(application_id: &str, configured_name: Option<&str>) -> Op
     }
     let safe_id: String = application_id
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     (!safe_id.is_empty()).then_some(safe_id)
 }
@@ -129,14 +141,36 @@ mod tests {
         history.record(PathBuf::from("project-5"));
         assert_eq!(history.paths.len(), 10);
         assert_eq!(history.paths[0], PathBuf::from("project-5"));
-        assert_eq!(history.paths.iter().filter(|p| p.as_path() == std::path::Path::new("project-5")).count(), 1);
+        assert_eq!(
+            history
+                .paths
+                .iter()
+                .filter(|p| p.as_path() == std::path::Path::new("project-5"))
+                .count(),
+            1
+        );
     }
 
     #[test]
     fn explicit_directory_name_and_invalid_names() {
-        assert_eq!(directory_name("org.example.app", Some("ExampleApp")).as_deref(), Some("ExampleApp"));
-        assert_eq!(directory_name("org.example.app", None).as_deref(), Some("org_example_app"));
-        for invalid in ["", ".", "..", "../other", "a/b", "a\\\\b", "bad:name", "trailing."] {
+        assert_eq!(
+            directory_name("org.example.app", Some("ExampleApp")).as_deref(),
+            Some("ExampleApp")
+        );
+        assert_eq!(
+            directory_name("org.example.app", None).as_deref(),
+            Some("org_example_app")
+        );
+        for invalid in [
+            "",
+            ".",
+            "..",
+            "../other",
+            "a/b",
+            "a\\\\b",
+            "bad:name",
+            "trailing.",
+        ] {
             assert_eq!(directory_name("org.example.app", Some(invalid)), None);
         }
     }

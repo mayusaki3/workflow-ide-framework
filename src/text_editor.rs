@@ -75,7 +75,6 @@ pub struct TextEditorOptions {
     pub ime_debug: bool,
 }
 
-
 #[derive(Debug, Default)]
 pub struct TextEditorResponse {
     pub changed: bool,
