@@ -1,6 +1,7 @@
 //! Consumer application command and menu definitions.
 
 use std::collections::HashMap;
+use eframe::egui;
 
 pub type CommandCallback = Box<dyn FnMut()>;
 /// Parse a single-key keyboard shortcut such as Ctrl+E or Ctrl+Shift+S.
