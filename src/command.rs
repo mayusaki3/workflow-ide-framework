@@ -148,6 +148,7 @@ impl MenuItemDefinition {
             menu_label: "Help".into(),
             location: MenuLocation::Help,
             command_id: command_id.into(),
+            placement: MenuPlacement::Append,
         }
     }
     /// Register a custom menu using a localization key for its title.
@@ -169,6 +170,7 @@ impl MenuItemDefinition {
             menu_label: menu_label.into(),
             location: MenuLocation::Custom,
             command_id: command_id.into(),
+            placement: MenuPlacement::Append,
         }
     }
 }
