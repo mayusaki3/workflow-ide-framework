@@ -129,7 +129,7 @@ mod tests {
         history.record(PathBuf::from("project-5"));
         assert_eq!(history.paths.len(), 10);
         assert_eq!(history.paths[0], PathBuf::from("project-5"));
-        assert_eq!(history.paths.iter().filter(|p| **p == PathBuf::from("project-5")).count(), 1);
+        assert_eq!(history.paths.iter().filter(|p| p.as_path() == std::path::Path::new("project-5")).count(), 1);
     }
 
     #[test]
