@@ -472,8 +472,7 @@ pub fn complete_framework_recovery<F: FnMut() -> String>(
                         && entry.resource_id != expected_id
                     {
                         return Err(
-                            "move destination registry resource ID does not match journal"
-                                .into(),
+                            "move destination registry resource ID does not match journal".into(),
                         );
                     }
                 }
