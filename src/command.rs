@@ -86,9 +86,9 @@ pub struct CommandRegistry {
 }
 
 impl CommandRegistry {
-    /// Dispatch the first enabled command matching the consumed keyboard shortcut.
+    /// Dispatch the most recently registered enabled command matching the shortcut.
     pub fn dispatch_shortcut(&mut self, shortcut: &egui::KeyboardShortcut) -> Option<String> {
-        let id = self.order.iter().find(|id| {
+        let id = self.order.iter().rev().find(|id| {
             self.commands.get(*id).is_some_and(|command| {
                 command.enabled && command.shortcut.as_deref()
                     .and_then(parse_shortcut).as_ref() == Some(shortcut)
@@ -254,6 +254,30 @@ mod localized_menu_tests {
         assert!(parse_shortcut("E").is_none());
     }
 
+
+    #[test]
+    fn duplicate_shortcuts_use_last_enabled_registration() {
+        use super::CommandRegistry;
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let invoked = Rc::new(RefCell::new(Vec::new()));
+        let mut registry = CommandRegistry::default();
+        for id in ["first", "second", "third"] {
+            let log = Rc::clone(&invoked);
+            let name = id.to_owned();
+            registry.register(CommandDefinition::new(id, id, move || {
+                log.borrow_mut().push(name.clone());
+            }).shortcut("Ctrl+E")).unwrap();
+        }
+        let key = parse_shortcut("Ctrl+E").unwrap();
+        assert_eq!(registry.dispatch_shortcut(&key).as_deref(), Some("third"));
+        registry.set_enabled("third", false).unwrap();
+        assert_eq!(registry.dispatch_shortcut(&key).as_deref(), Some("second"));
+        registry.set_enabled("second", false).unwrap();
+        assert_eq!(registry.dispatch_shortcut(&key).as_deref(), Some("first"));
+        assert_eq!(&*invoked.borrow(), &["third", "second", "first"]);
+    }
 
     #[test]
     fn command_label_key_is_stored_without_early_translation() {
