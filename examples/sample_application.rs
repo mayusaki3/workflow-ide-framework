@@ -194,6 +194,27 @@ fn main() -> eframe::Result<()> {
         .menu_item(MenuItemDefinition::custom_key(
             "sample.i18n", "sample.menu.i18n_title", "sample.i18n_probe",
         ))
+        // MENU-EXT-002B: visual placement checks in File and Help.
+        .command(CommandDefinition::new("sample.menu_before_save", "Before Save", || {
+            tracing::info!("sample menu item before Save");
+        }))
+        .menu_item(MenuItemDefinition::file("sample.menu_before_save").before("file.save"))
+        .command(CommandDefinition::new("sample.menu_after_save", "After Save", || {
+            tracing::info!("sample menu item after Save");
+        }))
+        .menu_item(MenuItemDefinition::file("sample.menu_after_save").after("file.save"))
+        .command(CommandDefinition::new("sample.menu_after_consumer", "After Consumer", || {
+            tracing::info!("sample menu item after consumer command");
+        }))
+        .menu_item(MenuItemDefinition::file("sample.menu_after_consumer").after("sample.menu_after_save"))
+        .command(CommandDefinition::new("sample.menu_unknown_anchor", "Missing Anchor Fallback", || {
+            tracing::info!("sample menu item with unknown anchor");
+        }))
+        .menu_item(MenuItemDefinition::file("sample.menu_unknown_anchor").after("file.not_registered"))
+        .command(CommandDefinition::new("sample.menu_before_about", "Before About", || {
+            tracing::info!("sample menu item before About");
+        }))
+        .menu_item(MenuItemDefinition::help("sample.menu_before_about").before("help.about"))
         .about_renderer(|ctx, framework, open| {
             let mut window_open = *open;
             eframe::egui::Window::new(localization::text("sample.about.title"))
