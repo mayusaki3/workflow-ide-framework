@@ -60,10 +60,9 @@ impl ProjectController {
             Ok(session) => session,
             Err(_) => return ProjectCommandResult::NeedsSaveLocation,
         };
-        if let Some(context) = session.context() {
-            if let Err(error) = application.initialize_project(context) {
+        if let Some(context) = session.context()
+            && let Err(error) = application.initialize_project(context) {
                 return ProjectCommandResult::Failed(error);
-            }
         }
         self.project_file = Some(self.project_template(name, language, description));
         self.framework_settings = FrameworkSettings::default();
@@ -152,10 +151,9 @@ impl ProjectController {
             let projection = restore_workspace_layout(&mut candidate, id, layout)?;
             restored.insert(id.clone(), projection);
         }
-        if let Some(id) = self.framework_settings.selected_workspace_id.as_deref() {
-            if candidate.get(id).is_some() {
+        if let Some(id) = self.framework_settings.selected_workspace_id.as_deref()
+            && candidate.get(id).is_some() {
                 candidate.select(id)?;
-            }
         }
         *registry = candidate;
         Ok(restored)
