@@ -20,7 +20,7 @@ pub fn parse_shortcut(value: &str) -> Option<egui::KeyboardShortcut> {
             _ => {
                 if key.is_some() { return None; }
                 key = egui::Key::from_name(&token);
-                if key.is_none() { return None; }
+                key?;
             }
         }
     }
@@ -326,9 +326,9 @@ mod localized_menu_tests {
  * Unknown anchors fall back to the end; cyclic anchors also remain visible.
  * Framework command IDs are supplied as the initial order.
  */
-pub fn resolve_menu_order<'a>(
+pub fn resolve_menu_order(
     framework_ids: &[&str],
-    items: &'a [MenuItemDefinition],
+    items: &[MenuItemDefinition],
 ) -> Vec<String> {
     let mut order: Vec<String> = framework_ids.iter().map(|id| (*id).to_owned()).collect();
     let mut pending: Vec<&MenuItemDefinition> = items.iter().collect();
