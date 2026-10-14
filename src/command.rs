@@ -105,20 +105,41 @@ pub enum MenuLocation {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MenuPlacement {
+    Append,
+    Before(String),
+    After(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MenuItemDefinition {
     pub menu_id: String,
     pub menu_label: String,
     pub location: MenuLocation,
     pub command_id: String,
+    pub placement: MenuPlacement,
 }
 
 impl MenuItemDefinition {
+    /// Place this item before a framework menu command id.
+    pub fn before(mut self, anchor_id: impl Into<String>) -> Self {
+        self.placement = MenuPlacement::Before(anchor_id.into());
+        self
+    }
+
+    /// Place this item after a framework menu command id.
+    pub fn after(mut self, anchor_id: impl Into<String>) -> Self {
+        self.placement = MenuPlacement::After(anchor_id.into());
+        self
+    }
+
     pub fn file(command_id: impl Into<String>) -> Self {
         Self {
             menu_id: "file".into(),
             menu_label: "File".into(),
             location: MenuLocation::File,
             command_id: command_id.into(),
+            placement: MenuPlacement::Append,
         }
     }
     pub fn help(command_id: impl Into<String>) -> Self {
