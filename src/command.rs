@@ -118,9 +118,22 @@ pub struct MenuItemDefinition {
     pub location: MenuLocation,
     pub command_id: String,
     pub placement: MenuPlacement,
+    pub top_level_placement: MenuPlacement,
 }
 
 impl MenuItemDefinition {
+    /// Position the custom top-level menu before a framework menu id.
+    pub fn menu_before(mut self, anchor_id: impl Into<String>) -> Self {
+        self.top_level_placement = MenuPlacement::Before(anchor_id.into());
+        self
+    }
+
+    /// Position the custom top-level menu after a framework menu id.
+    pub fn menu_after(mut self, anchor_id: impl Into<String>) -> Self {
+        self.top_level_placement = MenuPlacement::After(anchor_id.into());
+        self
+    }
+
     /// Place this item before a framework menu command id.
     pub fn before(mut self, anchor_id: impl Into<String>) -> Self {
         self.placement = MenuPlacement::Before(anchor_id.into());
@@ -140,6 +153,7 @@ impl MenuItemDefinition {
             location: MenuLocation::File,
             command_id: command_id.into(),
             placement: MenuPlacement::Append,
+            top_level_placement: MenuPlacement::Append,
         }
     }
     pub fn help(command_id: impl Into<String>) -> Self {
@@ -149,6 +163,7 @@ impl MenuItemDefinition {
             location: MenuLocation::Help,
             command_id: command_id.into(),
             placement: MenuPlacement::Append,
+            top_level_placement: MenuPlacement::Append,
         }
     }
     /// Register a custom menu using a localization key for its title.
@@ -171,6 +186,7 @@ impl MenuItemDefinition {
             location: MenuLocation::Custom,
             command_id: command_id.into(),
             placement: MenuPlacement::Append,
+            top_level_placement: MenuPlacement::Append,
         }
     }
 }
