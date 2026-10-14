@@ -195,7 +195,6 @@ pub struct WindowConfig {
     pub min_size: Option<[f32; 2]>,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct AppearanceConfig {
     pub ui_scale: Option<f32>,
@@ -2284,9 +2283,7 @@ impl FrameworkHost {
                             });
                         }
                     });
-                if dismiss_create
-                    && let Some(state) = self.project_ui.folder_dialog.as_mut()
-                {
+                if dismiss_create && let Some(state) = self.project_ui.folder_dialog.as_mut() {
                     state.create_folder_parent = None;
                     state.new_folder_name.clear();
                 }
@@ -2511,9 +2508,7 @@ impl FrameworkHost {
                             self.handle_project_result(outcome, None);
                             if completed {
                                 self.restore_project_workspaces();
-                                self.emit_project_event(
-                                    project_event::ProjectEventKind::Opened,
-                                );
+                                self.emit_project_event(project_event::ProjectEventKind::Opened);
                             }
                         }
                         if ui.button(localization::text("common.cancel")).clicked() {
@@ -2705,7 +2700,6 @@ impl eframe::App for FrameworkHost {
             .unwrap_or_else(|| application_title.to_owned());
         ui.ctx()
             .send_viewport_cmd(egui::ViewportCommand::Title(window_title));
-
 
         if !self.workspace_docks.normal.is_empty() || !self.workspace_docks.floating.is_empty() {
             ui.separator();
@@ -2997,7 +2991,8 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                 logging::LogLevel::Trace,
             ] {
                 let selected = current == level;
-                if ui.radio(selected, format!("{level:?}")).clicked() && !selected
+                if ui.radio(selected, format!("{level:?}")).clicked()
+                    && !selected
                     && let Err(error) = logging::set_level(level)
                 {
                     tracing::error!(target: "wfide::logging", %error, "failed to change runtime log level");
