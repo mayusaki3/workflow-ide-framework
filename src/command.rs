@@ -3,6 +3,28 @@
 use std::collections::HashMap;
 
 pub type CommandCallback = Box<dyn FnMut()>;
+/// Parse a single-key keyboard shortcut such as Ctrl+E or Ctrl+Shift+S.
+/// Unsupported or ambiguous strings are rejected rather than displayed as working shortcuts.
+pub fn parse_shortcut(value: &str) -> Option<egui::KeyboardShortcut> {
+    let mut modifiers = egui::Modifiers::NONE;
+    let mut key = None;
+    for token in value.split('+').map(str::trim) {
+        let token = token.to_ascii_uppercase();
+        match token.as_str() {
+            "CTRL" | "CONTROL" => modifiers.ctrl = true,
+            "CMD" | "COMMAND" => modifiers.command = true,
+            "ALT" => modifiers.alt = true,
+            "SHIFT" => modifiers.shift = true,
+            _ => {
+                if key.is_some() { return None; }
+                key = egui::Key::from_name(&token);
+                if key.is_none() { return None; }
+            }
+        }
+    }
+    Some(egui::KeyboardShortcut::new(modifiers, key?))
+}
+
 
 pub struct CommandDefinition {
     pub id: String,
@@ -28,7 +50,9 @@ impl CommandDefinition {
     }
 
     pub fn shortcut(mut self, shortcut: impl Into<String>) -> Self {
-        self.shortcut = Some(shortcut.into());
+        let shortcut = shortcut.into();
+        assert!(parse_shortcut(&shortcut).is_some(), "invalid command shortcut: {shortcut}");
+        self.shortcut = Some(shortcut);
         self
     }
 
@@ -58,6 +82,18 @@ pub struct CommandRegistry {
 }
 
 impl CommandRegistry {
+    /// Dispatch the first enabled command matching the consumed keyboard shortcut.
+    pub fn dispatch_shortcut(&mut self, shortcut: &egui::KeyboardShortcut) -> Option<String> {
+        let id = self.order.iter().find(|id| {
+            self.commands.get(*id).is_some_and(|command| {
+                command.enabled && command.shortcut.as_deref()
+                    .and_then(parse_shortcut).as_ref() == Some(shortcut)
+            })
+        })?.clone();
+        let _ = self.dispatch(&id);
+        Some(id)
+    }
+
     pub fn register(&mut self, command: CommandDefinition) -> Result<(), CommandRegistryError> {
         if self.commands.contains_key(&command.id) {
             return Err(CommandRegistryError::DuplicateId(command.id));
@@ -203,7 +239,15 @@ impl MenuItemDefinition {
 
 #[cfg(test)]
 mod localized_menu_tests {
-    use super::{CommandDefinition, MenuItemDefinition};
+    use super::{parse_shortcut, CommandDefinition, MenuItemDefinition};
+
+    #[test]
+    fn shortcut_parser_rejects_invalid_values() {
+        assert!(parse_shortcut("Ctrl+E").is_some());
+        assert!(parse_shortcut("Ctrl+Shift+S").is_some());
+        assert!(parse_shortcut("Ctrl+NotAKey").is_none());
+    }
+
 
     #[test]
     fn command_label_key_is_stored_without_early_translation() {
