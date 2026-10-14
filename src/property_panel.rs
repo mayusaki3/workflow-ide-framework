@@ -138,14 +138,13 @@ fn show_value(ui: &mut egui::Ui, id: &str, value: &mut PropertyValue, read_only:
         PropertyValue::Float(v) => ui.add(egui::DragValue::new(v)).changed(),
         PropertyValue::FilePath(v) => {
             let mut changed = ui.text_edit_singleline(v).changed();
-            if ui.button("…").on_hover_text("ファイルを選択").clicked() {
-                if let Some(path) = rfd::FileDialog::new()
+            if ui.button("…").on_hover_text("ファイルを選択").clicked()
+                && let Some(path) = rfd::FileDialog::new()
                     .add_filter("画像", &["png", "jpg", "jpeg", "webp", "bmp", "gif"])
                     .pick_file()
-                {
-                    *v = path.to_string_lossy().into_owned();
-                    changed = true;
-                }
+            {
+                *v = path.to_string_lossy().into_owned();
+                changed = true;
             }
             changed
         }
