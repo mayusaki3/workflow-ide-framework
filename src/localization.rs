@@ -41,7 +41,7 @@ struct LocalizationState {
 static STATE: OnceLock<RwLock<LocalizationState>> = OnceLock::new();
 
 pub fn init(config: &LocalizationConfig) {
-    let mut resources = load_resources(&config.resource_directory);
+    let mut resources = embedded_framework_resources();
     for directory in &config.application_resource_directories {
         merge_resources(&mut resources, load_resources(directory));
     }
@@ -93,6 +93,19 @@ fn select_initial_locale<'a>(
         .into_iter()
         .next()
         .unwrap_or_else(|| EN_US.to_owned())
+}
+
+fn embedded_framework_resources() -> HashMap<String, LocaleResource> {
+    let mut resources = HashMap::new();
+    for (source, content) in [
+        ("en-US.toml", include_str!("../resources/locales/en-US.toml")),
+        ("ja-JP.toml", include_str!("../resources/locales/ja-JP.toml")),
+    ] {
+        let resource: LocaleResource = toml::from_str(content)
+            .unwrap_or_else(|error| panic!("invalid embedded FW locale {source}: {error}"));
+        resources.insert(resource.locale.clone(), resource);
+    }
+    resources
 }
 
 fn load_resources(directory: &Path) -> HashMap<String, LocaleResource> {
@@ -237,7 +250,17 @@ pub fn text(key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::select_initial_locale;
+    use super::{embedded_framework_resources, select_initial_locale, EN_US, JA_JP};
+
+    #[test]
+    fn embedded_framework_locales_are_available() {
+        let resources = embedded_framework_resources();
+        assert!(resources.contains_key(EN_US));
+        assert!(resources.contains_key(JA_JP));
+        for locale in [EN_US, JA_JP] {
+            assert!(resources[locale].strings.contains_key("framework.product_name"));
+        }
+    }
 
     #[test]
     fn os_locale_selects_matching_supported_locale() {
