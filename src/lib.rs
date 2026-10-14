@@ -1481,23 +1481,31 @@ impl FrameworkHost {
         }
     }
 
-    fn consumer_menu_items(
-        &mut self,
-        ui: &mut egui::Ui,
-        location: command::MenuLocation,
-        menu_id: Option<&str>,
-        placement: &command::MenuPlacement,
+    fn consumer_menu_items_between(
+        &mut self, ui: &mut egui::Ui, location: command::MenuLocation,
+        menu_id: Option<&str>, previous: Option<&str>, next: Option<&str>,
     ) {
-        let items = self
-            .menu_items
-            .iter()
-            .filter(|item| item.location == location && menu_id.is_none_or(|id| item.menu_id == id) && &item.placement == placement)
-            .cloned()
-            .collect::<Vec<_>>();
-        for item in items {
-            let Some(command) = self.commands.get(&item.command_id) else {
-                continue;
-            };
+        let framework: &[&str] = match location {
+            command::MenuLocation::File => &[
+                "file.new_project", "file.open_project", "file.recent_projects",
+                "file.save", "file.save_as", "file.project_properties",
+                "file.close_project", "file.exit",
+            ],
+            command::MenuLocation::Help => &["help.about"],
+            command::MenuLocation::Custom => &[],
+        };
+        let items = self.menu_items.iter()
+            .filter(|item| item.location == location && menu_id.is_none_or(|id| item.menu_id == id))
+            .cloned().collect::<Vec<_>>();
+        let order = command::resolve_menu_order(framework, &items);
+        let begin = previous.and_then(|id| order.iter().position(|x| x == id))
+            .map_or(0, |i| i + 1);
+        let end = next.and_then(|id| order.iter().position(|x| x == id))
+            .unwrap_or(order.len());
+        if begin > end { return; }
+        for id in &order[begin..end] {
+            let Some(item) = items.iter().find(|item| &item.command_id == id) else { continue; };
+            let Some(command) = self.commands.get(&item.command_id) else { continue; };
             let label = localization::text(&command.label);
             let shortcut = command.shortcut.clone().unwrap_or_default();
             let enabled = command.enabled;
@@ -1584,6 +1592,7 @@ impl FrameworkHost {
                         .project_controller
                         .as_ref()
                         .is_some_and(|c| c.is_open());
+                    self.consumer_menu_items_between(ui, command::MenuLocation::File, None, None, Some("file.new_project"));
                     if Self::project_menu_item(
                         ui,
                         localization::text("file.new_project"),
@@ -1593,6 +1602,7 @@ impl FrameworkHost {
                         ui.close();
                         self.project_new();
                     }
+                    self.consumer_menu_items_between(ui, command::MenuLocation::File, None, Some("file.new_project"), Some("file.open_project"));
                     if Self::project_menu_item(
                         ui,
                         localization::text("file.open_project"),
@@ -1602,6 +1612,7 @@ impl FrameworkHost {
                         ui.close();
                         self.project_open();
                     }
+                    self.consumer_menu_items_between(ui, command::MenuLocation::File, None, Some("file.open_project"), Some("file.recent_projects"));
                     ui.menu_button(localization::text("file.recent_projects"), |ui| {
                         ui.set_min_width(420.0);
                         if self.recent_projects.paths.is_empty() {
@@ -1638,7 +1649,8 @@ impl FrameworkHost {
                         }
                     });
                     ui.separator();
-                    self.consumer_menu_items(ui, command::MenuLocation::File, None, &command::MenuPlacement::Before("file.save".into()));
+                    
+                    self.consumer_menu_items_between(ui, command::MenuLocation::File, None, Some("file.recent_projects"), Some("file.save"));
                     if Self::project_menu_item(
                         ui,
                         localization::text("file.save"),
@@ -1648,7 +1660,8 @@ impl FrameworkHost {
                         ui.close();
                         self.project_save();
                     }
-                    self.consumer_menu_items(ui, command::MenuLocation::File, None, &command::MenuPlacement::After("file.save".into()));
+                    
+                    self.consumer_menu_items_between(ui, command::MenuLocation::File, None, Some("file.save"), Some("file.save_as"));
                     if Self::project_menu_item(
                         ui,
                         localization::text("file.save_as"),
@@ -1659,6 +1672,7 @@ impl FrameworkHost {
                         self.project_save_as();
                     }
                     ui.separator();
+                    self.consumer_menu_items_between(ui, command::MenuLocation::File, None, Some("file.save_as"), Some("file.project_properties"));
                     if Self::project_menu_item(
                         ui,
                         localization::text("file.project_properties"),
@@ -1669,6 +1683,7 @@ impl FrameworkHost {
                         self.project_properties_open();
                     }
                     ui.separator();
+                    self.consumer_menu_items_between(ui, command::MenuLocation::File, None, Some("file.project_properties"), Some("file.close_project"));
                     if Self::project_menu_item(
                         ui,
                         localization::text("file.close_project"),
@@ -1679,12 +1694,14 @@ impl FrameworkHost {
                         self.project_close(false);
                     }
                     ui.separator();
+                    self.consumer_menu_items_between(ui, command::MenuLocation::File, None, Some("file.close_project"), Some("file.exit"));
                     if Self::project_menu_item(ui, localization::text("file.exit"), "Alt+F4", true)
                     {
                         ui.close();
                         self.request_exit(ui.ctx());
                     }
-                    self.consumer_menu_items(ui, command::MenuLocation::File, None, &command::MenuPlacement::Append);
+                    self.consumer_menu_items_between(ui, command::MenuLocation::File, None, Some("file.exit"), None);
+                    
                 });
 
                 let workspace_access_key =
@@ -1735,13 +1752,15 @@ impl FrameworkHost {
                     egui::Popup::open_id(ui.ctx(), help_response.id.with("popup"));
                 }
                 egui::Popup::menu(&help_response).show(|ui| {
-                    self.consumer_menu_items(ui, command::MenuLocation::Help, None, &command::MenuPlacement::Before("help.about".into()));
+                    
+                    self.consumer_menu_items_between(ui, command::MenuLocation::Help, None, None, Some("help.about"));
                     if Self::project_menu_item(ui, localization::text("help.about"), "", true) {
                         ui.close();
                         self.project_ui.show_about = true;
                     }
-                    self.consumer_menu_items(ui, command::MenuLocation::Help, None, &command::MenuPlacement::After("help.about".into()));
-                    self.consumer_menu_items(ui, command::MenuLocation::Help, None, &command::MenuPlacement::Append);
+                    self.consumer_menu_items_between(ui, command::MenuLocation::Help, None, Some("help.about"), None);
+                    
+                    
                 });
 
                 let custom_menus = self
@@ -1758,7 +1777,7 @@ impl FrameworkHost {
                 for (menu_id, menu_label) in custom_menus {
                     let response = ui.add(egui::Button::new(localization::text(&menu_label)));
                     egui::Popup::menu(&response).show(|ui| {
-                        self.consumer_menu_items(ui, command::MenuLocation::Custom, Some(&menu_id), &command::MenuPlacement::Append)
+                        self.consumer_menu_items_between(ui, command::MenuLocation::Custom, Some(&menu_id), None, None)
                     });
                 }
             });
