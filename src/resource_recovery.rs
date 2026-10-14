@@ -220,17 +220,13 @@ fn combine_recovery(
     app: ApplicationRecoveryState,
 ) -> CombinedRecoveryState {
     if fs
-        .item_states
-        .iter()
-        .any(|s| *s == JournalItemRecoveryState::Conflict)
+        .item_states.contains(&JournalItemRecoveryState::Conflict)
         || app == ApplicationRecoveryState::Conflict
     {
         return CombinedRecoveryState::Conflict;
     }
     if fs
-        .item_states
-        .iter()
-        .any(|s| *s == JournalItemRecoveryState::Indeterminate)
+        .item_states.contains(&JournalItemRecoveryState::Indeterminate)
         || app == ApplicationRecoveryState::Indeterminate
     {
         return CombinedRecoveryState::Indeterminate;
