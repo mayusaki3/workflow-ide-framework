@@ -249,12 +249,11 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
                         rect.max.y,
                     ),
                 );
-                if model.mode == ControllerMode::Operate && response.dragged() {
-                    if let Some(p) = response.interact_pointer_pos() {
+                if model.mode == ControllerMode::Operate && response.dragged()
+                    && let Some(p) = response.interact_pointer_pos() {
                         let t = ((p.x - track_rect.left()) / track_rect.width().max(1.0))
                             .clamp(0.0, 1.0);
                         *value = *min + (*max - *min) * t;
-                    }
                 }
                 let y = rect.center().y;
                 ui.painter().line_segment(
