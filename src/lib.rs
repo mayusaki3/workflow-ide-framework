@@ -2116,11 +2116,10 @@ impl FrameworkHost {
                                         &mut context_create_parent,
                                         &mut context_delete_target,
                                     );
-                                    if response.clicked() {
-                                        if let Some(state) = self.project_ui.folder_dialog.as_mut()
-                                        {
-                                            state.selected_entry = Some(path.clone());
-                                        }
+                                    if response.clicked()
+                                        && let Some(state) = self.project_ui.folder_dialog.as_mut()
+                                    {
+                                        state.selected_entry = Some(path.clone());
                                     }
                                     if response.double_clicked() {
                                         match kind {
@@ -2339,10 +2338,10 @@ impl FrameworkHost {
                                     state.delete_folder_pending = None;
                                 }
                             }
-                            if ui.button(localization::text("common.cancel")).clicked() {
-                                if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                                    state.delete_folder_pending = None;
-                                }
+                            if ui.button(localization::text("common.cancel")).clicked()
+                                && let Some(state) = self.project_ui.folder_dialog.as_mut()
+                            {
+                                state.delete_folder_pending = None;
                             }
                         });
                     });
@@ -2360,10 +2359,10 @@ impl FrameworkHost {
                     .order(egui::Order::Foreground)
                     .show(ctx, |ui| {
                         ui.label(error);
-                        if ui.button(localization::text("common.ok")).clicked() {
-                            if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                                state.delete_folder_error = None;
-                            }
+                        if ui.button(localization::text("common.ok")).clicked()
+                            && let Some(state) = self.project_ui.folder_dialog.as_mut()
+                        {
+                            state.delete_folder_error = None;
                         }
                     });
             }
@@ -2498,10 +2497,11 @@ impl FrameworkHost {
                                 )),
                             )
                             .clicked()
+                            && self.project_controller.is_some()
+                            && let Some((context, result)) = self.project_ui.pending_open.take()
                         {
-                            if let Some((context, result)) = self.project_ui.pending_open.take() {
-                                if let Some(controller) = self.project_controller.as_mut() {
-                                    let outcome = controller.accept_open(context, result);
+                            if let Some(controller) = self.project_controller.as_mut() {
+                                let outcome = controller.accept_open(context, result);
                                     let completed = matches!(
                                         outcome,
                                         project_controller::ProjectCommandResult::Completed
@@ -2513,7 +2513,6 @@ impl FrameworkHost {
                                             project_event::ProjectEventKind::Opened,
                                         );
                                     }
-                                }
                             }
                         }
                         if ui.button(localization::text("common.cancel")).clicked() {
@@ -2997,10 +2996,10 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                 logging::LogLevel::Trace,
             ] {
                 let selected = current == level;
-                if ui.radio(selected, format!("{level:?}")).clicked() && !selected {
-                    if let Err(error) = logging::set_level(level) {
-                        tracing::error!(target: "wfide::logging", %error, "failed to change runtime log level");
-                    }
+                if ui.radio(selected, format!("{level:?}")).clicked() && !selected
+                    && let Err(error) = logging::set_level(level)
+                {
+                    tracing::error!(target: "wfide::logging", %error, "failed to change runtime log level");
                 }
             }
 
@@ -3074,17 +3073,16 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                                 .get(&link.property_panel_id)
                                 .and_then(|property| property.object_id.as_deref())
                                 == Some(element_id.as_str());
-                            if should_refresh {
-                                if let Some(element) = model
+                            if should_refresh
+                                && let Some(element) = model
                                     .elements
                                     .iter()
                                     .find(|element| element.id == *element_id)
-                                {
-                                    self.property_panels.insert(
-                                        link.property_panel_id.clone(),
-                                        controller_panel::property_model_for_element(element),
-                                    );
-                                }
+                            {
+                                self.property_panels.insert(
+                                    link.property_panel_id.clone(),
+                                    controller_panel::property_model_for_element(element),
+                                );
                             }
                         }
                     }
@@ -3117,8 +3115,8 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                 {
                     if let Some(controller) =
                         self.controller_panels.get_mut(&link.controller_panel_id)
+                        && let Some(object_id) = model.object_id.as_deref()
                     {
-                        if let Some(object_id) = model.object_id.as_deref() {
                             if object_id == "__controller_canvas__" {
                                 controller_panel::apply_canvas_property_action(controller, &action);
                             } else if let Some(element) = controller
@@ -3128,7 +3126,6 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                             {
                                 controller_panel::apply_property_action(element, &action);
                             }
-                        }
                     }
                 }
                 tracing::info!(
