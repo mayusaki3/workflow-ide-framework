@@ -19,6 +19,8 @@ use crate::{
 };
 use std::collections::BTreeMap;
 
+// Preserve the public enum's payload shape for existing application consumers.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProjectCommandResult {
     Completed,
