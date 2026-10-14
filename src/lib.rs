@@ -1638,6 +1638,7 @@ impl FrameworkHost {
                         }
                     });
                     ui.separator();
+                    self.consumer_menu_items(ui, command::MenuLocation::File, None, &command::MenuPlacement::Before("file.save".into()));
                     if Self::project_menu_item(
                         ui,
                         localization::text("file.save"),
@@ -1647,6 +1648,7 @@ impl FrameworkHost {
                         ui.close();
                         self.project_save();
                     }
+                    self.consumer_menu_items(ui, command::MenuLocation::File, None, &command::MenuPlacement::After("file.save".into()));
                     if Self::project_menu_item(
                         ui,
                         localization::text("file.save_as"),
@@ -1733,10 +1735,12 @@ impl FrameworkHost {
                     egui::Popup::open_id(ui.ctx(), help_response.id.with("popup"));
                 }
                 egui::Popup::menu(&help_response).show(|ui| {
+                    self.consumer_menu_items(ui, command::MenuLocation::Help, None, &command::MenuPlacement::Before("help.about".into()));
                     if Self::project_menu_item(ui, localization::text("help.about"), "", true) {
                         ui.close();
                         self.project_ui.show_about = true;
                     }
+                    self.consumer_menu_items(ui, command::MenuLocation::Help, None, &command::MenuPlacement::After("help.about".into()));
                     self.consumer_menu_items(ui, command::MenuLocation::Help, None, &command::MenuPlacement::Append);
                 });
 
