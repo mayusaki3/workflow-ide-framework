@@ -194,6 +194,19 @@ fn main() -> eframe::Result<()> {
         .menu_item(MenuItemDefinition::custom_key(
             "sample.i18n", "sample.menu.i18n_title", "sample.i18n_probe",
         ).menu_before("menu.help"))
+        // MENU-EXT-003C: top-level After and unknown-anchor fallback.
+        .command(CommandDefinition::new("sample.top_after_file", "Run After File", || {
+            tracing::info!("sample top-level menu after File invoked");
+        }))
+        .menu_item(MenuItemDefinition::custom(
+            "sample.top_after_file_menu", "After File", "sample.top_after_file",
+        ).menu_after("menu.file"))
+        .command(CommandDefinition::new("sample.top_missing_anchor", "Run Missing Anchor", || {
+            tracing::info!("sample top-level menu fallback invoked");
+        }))
+        .menu_item(MenuItemDefinition::custom(
+            "sample.top_missing_anchor_menu", "Missing Anchor", "sample.top_missing_anchor",
+        ).menu_after("menu.not_registered"))
         // MENU-EXT-002B: visual placement checks in File and Help.
         .command(CommandDefinition::new("sample.menu_before_save", "Before Save", || {
             tracing::info!("sample menu item before Save");
