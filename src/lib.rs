@@ -1206,10 +1206,9 @@ impl FrameworkHost {
         if let Some(path) = recent_projects::settings_path(
             &self.config.id,
             self.config.user_config_directory_name.as_deref(),
-        ) {
-            if let Err(error) = self.recent_projects.save(&path) {
-                tracing::warn!(%error, "Could not save recent projects");
-            }
+        ) && let Err(error) = self.recent_projects.save(&path)
+        {
+            tracing::warn!(%error, "Could not save recent projects");
         }
     }
 
@@ -1283,10 +1282,10 @@ impl FrameworkHost {
                 let selected = self.workspace_registry.selected_id().to_owned();
                 if let Some(projection) = restored.remove(&selected) {
                     self.workspace_docks = projection;
-                } else if let Some(workspace) = self.workspace_registry.get(&selected) {
-                    if let Ok(projection) = workspace_dock::project_workspace(workspace) {
-                        self.workspace_docks = projection;
-                    }
+                } else if let Some(workspace) = self.workspace_registry.get(&selected)
+                    && let Ok(projection) = workspace_dock::project_workspace(workspace)
+                {
+                    self.workspace_docks = projection;
                 }
                 self.workspace_docks_by_id = restored;
                 self.active_workspace_dock_id = selected;
@@ -1991,10 +1990,10 @@ impl FrameworkHost {
                 .show(ctx, |ui| {
                     ui.label(localization::text("project.folder.location"));
                     ui.horizontal(|ui| {
-                        if ui.button(localization::text("project.folder.up")).clicked() {
-                            if let Some(parent) = directory.parent() {
-                                navigate_to = Some(parent.to_path_buf());
-                            }
+                        if ui.button(localization::text("project.folder.up")).clicked()
+                            && let Some(parent) = directory.parent()
+                        {
+                            navigate_to = Some(parent.to_path_buf());
                         }
                         ui.monospace(directory.display().to_string());
                     });
@@ -2284,11 +2283,11 @@ impl FrameworkHost {
                             });
                         }
                     });
-                if dismiss_create {
-                    if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                        state.create_folder_parent = None;
-                        state.new_folder_name.clear();
-                    }
+                if dismiss_create
+                    && let Some(state) = self.project_ui.folder_dialog.as_mut()
+                {
+                    state.create_folder_parent = None;
+                    state.new_folder_name.clear();
                 }
             }
             if let Some(path) = self
@@ -2368,16 +2367,16 @@ impl FrameworkHost {
                         }
                     });
             }
-            if let Some(parent) = context_create_parent {
-                if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                    state.create_folder_parent = Some(parent);
-                    state.new_folder_name.clear();
-                }
+            if let Some(parent) = context_create_parent
+                && let Some(state) = self.project_ui.folder_dialog.as_mut()
+            {
+                state.create_folder_parent = Some(parent);
+                state.new_folder_name.clear();
             }
-            if let Some(path) = context_delete_target {
-                if let Some(state) = self.project_ui.folder_dialog.as_mut() {
-                    state.delete_folder_pending = Some(path);
-                }
+            if let Some(path) = context_delete_target
+                && let Some(state) = self.project_ui.folder_dialog.as_mut()
+            {
+                state.delete_folder_pending = Some(path);
             }
             if let Some(path) = create_folder {
                 match std::fs::create_dir(&path) {
@@ -3104,14 +3103,11 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                     .iter()
                     .filter(|link| link.property_panel_id == *tab)
                 {
-                    if let Some(flow) = self.flow_editors.get_mut(&link.flow_panel_id) {
-                        if let Some(object_id) = model.object_id.as_deref() {
-                            if let Some(node) =
-                                flow.nodes.iter_mut().find(|node| node.id == object_id)
-                            {
-                                property_panel::apply_to_flow_node(node, &action);
-                            }
-                        }
+                    if let Some(flow) = self.flow_editors.get_mut(&link.flow_panel_id)
+                        && let Some(object_id) = model.object_id.as_deref()
+                        && let Some(node) = flow.nodes.iter_mut().find(|node| node.id == object_id)
+                    {
+                        property_panel::apply_to_flow_node(node, &action);
                     }
                 }
                 for link in self
