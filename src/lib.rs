@@ -1571,6 +1571,24 @@ impl FrameworkHost {
             return;
         }
         self.project_shortcuts(ui);
+        // Consumer shortcuts are handled after the framework's reserved shortcuts.
+        // Do not steal keys from active text widgets or IME composition.
+        if !ui.ctx().wants_keyboard_input() {
+            let shortcuts: Vec<_> = self.commands.iter()
+                .filter(|command| command.enabled)
+                .filter_map(|command| command.shortcut.as_deref().and_then(command::parse_shortcut))
+                .filter(|shortcut| {
+                    !(shortcut.modifiers.command && !shortcut.modifiers.alt
+                        && matches!(shortcut.logical_key, egui::Key::N | egui::Key::O | egui::Key::S))
+                })
+                .collect();
+            for shortcut in shortcuts {
+                if ui.input_mut(|input| input.consume_shortcut(&shortcut)) {
+                    let _ = self.commands.dispatch_shortcut(&shortcut);
+                    break;
+                }
+            }
+        }
         let frame = egui::Frame::new()
             .fill(ui.visuals().faint_bg_color)
             .inner_margin(egui::Margin::symmetric(6, 3))
@@ -1795,7 +1813,18 @@ impl FrameworkHost {
             let Some(item) = self.menu_items.iter().find(|item| item.location == command::MenuLocation::Custom && item.menu_id == *id) else { continue; };
             let menu_id = item.menu_id.clone();
             let menu_label = item.menu_label.clone();
+            let access_key_pressed = item.access_key
+                .and_then(|letter| egui::Key::from_name(&letter.to_string()))
+                .is_some_and(|key| {
+                    ui.input(|input| input.modifiers.alt
+                        && !input.modifiers.ctrl
+                        && !input.modifiers.shift
+                        && input.key_pressed(key))
+                });
             let response = ui.add(egui::Button::new(localization::text(&menu_label)));
+            if access_key_pressed {
+                egui::Popup::open_id(ui.ctx(), response.id.with("popup"));
+            }
             egui::Popup::menu(&response).show(|ui| {
                 self.consumer_menu_items_between(ui, command::MenuLocation::Custom, Some(&menu_id), None, None);
             });
