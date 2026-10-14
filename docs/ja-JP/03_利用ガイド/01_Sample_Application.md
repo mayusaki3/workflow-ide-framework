@@ -64,3 +64,17 @@ Sample Applicationは個々のPanel表示だけでなく、次を確認する。
 - Layout内の各Panelへアクセスできる
 
 細かなPanelサイズやSplit比率はv0.1.0では調整対象としない。
+
+## 6. メニューとキーボード操作の検証
+
+Sample Application は、Framework 標準メニューと Consumer の追加メニューを同時に表示する。
+
+- `Alt+F`：Framework のファイルメニューを開く。
+- `Alt+T`：Consumer の「翻訳テスト (T)」メニューを開く。アクセスキーは `MenuItemDefinition::access_key('T')` で設定する。
+- `Ctrl+S`：Project の保存。 `Ctrl+Shift+S`：名前を付けて保存。
+- 長い日本語ラベルとショートカットの表示が重ならないことを確認する。
+- Consumer コマンドのショートカットが重複した場合は、最後に登録された有効なコマンドを優先する。最後のコマンドが無効なら、それ以前の有効なコマンドへ戻る。
+- `Ctrl+N`、`Ctrl+O`、`Ctrl+S` 系は Framework の Project 操作として予約する。
+- テキスト入力欄にキーボードフォーカスがある間は、Framework / Consumer ともショートカットを実行しない。IME 変換・確定操作を妨げないことを実機で確認する。
+
+回帰テスト：`cargo test -j 1`。ショートカットの重複、無効なコマンド、不一致のコマンドは `src/command.rs` の単体テストで確認する。表示と IME の挙動は GUI の手動検証項目とする。
