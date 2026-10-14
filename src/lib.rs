@@ -1434,7 +1434,23 @@ impl FrameworkHost {
         }).inner
     }
 
+    /// Avoid triggering application commands while an editor or IME owns keyboard focus.
+    fn shortcuts_blocked(ctx: &egui::Context) -> bool {
+        ctx.wants_keyboard_input()
+    }
+
+    /// Framework project shortcuts cannot be overridden by consumer commands.
+    fn is_reserved_project_shortcut(shortcut: &egui::KeyboardShortcut) -> bool {
+        let modifiers = shortcut.modifiers;
+        (modifiers.ctrl || modifiers.command)
+            && !modifiers.alt
+            && matches!(shortcut.logical_key, egui::Key::N | egui::Key::O | egui::Key::S)
+    }
+
     fn project_shortcuts(&mut self, ui: &egui::Ui) {
+        if Self::shortcuts_blocked(ui.ctx()) {
+            return;
+        }
         let modifiers = ui.input(|input| input.modifiers);
         if modifiers.alt && ui.input(|input| input.key_pressed(egui::Key::F4)) {
             self.request_exit(ui.ctx());
@@ -1578,14 +1594,11 @@ impl FrameworkHost {
         self.project_shortcuts(ui);
         // Consumer shortcuts are handled after the framework's reserved shortcuts.
         // Do not steal keys from active text widgets or IME composition.
-        if !ui.ctx().wants_keyboard_input() {
+        if !Self::shortcuts_blocked(ui.ctx()) {
             let shortcuts: Vec<_> = self.commands.iter()
                 .filter(|command| command.enabled)
                 .filter_map(|command| command.shortcut.as_deref().and_then(command::parse_shortcut))
-                .filter(|shortcut| {
-                    !(shortcut.modifiers.command && !shortcut.modifiers.alt
-                        && matches!(shortcut.logical_key, egui::Key::N | egui::Key::O | egui::Key::S))
-                })
+                .filter(|shortcut| !Self::is_reserved_project_shortcut(shortcut))
                 .collect();
             for shortcut in shortcuts {
                 if ui.input_mut(|input| input.consume_shortcut(&shortcut)) {
