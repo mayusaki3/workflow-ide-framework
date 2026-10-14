@@ -943,10 +943,10 @@ mod tests {
             vec![DockPanelKey::from(&PanelInstanceId::new("editor", "b"))],
         );
         for node in tree.iter_mut() {
-            if let Node::Leaf(leaf) = node {
-                if leaf.tabs.len() > 1 {
-                    leaf.tabs.retain(|key| key.instance_id != "b");
-                }
+            if let Node::Leaf(leaf) = node
+                && leaf.tabs.len() > 1
+            {
+                leaf.tabs.retain(|key| key.instance_id != "b");
             }
         }
         tree.set_active_tab(egui_dock::NodeIndex(2), egui_dock::TabIndex(1))
