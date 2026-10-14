@@ -1436,7 +1436,7 @@ impl FrameworkHost {
 
     /// Avoid triggering application commands while an editor or IME owns keyboard focus.
     fn shortcuts_blocked(ctx: &egui::Context) -> bool {
-        ctx.wants_keyboard_input()
+        ctx.egui_wants_keyboard_input()
     }
 
     /// Framework project shortcuts cannot be overridden by consumer commands.
@@ -1981,7 +1981,7 @@ impl FrameworkHost {
                                         .is_some_and(|selected| selected == &path);
                                     let response = ui.add_enabled(
                                         enabled,
-                                        egui::SelectableLabel::new(selected, label),
+                                        egui::Button::selectable(selected, label),
                                     );
                                     project_tree_context_menu(&response, &path, kind == ProjectFolderKind::Folder, kind == ProjectFolderKind::Folder, &mut context_create_parent, &mut context_delete_target);
                                     if response.clicked() {
