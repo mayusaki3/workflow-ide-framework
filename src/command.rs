@@ -280,6 +280,27 @@ mod localized_menu_tests {
     }
 
     #[test]
+    fn disabled_shortcuts_are_not_dispatched() {
+        use super::CommandRegistry;
+        let mut registry = CommandRegistry::default();
+        registry.register(CommandDefinition::new("disabled", "Disabled", || {
+            panic!("disabled callback must not execute");
+        }).shortcut("Ctrl+E").enabled(false)).unwrap();
+        let key = parse_shortcut("Ctrl+E").unwrap();
+        assert_eq!(registry.dispatch_shortcut(&key), None);
+    }
+
+    #[test]
+    fn unrelated_shortcuts_do_not_dispatch() {
+        use super::CommandRegistry;
+        let mut registry = CommandRegistry::default();
+        registry.register(CommandDefinition::new("export", "Export", || {
+            panic!("unrelated shortcut must not execute");
+        }).shortcut("Ctrl+E")).unwrap();
+        assert_eq!(registry.dispatch_shortcut(&parse_shortcut("Ctrl+R").unwrap()), None);
+    }
+
+    #[test]
     fn command_label_key_is_stored_without_early_translation() {
         let command = CommandDefinition::new("sample.open", "Open", || {})
             .label_key("sample.menu.open");
