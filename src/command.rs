@@ -119,9 +119,16 @@ pub struct MenuItemDefinition {
     pub command_id: String,
     pub placement: MenuPlacement,
     pub top_level_placement: MenuPlacement,
+    pub access_key: Option<char>,
 }
 
 impl MenuItemDefinition {
+    /// Alt+letter opens this custom top-level menu.
+    pub fn access_key(mut self, key: char) -> Self {
+        self.access_key = Some(key.to_ascii_uppercase());
+        self
+    }
+
     /// Position the custom top-level menu before a framework menu id.
     pub fn menu_before(mut self, anchor_id: impl Into<String>) -> Self {
         self.top_level_placement = MenuPlacement::Before(anchor_id.into());
@@ -154,6 +161,7 @@ impl MenuItemDefinition {
             command_id: command_id.into(),
             placement: MenuPlacement::Append,
             top_level_placement: MenuPlacement::Append,
+            access_key: None,
         }
     }
     pub fn help(command_id: impl Into<String>) -> Self {
@@ -164,6 +172,7 @@ impl MenuItemDefinition {
             command_id: command_id.into(),
             placement: MenuPlacement::Append,
             top_level_placement: MenuPlacement::Append,
+            access_key: None,
         }
     }
     /// Register a custom menu using a localization key for its title.
@@ -187,6 +196,7 @@ impl MenuItemDefinition {
             command_id: command_id.into(),
             placement: MenuPlacement::Append,
             top_level_placement: MenuPlacement::Append,
+            access_key: None,
         }
     }
 }
@@ -200,6 +210,12 @@ mod localized_menu_tests {
         let command = CommandDefinition::new("sample.open", "Open", || {})
             .label_key("sample.menu.open");
         assert_eq!(command.label, "sample.menu.open");
+    }
+
+    #[test]
+    fn custom_menu_access_key_is_normalized() {
+        let item = MenuItemDefinition::custom("tools", "Tools", "app.export").access_key('t');
+        assert_eq!(item.access_key, Some('T'));
     }
 
     #[test]
