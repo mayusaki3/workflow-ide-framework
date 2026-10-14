@@ -1486,11 +1486,12 @@ impl FrameworkHost {
         ui: &mut egui::Ui,
         location: command::MenuLocation,
         menu_id: Option<&str>,
+        placement: &command::MenuPlacement,
     ) {
         let items = self
             .menu_items
             .iter()
-            .filter(|item| item.location == location && menu_id.is_none_or(|id| item.menu_id == id))
+            .filter(|item| item.location == location && menu_id.is_none_or(|id| item.menu_id == id) && &item.placement == placement)
             .cloned()
             .collect::<Vec<_>>();
         for item in items {
@@ -1681,7 +1682,7 @@ impl FrameworkHost {
                         ui.close();
                         self.request_exit(ui.ctx());
                     }
-                    self.consumer_menu_items(ui, command::MenuLocation::File, None);
+                    self.consumer_menu_items(ui, command::MenuLocation::File, None, &command::MenuPlacement::Append);
                 });
 
                 let workspace_access_key =
@@ -1736,7 +1737,7 @@ impl FrameworkHost {
                         ui.close();
                         self.project_ui.show_about = true;
                     }
-                    self.consumer_menu_items(ui, command::MenuLocation::Help, None);
+                    self.consumer_menu_items(ui, command::MenuLocation::Help, None, &command::MenuPlacement::Append);
                 });
 
                 let custom_menus = self
@@ -1753,7 +1754,7 @@ impl FrameworkHost {
                 for (menu_id, menu_label) in custom_menus {
                     let response = ui.add(egui::Button::new(localization::text(&menu_label)));
                     egui::Popup::menu(&response).show(|ui| {
-                        self.consumer_menu_items(ui, command::MenuLocation::Custom, Some(&menu_id))
+                        self.consumer_menu_items(ui, command::MenuLocation::Custom, Some(&menu_id), &command::MenuPlacement::Append)
                     });
                 }
             });
