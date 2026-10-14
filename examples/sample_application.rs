@@ -193,7 +193,7 @@ fn main() -> eframe::Result<()> {
         }).label_key("sample.menu.i18n_probe"))
         .menu_item(MenuItemDefinition::custom_key(
             "sample.i18n", "sample.menu.i18n_title", "sample.i18n_probe",
-        ).before("unused.anchor").menu_before("menu.help"))
+        ).menu_before("menu.help"))
         // MENU-EXT-002B: visual placement checks in File and Help.
         .command(CommandDefinition::new("sample.menu_before_save", "Before Save", || {
             tracing::info!("sample menu item before Save");
