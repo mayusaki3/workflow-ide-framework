@@ -72,15 +72,15 @@ fn select_initial_locale<'a>(
         {
             return found.clone();
         }
-        if let Some(language) = normalized.split('-').next() {
-            if let Some(found) = available.iter().find(|locale| {
+        if let Some(language) = normalized.split('-').next()
+            && let Some(found) = available.iter().find(|locale| {
                 locale
                     .split('-')
                     .next()
                     .is_some_and(|part| part.eq_ignore_ascii_case(language))
-            }) {
-                return found.clone();
-            }
+            })
+        {
+            return found.clone();
         }
     }
     if let Some(found) = available.iter().find(|locale| locale.as_str() == fallback) {
