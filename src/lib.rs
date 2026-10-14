@@ -3113,15 +3113,15 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                         self.controller_panels.get_mut(&link.controller_panel_id)
                         && let Some(object_id) = model.object_id.as_deref()
                     {
-                            if object_id == "__controller_canvas__" {
-                                controller_panel::apply_canvas_property_action(controller, &action);
-                            } else if let Some(element) = controller
-                                .elements
-                                .iter_mut()
-                                .find(|element| element.id == object_id)
-                            {
-                                controller_panel::apply_property_action(element, &action);
-                            }
+                        if object_id == "__controller_canvas__" {
+                            controller_panel::apply_canvas_property_action(controller, &action);
+                        } else if let Some(element) = controller
+                            .elements
+                            .iter_mut()
+                            .find(|element| element.id == object_id)
+                        {
+                            controller_panel::apply_property_action(element, &action);
+                        }
                     }
                 }
                 tracing::info!(
