@@ -1701,7 +1701,7 @@ impl FrameworkHost {
                         }
                     });
                     ui.separator();
-                    
+
                     self.consumer_menu_items_between(ui, command::MenuLocation::File, None, Some("file.recent_projects"), Some("file.save"));
                     if Self::project_menu_item(
                         ui,
@@ -1712,7 +1712,7 @@ impl FrameworkHost {
                         ui.close();
                         self.project_save();
                     }
-                    
+
                     self.consumer_menu_items_between(ui, command::MenuLocation::File, None, Some("file.save"), Some("file.save_as"));
                     if Self::project_menu_item(
                         ui,
@@ -1753,7 +1753,7 @@ impl FrameworkHost {
                         self.request_exit(ui.ctx());
                     }
                     self.consumer_menu_items_between(ui, command::MenuLocation::File, None, Some("file.exit"), None);
-                    
+
                 });
 
                 self.render_custom_menus_at(ui, &top_level_order, Some("menu.file"), Some("menu.workspace"));
@@ -1806,15 +1806,15 @@ impl FrameworkHost {
                     egui::Popup::open_id(ui.ctx(), help_response.id.with("popup"));
                 }
                 egui::Popup::menu(&help_response).show(|ui| {
-                    
+
                     self.consumer_menu_items_between(ui, command::MenuLocation::Help, None, None, Some("help.about"));
                     if Self::project_menu_item(ui, localization::text("help.about"), "", true) {
                         ui.close();
                         self.project_ui.show_about = true;
                     }
                     self.consumer_menu_items_between(ui, command::MenuLocation::Help, None, Some("help.about"), None);
-                    
-                    
+
+
                 });
 
                 self.render_custom_menus_at(ui, &top_level_order, Some("menu.help"), None);
