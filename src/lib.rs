@@ -1821,7 +1821,11 @@ impl FrameworkHost {
                         && !input.modifiers.shift
                         && input.key_pressed(key))
                 });
-            let response = ui.add(egui::Button::new(localization::text(&menu_label)));
+            let mut display_label = localization::text(&menu_label).to_string();
+            if let Some(key) = item.access_key {
+                display_label.push_str(&format!(" ({})", key.to_ascii_uppercase()));
+            }
+            let response = ui.add(egui::Button::new(display_label));
             if access_key_pressed {
                 egui::Popup::open_id(ui.ctx(), response.id.with("popup"));
             }
