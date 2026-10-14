@@ -386,19 +386,17 @@ fn show_canvas(
     if let (Some(start), Some(pointer)) = (
         &model.pending_connection,
         ui.input(|i| i.pointer.hover_pos()),
-    ) {
-        if let Some(node) = model.nodes.iter().find(|n| n.id == start.node_id) {
-            if let Some(a) = port_position(
-                graph_rect,
-                node,
-                &start.port_id,
-                node_size,
-                model.pan,
-                model.zoom,
-            ) {
-                painter.line_segment([a, pointer], ui.visuals().widgets.hovered.fg_stroke);
-            }
-        }
+    ) && let Some(node) = model.nodes.iter().find(|n| n.id == start.node_id)
+        && let Some(a) = port_position(
+            graph_rect,
+            node,
+            &start.port_id,
+            node_size,
+            model.pan,
+            model.zoom,
+        )
+    {
+        painter.line_segment([a, pointer], ui.visuals().widgets.hovered.fg_stroke);
     }
 
     let mut clicked_port: Option<PortRef> = None;
