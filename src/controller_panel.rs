@@ -141,8 +141,7 @@ pub fn show(ui: &mut egui::Ui, model: &mut ControllerModel) -> ControllerRespons
     let logical = egui::vec2(model.canvas_size[0].max(1.0), model.canvas_size[1].max(1.0));
     let scale = (available.x / logical.x)
         .min(available.y / logical.y)
-        .min(1.0)
-        .max(0.05);
+        .clamp(0.05, 1.0);
     let display = logical * scale;
     let (canvas, canvas_response) = ui.allocate_exact_size(display, egui::Sense::click());
     let canvas_bg = egui::Color32::from_rgba_unmultiplied(
