@@ -1,7 +1,7 @@
 //! Consumer application command and menu definitions.
 
-use std::collections::HashMap;
 use eframe::egui;
+use std::collections::HashMap;
 
 pub type CommandCallback = Box<dyn FnMut()>;
 /// Parse a single-key keyboard shortcut such as Ctrl+E or Ctrl+Shift+S.
@@ -11,6 +11,7 @@ pub fn parse_shortcut(value: &str) -> Option<egui::KeyboardShortcut> {
     let mut key = None;
     for token in value.split('+').map(str::trim) {
         let token = token.to_ascii_uppercase();
+        if token.is_empty() { return None; }
         match token.as_str() {
             "CTRL" | "CONTROL" => modifiers.ctrl = true,
             "CMD" | "COMMAND" => modifiers.command = true,
@@ -23,7 +24,9 @@ pub fn parse_shortcut(value: &str) -> Option<egui::KeyboardShortcut> {
             }
         }
     }
-    Some(egui::KeyboardShortcut::new(modifiers, key?))
+    let key = key?;
+    if modifiers == egui::Modifiers::NONE { return None; }
+    Some(egui::KeyboardShortcut::new(modifiers, key))
 }
 
 
@@ -247,6 +250,8 @@ mod localized_menu_tests {
         assert!(parse_shortcut("Ctrl+E").is_some());
         assert!(parse_shortcut("Ctrl+Shift+S").is_some());
         assert!(parse_shortcut("Ctrl+NotAKey").is_none());
+        assert!(parse_shortcut("Ctrl+").is_none());
+        assert!(parse_shortcut("E").is_none());
     }
 
 
