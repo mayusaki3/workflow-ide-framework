@@ -193,7 +193,7 @@ fn main() -> eframe::Result<()> {
         }).label_key("sample.menu.i18n_probe"))
         .menu_item(MenuItemDefinition::custom_key(
             "sample.i18n", "sample.menu.i18n_title", "sample.i18n_probe",
-        ).menu_before("menu.help"))
+        ).access_key('T').menu_before("menu.help"))
         // MENU-EXT-003C: top-level After and unknown-anchor fallback.
         .command(CommandDefinition::new("sample.top_after_file", "Run After File", || {
             tracing::info!("sample top-level menu after File invoked");
