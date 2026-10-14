@@ -1580,6 +1580,22 @@ impl FrameworkHost {
             ));
         frame.show(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
+                let custom_menu_items = self.menu_items.iter()
+                    .filter(|item| item.location == command::MenuLocation::Custom)
+                    .fold(Vec::<command::MenuItemDefinition>::new(), |mut acc, item| {
+                        if !acc.iter().any(|x| x.menu_id == item.menu_id) { acc.push(item.clone()); }
+                        acc
+                    });
+                let top_level_order = command::resolve_menu_order(
+                    &["menu.file", "menu.workspace", "menu.help"],
+                    &custom_menu_items.iter().map(|item| {
+                        let mut item = item.clone();
+                        item.command_id = item.menu_id.clone();
+                        item.placement = item.top_level_placement.clone();
+                        item
+                    }).collect::<Vec<_>>(),
+                );
+                self.render_custom_menus_at(ui, &top_level_order, None, Some("menu.file"));
                 let file_access_key =
                     ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::F));
                 let file_response = ui.add(egui::Button::new(localization::text("file.menu")));
@@ -1704,6 +1720,7 @@ impl FrameworkHost {
                     
                 });
 
+                self.render_custom_menus_at(ui, &top_level_order, Some("menu.file"), Some("menu.workspace"));
                 let workspace_access_key =
                     ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::W));
                 let workspace_response = ui.add(egui::Button::new(localization::text("workspace.menu")));
@@ -1745,6 +1762,7 @@ impl FrameworkHost {
                     }
                 });
 
+                self.render_custom_menus_at(ui, &top_level_order, Some("menu.workspace"), Some("menu.help"));
                 let help_access_key =
                     ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::H));
                 let help_response = ui.add(egui::Button::new(localization::text("help.menu")));
@@ -1763,25 +1781,25 @@ impl FrameworkHost {
                     
                 });
 
-                let custom_menus = self
-                    .menu_items
-                    .iter()
-                    .filter(|item| item.location == command::MenuLocation::Custom)
-                    .map(|item| (item.menu_id.clone(), item.menu_label.clone()))
-                    .fold(Vec::<(String, String)>::new(), |mut acc, item| {
-                        if !acc.iter().any(|x| x.0 == item.0) {
-                            acc.push(item);
-                        }
-                        acc
-                    });
-                for (menu_id, menu_label) in custom_menus {
-                    let response = ui.add(egui::Button::new(localization::text(&menu_label)));
-                    egui::Popup::menu(&response).show(|ui| {
-                        self.consumer_menu_items_between(ui, command::MenuLocation::Custom, Some(&menu_id), None, None)
-                    });
-                }
+                self.render_custom_menus_at(ui, &top_level_order, Some("menu.help"), None);
             });
         });
+    }
+
+    fn render_custom_menus_at(&mut self, ui: &mut egui::Ui, order: &[String], previous: Option<&str>, next: Option<&str>) {
+        let begin = previous.and_then(|id| order.iter().position(|x| x == id)).map_or(0, |i| i + 1);
+        let end = next.and_then(|id| order.iter().position(|x| x == id)).unwrap_or(order.len());
+        if begin > end { return; }
+        for id in &order[begin..end] {
+            if matches!(id.as_str(), "menu.file" | "menu.workspace" | "menu.help") { continue; }
+            let Some(item) = self.menu_items.iter().find(|item| item.location == command::MenuLocation::Custom && item.menu_id == *id) else { continue; };
+            let menu_id = item.menu_id.clone();
+            let menu_label = item.menu_label.clone();
+            let response = ui.add(egui::Button::new(localization::text(&menu_label)));
+            egui::Popup::menu(&response).show(|ui| {
+                self.consumer_menu_items_between(ui, command::MenuLocation::Custom, Some(&menu_id), None, None);
+            });
+        }
     }
 
     fn project_dialogs(&mut self, ctx: &egui::Context) {
