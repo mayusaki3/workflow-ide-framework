@@ -2709,7 +2709,6 @@ impl eframe::App for FrameworkHost {
 
         ui.heading(&self.config.name);
         ui.label(format!("Application ID: {}", self.config.id));
-        ui.label("workflow-ide-framework v0.1.0 Sample");
 
         if !self.workspace_docks.normal.is_empty() || !self.workspace_docks.floating.is_empty() {
             ui.separator();
