@@ -1408,25 +1408,30 @@ impl FrameworkHost {
     }
 
     fn project_menu_item(ui: &mut egui::Ui, label: String, shortcut: &str, enabled: bool) -> bool {
-        let width = 230.0;
+        // Reserve separate space for translated labels and shortcut hints.
+        // The old 230-point row allowed long Japanese labels to overlap Ctrl+Shift+S.
+        let label_width = 230.0;
+        let shortcut_width = 115.0;
+        let width = label_width + shortcut_width;
         ui.add_enabled_ui(enabled, |ui| {
             ui.set_min_width(width);
-            let response = ui
-                .allocate_ui_with_layout(
-                    egui::vec2(width, 22.0),
-                    egui::Layout::left_to_right(egui::Align::Center),
-                    |ui| {
-                        let label_response = ui.selectable_label(false, label);
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.weak(shortcut);
-                        });
-                        label_response
-                    },
-                )
-                .inner;
-            response.clicked()
-        })
-        .inner
+            ui.allocate_ui_with_layout(
+                egui::vec2(width, 22.0),
+                egui::Layout::left_to_right(egui::Align::Center),
+                |ui| {
+                    let label_response = ui.add_sized(
+                        egui::vec2(label_width, 22.0),
+                        egui::Button::selectable(false, label),
+                    );
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(shortcut_width, 22.0),
+                        egui::Layout::right_to_left(egui::Align::Center),
+                        |ui| { ui.weak(shortcut); },
+                    );
+                    label_response.clicked()
+                },
+            ).inner
+        }).inner
     }
 
     fn project_shortcuts(&mut self, ui: &egui::Ui) {
