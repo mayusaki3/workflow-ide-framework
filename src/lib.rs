@@ -188,22 +188,13 @@ impl ApplicationConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct WindowConfig {
     pub title: Option<String>,
     pub initial_size: Option<[f32; 2]>,
     pub min_size: Option<[f32; 2]>,
 }
 
-impl Default for WindowConfig {
-    fn default() -> Self {
-        Self {
-            title: None,
-            initial_size: None,
-            min_size: None,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct AppearanceConfig {
