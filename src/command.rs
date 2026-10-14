@@ -194,3 +194,82 @@ mod localized_menu_tests {
         assert_eq!(item.menu_label, "sample.menu.title");
     }
 }
+
+/** Resolve consumer item order relative to stable command IDs.
+ * Unknown anchors fall back to the end; cyclic anchors also remain visible.
+ * Framework command IDs are supplied as the initial order.
+ */
+pub fn resolve_menu_order<'a>(
+    framework_ids: &[&str],
+    items: &'a [MenuItemDefinition],
+) -> Vec<String> {
+    let mut order: Vec<String> = framework_ids.iter().map(|id| (*id).to_owned()).collect();
+    let mut pending: Vec<&MenuItemDefinition> = items.iter().collect();
+    // Iterative resolution supports anchors that refer to other consumer commands.
+    while !pending.is_empty() {
+        let mut next = Vec::new();
+        let mut progress = false;
+        for item in pending {
+            let anchor = match &item.placement {
+                MenuPlacement::Append => None,
+                MenuPlacement::Before(id) | MenuPlacement::After(id) => Some(id.as_str()),
+            };
+            if let Some(anchor) = anchor {
+                if let Some(index) = order.iter().position(|id| id == anchor) {
+                    let position = if matches!(item.placement, MenuPlacement::After(_)) {
+                        index + 1
+                    } else {
+                        index
+                    };
+                    order.insert(position, item.command_id.clone());
+                    progress = true;
+                } else {
+                    next.push(item);
+                }
+            } else {
+                order.push(item.command_id.clone());
+                progress = true;
+            }
+        }
+        if !progress {
+            // Missing and cyclic anchors are appended in registration order.
+            order.extend(next.into_iter().map(|item| item.command_id.clone()));
+            break;
+        }
+        pending = next;
+    }
+    order
+}
+
+#[cfg(test)]
+mod menu_order_tests {
+    use super::{resolve_menu_order, MenuItemDefinition};
+
+    #[test]
+    fn positions_before_and_after_framework_commands() {
+        let items = vec![
+            MenuItemDefinition::file("export").after("save"),
+            MenuItemDefinition::file("import").before("save"),
+        ];
+        assert_eq!(resolve_menu_order(&["new", "save"], &items), ["new", "import", "save", "export"]);
+    }
+
+    #[test]
+    fn resolves_forward_references_to_consumer_commands() {
+        let items = vec![
+            MenuItemDefinition::file("a").after("b"),
+            MenuItemDefinition::file("b").after("save"),
+        ];
+        assert_eq!(resolve_menu_order(&["save"], &items), ["save", "b", "a"]);
+    }
+
+    #[test]
+    fn missing_and_cyclic_anchors_remain_visible() {
+        let items = vec![
+            MenuItemDefinition::file("a").after("missing"),
+            MenuItemDefinition::file("b").after("c"),
+            MenuItemDefinition::file("c").after("b"),
+        ];
+        assert_eq!(resolve_menu_order(&["save"], &items), ["save", "a", "b", "c"]);
+    }
+}
