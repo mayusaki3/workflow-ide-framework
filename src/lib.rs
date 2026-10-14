@@ -955,6 +955,8 @@ fn project_browser_roots() -> Vec<std::path::PathBuf> {
     }
 }
 
+// Recursive tree rendering passes independent navigation and context-menu outputs.
+#[allow(clippy::too_many_arguments)]
 fn show_project_folder_tree(
     ui: &mut egui::Ui,
     path: &std::path::Path,
@@ -2499,20 +2501,19 @@ impl FrameworkHost {
                             .clicked()
                             && self.project_controller.is_some()
                             && let Some((context, result)) = self.project_ui.pending_open.take()
+                            && let Some(controller) = self.project_controller.as_mut()
                         {
-                            if let Some(controller) = self.project_controller.as_mut() {
-                                let outcome = controller.accept_open(context, result);
-                                    let completed = matches!(
-                                        outcome,
-                                        project_controller::ProjectCommandResult::Completed
-                                    );
-                                    self.handle_project_result(outcome, None);
-                                    if completed {
-                                        self.restore_project_workspaces();
-                                        self.emit_project_event(
-                                            project_event::ProjectEventKind::Opened,
-                                        );
-                                    }
+                            let outcome = controller.accept_open(context, result);
+                            let completed = matches!(
+                                outcome,
+                                project_controller::ProjectCommandResult::Completed
+                            );
+                            self.handle_project_result(outcome, None);
+                            if completed {
+                                self.restore_project_workspaces();
+                                self.emit_project_event(
+                                    project_event::ProjectEventKind::Opened,
+                                );
                             }
                         }
                         if ui.button(localization::text("common.cancel")).clicked() {
