@@ -73,9 +73,7 @@ where
             }
             ResourceOperationKind::Replace => Ok(()),
         };
-        if let Err(error) = result {
-            return Err(error);
-        }
+        result?;
     }
 
     apply_framework_state(registry, framework_uses, plan, &journal);
