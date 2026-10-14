@@ -68,21 +68,13 @@ pub enum TextEditorAction {
     SaveRequested,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TextEditorOptions {
     pub word_wrap: bool,
     /// Draw IME/caret coordinate diagnostics in the editor. Verification only.
     pub ime_debug: bool,
 }
 
-impl Default for TextEditorOptions {
-    fn default() -> Self {
-        Self {
-            word_wrap: false,
-            ime_debug: false,
-        }
-    }
-}
 
 #[derive(Debug, Default)]
 pub struct TextEditorResponse {
