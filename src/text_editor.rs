@@ -233,7 +233,7 @@ pub fn show_with_options(
                         if options.ime_debug && output.response.has_focus() {
                             let cursor = output.galley.pos_from_cursor(range.primary);
                             let caret = cursor.translate(output.galley_pos.to_vec2());
-                            let ime = ui.ctx().output(|platform| platform.ime.clone());
+                            let ime = ui.ctx().output(|platform| platform.ime);
 
                             ui.painter().rect_stroke(
                                 caret,
