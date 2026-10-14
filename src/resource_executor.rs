@@ -224,6 +224,8 @@ fn replace_uses(
     }
 }
 
+// Keep the established public resource execution API compatible with consumers.
+#[allow(clippy::too_many_arguments)]
 pub fn execute_prepared_operation<A, F>(
     application: &mut A,
     context: &ProjectContext,
