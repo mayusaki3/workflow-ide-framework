@@ -2707,8 +2707,6 @@ impl eframe::App for FrameworkHost {
         ui.ctx()
             .send_viewport_cmd(egui::ViewportCommand::Title(window_title));
 
-        ui.heading(&self.config.name);
-        ui.label(format!("Application ID: {}", self.config.id));
 
         if !self.workspace_docks.normal.is_empty() || !self.workspace_docks.floating.is_empty() {
             ui.separator();
