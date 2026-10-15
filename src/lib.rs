@@ -3193,6 +3193,9 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                             "tree node selected"
                         );
                     }
+                    tree_viewer::TreeAction::SelectionChanged { .. }
+                    | tree_viewer::TreeAction::Activated { .. }
+                    | tree_viewer::TreeAction::ContextRequested { .. } => {}
                 }
             }
             return;
