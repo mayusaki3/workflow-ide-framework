@@ -198,3 +198,69 @@ fn pp_hyb_005_duplicate_node_id_is_rejected() {
         AppPanelTreeError::DuplicateNodeId("same".into())
     );
 }
+
+#[test]
+fn pp_hyb_013_tree_events_map_to_application_actions() {
+    use workflow_ide_framework::{
+        project_panel_api::app_action_from_tree_action,
+        tree_viewer::TreeAction,
+    };
+    assert_eq!(
+        app_action_from_tree_action(&TreeAction::SelectionChanged {
+            node_ids: vec!["robot01".into(), "robot02".into()],
+        }),
+        Some(AppPanelAction::Selected {
+            node_ids: vec!["robot01".into(), "robot02".into()],
+        })
+    );
+    assert_eq!(
+        app_action_from_tree_action(&TreeAction::Activated {
+            node_id: "robot01".into(),
+        }),
+        Some(AppPanelAction::Activated {
+            node_id: "robot01".into(),
+        })
+    );
+    assert_eq!(
+        app_action_from_tree_action(&TreeAction::ContextRequested {
+            node_ids: vec!["robot01".into()],
+        }),
+        None
+    );
+}
+
+#[test]
+fn pp_hyb_014_fallback_only_on_not_handled() {
+    use workflow_ide_framework::project_panel_api::dispatch_project_panel_action;
+    let mut provider = RobotProvider;
+    let project = ProjectContext::new("example");
+    let mut called = false;
+    let result = dispatch_project_panel_action(
+        &mut provider,
+        &project,
+        AppPanelAction::Selected {
+            node_ids: vec!["robot01".into()],
+        },
+        |_| {
+            called = true;
+            AppPanelActionResult::Handled
+        },
+    );
+    assert_eq!(result, AppPanelActionResult::Handled);
+    assert!(called);
+
+    called = false;
+    let result = dispatch_project_panel_action(
+        &mut provider,
+        &project,
+        AppPanelAction::Activated {
+            node_id: "robot01".into(),
+        },
+        |_| {
+            called = true;
+            AppPanelActionResult::Handled
+        },
+    );
+    assert_eq!(result, AppPanelActionResult::Handled);
+    assert!(!called);
+}
