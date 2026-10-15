@@ -2813,6 +2813,15 @@ impl eframe::App for FrameworkHost {
                 text_editor_options: &mut self.text_editor_options,
                 log_viewers: &mut self.log_viewers,
                 tree_viewers: &mut self.tree_viewers,
+                project_panel_id: self.project_panel_id.as_deref(),
+                project_panel_selection: &mut self.project_panel_selection,
+                project_panel_provider: &mut self.project_panel_provider,
+                project_panel_context: self
+                    .project_controller
+                    .as_ref()
+                    .and_then(|controller| controller.session.as_ref())
+                    .and_then(|session| session.context())
+                    .cloned(),
                 flow_editors: &mut self.flow_editors,
                 property_panels: &mut self.property_panels,
                 flow_property_links: &self.flow_property_links,
@@ -2953,6 +2962,11 @@ struct FrameworkTabViewer<'a> {
     text_editor_options: &'a mut std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: &'a mut std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: &'a mut std::collections::HashMap<String, tree_viewer::TreeModel>,
+    project_panel_id: Option<&'a str>,
+    project_panel_selection: &'a mut tree_viewer::TreeSelection,
+    project_panel_provider:
+        &'a mut Option<Box<dyn project_panel_api::ApplicationProjectPanelProvider>>,
+    project_panel_context: Option<project::ProjectContext>,
     flow_editors: &'a mut std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: &'a mut std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: &'a [FlowPropertyLink],
@@ -3275,12 +3289,7 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
             if self.project_panel_id.as_deref() == Some(tab.as_str()) {
                 let response =
                     tree_viewer::show_with_selection(ui, model, &mut self.project_panel_selection);
-                let project = self
-                    .project_controller
-                    .as_ref()
-                    .and_then(|controller| controller.session.as_ref())
-                    .and_then(|session| session.context())
-                    .cloned();
+                let project = self.project_panel_context.clone();
                 if let (Some(project), Some(provider)) =
                     (project, self.project_panel_provider.as_mut())
                 {
