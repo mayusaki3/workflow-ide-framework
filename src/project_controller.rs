@@ -64,9 +64,12 @@ impl ProjectController {
             Ok(session) => session,
             Err(_) => return ProjectCommandResult::NeedsSaveLocation,
         };
-        if let Some(context) = session.context()
-            && let Err(error) = application.initialize_project(context)
-        {
+        let initialization = if let Some(context) = session.context() {
+            application.initialize_project(context)
+        } else {
+            application.initialize_unsaved_project()
+        };
+        if let Err(error) = initialization {
             return ProjectCommandResult::Failed(error);
         }
         self.project_file = Some(self.project_template(name, language, description));
