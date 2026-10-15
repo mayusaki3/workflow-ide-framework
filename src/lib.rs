@@ -3273,11 +3273,8 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
 
         if let Some(model) = self.tree_viewers.get_mut(tab) {
             if self.project_panel_id.as_deref() == Some(tab.as_str()) {
-                let response = tree_viewer::show_with_selection(
-                    ui,
-                    model,
-                    &mut self.project_panel_selection,
-                );
+                let response =
+                    tree_viewer::show_with_selection(ui, model, &mut self.project_panel_selection);
                 let project = self
                     .project_controller
                     .as_ref()
