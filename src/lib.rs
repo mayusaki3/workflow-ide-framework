@@ -1262,6 +1262,7 @@ impl FrameworkHost {
         self.handle_project_result(result, None);
         if completed {
             self.emit_project_event(project_event::ProjectEventKind::Created);
+            self.project_save_as();
         }
     }
 
