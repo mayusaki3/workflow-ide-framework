@@ -21,6 +21,7 @@ pub mod project_io;
 pub mod project_lifecycle;
 pub mod project_open;
 pub mod project_panel;
+pub mod project_panel_api;
 pub mod project_resource;
 pub mod project_save;
 pub mod project_save_as;
