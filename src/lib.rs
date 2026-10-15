@@ -1702,7 +1702,12 @@ impl FrameworkHost {
             };
             let label = localization::text(&command.label);
             let shortcut = command.shortcut.clone().unwrap_or_default();
-            let enabled = command.enabled;
+            let enabled = command.enabled
+                && (!command.requires_stored_project
+                    || self
+                        .project_controller
+                        .as_ref()
+                        .is_some_and(|controller| controller.has_stored_project()));
             if Self::project_menu_item(ui, label, &shortcut, enabled) {
                 ui.close();
                 let _ = self.commands.dispatch(&item.command_id);
@@ -1796,7 +1801,14 @@ impl FrameworkHost {
             let shortcuts: Vec<_> = self
                 .commands
                 .iter()
-                .filter(|command| command.enabled)
+                .filter(|command| {
+                    command.enabled
+                        && (!command.requires_stored_project
+                            || self
+                                .project_controller
+                                .as_ref()
+                                .is_some_and(|controller| controller.has_stored_project()))
+                })
                 .filter_map(|command| {
                     command
                         .shortcut
