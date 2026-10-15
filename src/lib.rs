@@ -1662,6 +1662,7 @@ impl FrameworkHost {
                     self.project_panel_lifecycle.close_project();
                 }
             }
+            project_event::ProjectEventKind::CloseRequested => {}
             project_event::ProjectEventKind::Saved => {
                 self.project_panel_lifecycle.invalidate_application_project_panel();
             }
