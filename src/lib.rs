@@ -1779,21 +1779,7 @@ impl FrameworkHost {
     }
 
     fn application_menu(&mut self, ui: &mut egui::Ui) {
-        if self.modal_dialog_open() {
-            let frame = egui::Frame::new()
-                .fill(ui.visuals().faint_bg_color)
-                .inner_margin(egui::Margin::symmetric(6, 3));
-            frame.show(ui, |ui| {
-                ui.add_enabled_ui(false, |ui| {
-                    egui::MenuBar::new().ui(ui, |ui| {
-                        let _ = ui.button(localization::text("file.menu"));
-                        let _ = ui.button(localization::text("workspace.menu"));
-                        let _ = ui.button(localization::text("help.menu"));
-                    });
-                });
-            });
-            return;
-        }
+        let modal_dialog_open = self.modal_dialog_open();
         self.project_shortcuts(ui);
         // Consumer shortcuts are handled after the framework's reserved shortcuts.
         // Do not steal keys from active text widgets or IME composition.
@@ -1838,6 +1824,7 @@ impl FrameworkHost {
                 ui.visuals().widgets.noninteractive.bg_stroke.color,
             ));
         frame.show(ui, |ui| {
+            ui.add_enabled_ui(!modal_dialog_open, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 let custom_menu_items = self.menu_items.iter()
                     .filter(|item| item.location == command::MenuLocation::Custom)
@@ -2041,6 +2028,7 @@ impl FrameworkHost {
                 });
 
                 self.render_custom_menus_at(ui, &top_level_order, Some("menu.help"), None);
+            });
             });
         });
     }
