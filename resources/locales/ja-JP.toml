@@ -117,3 +117,5 @@ name = "日本語"
 "project.folder.delete_not_empty" = "フォルダが空ではないため削除できません。"
 "project.folder.delete_failed" = "フォルダの削除に失敗しました。"
 "project.folder.os_error" = "OSの詳細"
+
+"project.title.unsaved" = "未保存"
