@@ -131,3 +131,40 @@ fn build_application_node(
     }
     Ok(tree)
 }
+
+/// Convert extended Tree Viewer events into application-facing events.
+/// Context menus choose an action separately; ContextRequested itself is not dispatched.
+pub fn app_action_from_tree_action(
+    action: &crate::tree_viewer::TreeAction,
+) -> Option<AppPanelAction> {
+    match action {
+        crate::tree_viewer::TreeAction::Selected { node_id } => Some(AppPanelAction::Selected {
+            node_ids: vec![node_id.clone()],
+        }),
+        crate::tree_viewer::TreeAction::SelectionChanged { node_ids } => {
+            Some(AppPanelAction::Selected {
+                node_ids: node_ids.clone(),
+            })
+        }
+        crate::tree_viewer::TreeAction::Activated { node_id } => {
+            Some(AppPanelAction::Activated {
+                node_id: node_id.clone(),
+            })
+        }
+        crate::tree_viewer::TreeAction::ContextRequested { .. } => None,
+    }
+}
+
+/// Dispatch an application action and invoke the supported framework fallback
+/// only if the application explicitly returns NotHandled.
+pub fn dispatch_project_panel_action(
+    provider: &mut impl ApplicationProjectPanelProvider,
+    project: &ProjectContext,
+    action: AppPanelAction,
+    fallback: impl FnOnce(&AppPanelAction) -> AppPanelActionResult,
+) -> AppPanelActionResult {
+    match provider.handle_project_panel_action(project, action.clone()) {
+        AppPanelActionResult::NotHandled => fallback(&action),
+        result => result,
+    }
+}
