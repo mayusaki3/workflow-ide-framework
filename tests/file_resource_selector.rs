@@ -35,7 +35,7 @@ fn single_selection_returns_project_relative_reference() {
     let result =
         request(ResourceSelectionMode::Single).validate(&roots, ResourceScope::Project, vec![file]);
     assert!(
-        matches!(result,FileSelectionResult::Selected(ref v) if v.len()==1 && v[0].path==PathBuf::from("image.PNG"))
+        matches!(result,FileSelectionResult::Selected(ref v) if v.len()==1 && v[0].path == std::path::Path::new("image.PNG"))
     );
     let _ = fs::remove_dir_all(base);
 }
