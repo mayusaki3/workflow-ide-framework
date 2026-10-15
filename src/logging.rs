@@ -39,13 +39,23 @@ pub struct LogEntry {
     pub time: String,
     pub level: LogLevel,
     pub target: String,
+    pub process_id: u32,
+    pub thread_id: String,
+    pub thread_name: Option<String>,
     pub message: Option<String>,
     pub fields: Vec<(String, String)>,
 }
 
 impl LogEntry {
     pub fn display_text(&self) -> String {
-        let mut text = format!("{} {:?} {}", self.time, self.level, self.target);
+        let mut text = format!(
+            "{} {:?} {} pid={} tid={}",
+            self.time, self.level, self.target, self.process_id, self.thread_id
+        );
+        if let Some(name) = &self.thread_name {
+            text.push_str(" thread=");
+            text.push_str(name);
+        }
         if let Some(message) = &self.message {
             text.push_str(": ");
             text.push_str(message);
@@ -121,10 +131,14 @@ where
             }
         }
 
+        let current_thread = std::thread::current();
         let entry = LogEntry {
             time,
             level,
             target,
+            process_id: std::process::id(),
+            thread_id: format!("{:?}", current_thread.id()),
+            thread_name: current_thread.name().map(str::to_owned),
             message: visitor.message,
             fields,
         };
@@ -270,6 +284,8 @@ pub fn init(
     // Log Viewer must receive structured/plain data rather than terminal control codes.
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_target(true)
+        .with_thread_ids(true)
+        .with_thread_names(true)
         .with_ansi(false)
         .with_writer(make_writer)
         // The in-memory Log Viewer is line-oriented. Prevent pretty/multiline
