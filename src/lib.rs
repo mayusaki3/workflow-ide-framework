@@ -122,9 +122,20 @@ impl PanelDefinition {
     }
 }
 
-fn project_window_title(application_title: &str, project_name: &str, dirty: bool) -> String {
+fn project_window_title(
+    application_title: &str,
+    project_name: &str,
+    dirty: bool,
+    never_saved: bool,
+    unsaved_label: &str,
+) -> String {
     format!(
-        "{application_title} - {project_name}{}",
+        "{application_title} - {project_name}{}{}",
+        if never_saved {
+            format!(" [{unsaved_label}]")
+        } else {
+            String::new()
+        },
         if dirty { " *" } else { "" }
     )
 }
@@ -136,15 +147,27 @@ mod project_title_tests {
     #[test]
     fn dirty_project_has_unsaved_marker() {
         assert_eq!(
-            project_window_title("App", "Project", true),
+            project_window_title("App", "Project", true, false, "Unsaved"),
             "App - Project *"
+        );
+    }
+
+    #[test]
+    fn never_saved_project_shows_localized_label_and_dirty_marker() {
+        assert_eq!(
+            project_window_title("App", "Project", true, true, "未保存"),
+            "App - Project [未保存] *"
+        );
+        assert_eq!(
+            project_window_title("App", "Project", false, true, "Unsaved"),
+            "App - Project [Unsaved]"
         );
     }
 
     #[test]
     fn saved_project_has_no_unsaved_marker() {
         assert_eq!(
-            project_window_title("App", "Project", false),
+            project_window_title("App", "Project", false, false, "Unsaved"),
             "App - Project"
         );
     }
@@ -2800,7 +2823,16 @@ impl eframe::App for FrameworkHost {
                         .session
                         .as_ref()
                         .is_some_and(|session| session.dirty.is_dirty());
-                    project_window_title(application_title, project_name, dirty)
+                    let never_saved = controller.session.as_ref().is_some_and(|session| {
+                        matches!(session.storage, project_lifecycle::ProjectStorageState::Unsaved)
+                    });
+                    project_window_title(
+                        application_title,
+                        project_name,
+                        dirty,
+                        never_saved,
+                        &localization::text("project.title.unsaved"),
+                    )
                 })
             })
             .unwrap_or_else(|| application_title.to_owned());
