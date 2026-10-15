@@ -20,9 +20,9 @@ fn command_registry_rejects_duplicates_and_respects_enabled() {
         registry.register(CommandDefinition::new("app.run", "Run", || {})),
         Err(CommandRegistryError::DuplicateId(_))
     ));
-    assert_eq!(registry.dispatch("app.run").unwrap(), true);
+    assert!(registry.dispatch("app.run").unwrap());
     registry.set_enabled("app.run", false).unwrap();
-    assert_eq!(registry.dispatch("app.run").unwrap(), false);
+    assert!(!registry.dispatch("app.run").unwrap());
     assert_eq!(*count.borrow(), 1);
 }
 
