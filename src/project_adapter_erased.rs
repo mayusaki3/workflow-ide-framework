@@ -8,6 +8,7 @@ use crate::{
 /// Object-safe form used by the Framework host while preserving the typed
 /// ApplicationProjectAdapter as the Consumer-facing implementation contract.
 pub trait ErasedApplicationProjectAdapter {
+    fn initialize_unsaved_project(&mut self) -> Result<(), String>;
     fn initialize_project(&mut self, context: &ProjectContext) -> Result<(), String>;
     fn inspect_project_data(
         &mut self,
@@ -32,6 +33,10 @@ pub trait ErasedApplicationProjectAdapter {
 }
 
 impl<A: ApplicationProjectAdapter> ErasedApplicationProjectAdapter for A {
+    fn initialize_unsaved_project(&mut self) -> Result<(), String> {
+        ApplicationProjectAdapter::initialize_unsaved_project(self).map_err(|e| e.to_string())
+    }
+
     fn initialize_project(&mut self, context: &ProjectContext) -> Result<(), String> {
         ApplicationProjectAdapter::initialize_project(self, context).map_err(|e| e.to_string())
     }
