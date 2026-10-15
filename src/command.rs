@@ -40,6 +40,7 @@ pub struct CommandDefinition {
     pub label: String,
     pub shortcut: Option<String>,
     pub enabled: bool,
+    pub requires_stored_project: bool,
     callback: CommandCallback,
 }
 
@@ -54,6 +55,7 @@ impl CommandDefinition {
             label: label.into(),
             shortcut: None,
             enabled: true,
+            requires_stored_project: false,
             callback: Box::new(callback),
         }
     }
@@ -65,6 +67,12 @@ impl CommandDefinition {
             "invalid command shortcut: {shortcut}"
         );
         self.shortcut = Some(shortcut);
+        self
+    }
+
+    /// Disable this command until the current project has a confirmed storage location.
+    pub fn requires_stored_project(mut self) -> Self {
+        self.requires_stored_project = true;
         self
     }
 
