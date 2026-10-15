@@ -892,7 +892,7 @@ fn project_folder_kind(path: &std::path::Path, application_id: &str) -> ProjectF
     }
 }
 
-fn project_browser_visible_directory(path: &std::path::Path) -> bool {
+fn project_browser_visible_directory(_path: &std::path::Path) -> bool {
     // Leading dots are valid folder-name characters (e.g. ".A").
     // On Windows, hide only directories explicitly marked hidden/system.
     #[cfg(windows)]
@@ -900,7 +900,7 @@ fn project_browser_visible_directory(path: &std::path::Path) -> bool {
         use std::os::windows::fs::MetadataExt;
         const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
         const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
-        if let Ok(metadata) = std::fs::metadata(path) {
+        if let Ok(metadata) = std::fs::metadata(_path) {
             let attributes = metadata.file_attributes();
             if attributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM) != 0 {
                 return false;
@@ -1095,7 +1095,7 @@ fn project_tree_context_menu(
             #[cfg(target_os = "macos")]
             let result = std::process::Command::new("open").arg(open_path).spawn();
             #[cfg(all(not(windows), not(target_os = "macos")))]
-            let result = std::process::Command::new("xdg-open").arg(parent).spawn();
+            let result = std::process::Command::new("xdg-open").arg(open_path).spawn();
             if let Err(error) = result {
                 ui.label(error.to_string());
             }
