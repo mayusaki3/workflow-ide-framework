@@ -1410,10 +1410,6 @@ impl FrameworkHost {
 
     fn project_save(&mut self) {
         self.sync_unsaved_notifications();
-        if self.project_panel_refresh.take_pending() {
-            self.project_panel_lifecycle.invalidate_application_project_panel();
-        }
-        self.refresh_application_project_panel();
         if let Err(error) = self.capture_project_workspaces() {
             self.project_ui.message = Some(format!("Workspace layout capture failed: {error:?}"));
             return;
@@ -2759,6 +2755,11 @@ impl FrameworkHost {
 impl eframe::App for FrameworkHost {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.sync_unsaved_notifications();
+        if self.project_panel_refresh.take_pending() {
+            self.project_panel_lifecycle
+                .invalidate_application_project_panel();
+        }
+        self.refresh_application_project_panel();
         if let Err(error) = self.sync_active_workspace_dock() {
             tracing::warn!(target: "wfide::workspace", ?error, "workspace dock switch rejected");
         }
