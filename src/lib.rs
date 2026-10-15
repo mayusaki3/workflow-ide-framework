@@ -2089,9 +2089,20 @@ impl FrameworkHost {
             if let Some(key) = item.access_key {
                 display_label.push_str(&format!(" ({})", key.to_ascii_uppercase()));
             }
-            let response = ui.add(egui::Button::new(display_label));
-            if access_key_pressed {
+            let enabled = !self.menu_items.iter().any(|entry| {
+                entry.location == command::MenuLocation::Custom
+                    && entry.menu_id == menu_id
+                    && entry.requires_stored_project
+            }) || self
+                .project_controller
+                .as_ref()
+                .is_some_and(|controller| controller.has_stored_project());
+            let response = ui.add_enabled(enabled, egui::Button::new(display_label));
+            if enabled && access_key_pressed {
                 egui::Popup::open_id(ui.ctx(), response.id.with("popup"));
+            }
+            if !enabled {
+                egui::Popup::close_id(ui.ctx(), response.id.with("popup"));
             }
             egui::Popup::menu(&response).show(|ui| {
                 self.consumer_menu_items_between(
