@@ -129,3 +129,69 @@ fn pp_hyb_013_014_actions_and_not_handled_result() {
         AppPanelActionResult::Handled
     );
 }
+
+#[test]
+fn pp_hyb_015_unknown_registry_resource_is_rejected() {
+    use workflow_ide_framework::{
+        project_panel_api::{build_application_project_tree, AppPanelTreeError},
+        resource_registry::ResourceRegistry,
+    };
+    let roots = RobotProvider.project_panel_roots(&ProjectContext::new("example"));
+    let result = build_application_project_tree(&roots, &ResourceRegistry::default());
+    assert_eq!(
+        result.unwrap_err(),
+        AppPanelTreeError::UnknownRegisteredResource("urdf-registry-id".into())
+    );
+}
+
+#[test]
+fn pp_hyb_002_registry_resources_are_resolved() {
+    use workflow_ide_framework::{
+        project_panel_api::build_application_project_tree,
+        project_resource::{ResourceReference, ResourceScope},
+        resource_registry::ResourceRegistry,
+    };
+    let mut registry = ResourceRegistry::default();
+    registry.register(
+        "urdf-registry-id",
+        ResourceReference::new(ResourceScope::Project, "robot.urdf").unwrap(),
+    );
+    registry.register(
+        "mjcf-registry-id",
+        ResourceReference::new(ResourceScope::Project, "model.xml").unwrap(),
+    );
+    let roots = RobotProvider.project_panel_roots(&ProjectContext::new("example"));
+    let tree = build_application_project_tree(&roots, &registry).unwrap();
+    assert_eq!(tree.roots[0].children[0].children.len(), 2);
+    assert_eq!(tree.roots[0].children[0].node_type.as_deref(), Some("project.logical"));
+}
+
+#[test]
+fn pp_hyb_005_duplicate_node_id_is_rejected() {
+    use workflow_ide_framework::{
+        project_panel_api::{build_application_project_tree, AppPanelTreeError},
+        resource_registry::ResourceRegistry,
+    };
+    let nodes = vec![
+        AppPanelNode {
+            id: "same".into(),
+            label: "Robot".into(),
+            kind: AppPanelNodeKind::Category {
+                type_id: "robot".into(),
+            },
+            children: vec![],
+        },
+        AppPanelNode {
+            id: "same".into(),
+            label: "SysID".into(),
+            kind: AppPanelNodeKind::Category {
+                type_id: "sysid".into(),
+            },
+            children: vec![],
+        },
+    ];
+    assert_eq!(
+        build_application_project_tree(&nodes, &ResourceRegistry::default()).unwrap_err(),
+        AppPanelTreeError::DuplicateNodeId("same".into())
+    );
+}
