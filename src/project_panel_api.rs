@@ -79,3 +79,55 @@ impl ProjectPanelInvalidation {
         self.pending
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AppPanelTreeError {
+    DuplicateNodeId(String),
+    UnknownRegisteredResource(String),
+}
+
+/// Resolve application-owned nodes against the existing Registry without
+/// treating unregistered physical files as registered resources.
+pub fn build_application_project_tree(
+    roots: &[AppPanelNode],
+    registry: &crate::resource_registry::ResourceRegistry,
+) -> Result<crate::tree_viewer::TreeModel, AppPanelTreeError> {
+    let mut seen = std::collections::HashSet::new();
+    let roots = roots
+        .iter()
+        .map(|node| build_application_node(node, registry, &mut seen))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(crate::tree_viewer::TreeModel {
+        roots,
+        selected_id: None,
+    })
+}
+
+fn build_application_node(
+    node: &AppPanelNode,
+    registry: &crate::resource_registry::ResourceRegistry,
+    seen: &mut std::collections::HashSet<String>,
+) -> Result<crate::tree_viewer::TreeNode, AppPanelTreeError> {
+    if !seen.insert(node.id.clone()) {
+        return Err(AppPanelTreeError::DuplicateNodeId(node.id.clone()));
+    }
+    let node_type = match &node.kind {
+        AppPanelNodeKind::Category { .. } => "project.category",
+        AppPanelNodeKind::LogicalResource { .. } => "project.logical",
+        AppPanelNodeKind::RegisteredResource {
+            registry_resource_id,
+        } => {
+            if registry.find_by_id(registry_resource_id).is_none() {
+                return Err(AppPanelTreeError::UnknownRegisteredResource(
+                    registry_resource_id.clone(),
+                ));
+            }
+            "project.registered_resource"
+        }
+    };
+    let mut tree = crate::tree_viewer::TreeNode::new(&node.id, &node.label).node_type(node_type);
+    for child in &node.children {
+        tree = tree.child(build_application_node(child, registry, seen)?);
+    }
+    Ok(tree)
+}
