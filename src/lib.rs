@@ -234,6 +234,9 @@ pub struct Application {
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
+    project_panel_provider: Option<Box<dyn project_panel_api::ApplicationProjectPanelProvider>>,
+    project_panel_registry: Option<Box<dyn Fn(&project::ProjectContext) -> resource_registry::ResourceRegistry>>,
+    project_panel_id: Option<String>,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: Vec<FlowPropertyLink>,
@@ -262,6 +265,9 @@ impl Application {
             text_editor_options: std::collections::HashMap::new(),
             log_viewers: std::collections::HashMap::new(),
             tree_viewers: std::collections::HashMap::new(),
+            project_panel_provider: None,
+            project_panel_registry: None,
+            project_panel_id: None,
             flow_editors: std::collections::HashMap::new(),
             property_panels: std::collections::HashMap::new(),
             flow_property_links: Vec::new(),
@@ -313,6 +319,21 @@ impl Application {
         model: tree_viewer::TreeModel,
     ) -> Self {
         self.tree_viewers.insert(panel_id.into(), model);
+        self
+    }
+
+    /// Register an application-owned Project Panel and its registry snapshot source.
+    pub fn application_project_panel(
+        mut self,
+        panel_id: impl Into<String>,
+        provider: impl project_panel_api::ApplicationProjectPanelProvider + 'static,
+        registry: impl Fn(&project::ProjectContext) -> resource_registry::ResourceRegistry + 'static,
+    ) -> Self {
+        let panel_id = panel_id.into();
+        self.tree_viewers.entry(panel_id.clone()).or_default();
+        self.project_panel_id = Some(panel_id);
+        self.project_panel_provider = Some(Box::new(provider));
+        self.project_panel_registry = Some(Box::new(registry));
         self
     }
 
@@ -526,6 +547,9 @@ impl Application {
         let text_editor_options = self.text_editor_options;
         let log_viewers = self.log_viewers;
         let tree_viewers = self.tree_viewers;
+        let project_panel_provider = self.project_panel_provider;
+        let project_panel_registry = self.project_panel_registry;
+        let project_panel_id = self.project_panel_id;
         let flow_editors = self.flow_editors;
         let property_panels = self.property_panels;
         let flow_property_links = self.flow_property_links;
@@ -734,6 +758,9 @@ impl Application {
                     text_editor_options,
                     log_viewers,
                     tree_viewers,
+                    project_panel_provider,
+                    project_panel_registry,
+                    project_panel_id,
                     project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle::default(),
                     flow_editors,
                     property_panels,
@@ -793,6 +820,9 @@ struct FrameworkHost {
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
+    project_panel_provider: Option<Box<dyn project_panel_api::ApplicationProjectPanelProvider>>,
+    project_panel_registry: Option<Box<dyn Fn(&project::ProjectContext) -> resource_registry::ResourceRegistry>>,
+    project_panel_id: Option<String>,
     project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
