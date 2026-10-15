@@ -202,8 +202,7 @@ fn pp_hyb_005_duplicate_node_id_is_rejected() {
 #[test]
 fn pp_hyb_013_tree_events_map_to_application_actions() {
     use workflow_ide_framework::{
-        project_panel_api::app_action_from_tree_action,
-        tree_viewer::TreeAction,
+        project_panel_api::app_action_from_tree_action, tree_viewer::TreeAction,
     };
     assert_eq!(
         app_action_from_tree_action(&TreeAction::SelectionChanged {
