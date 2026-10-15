@@ -1708,6 +1708,9 @@ impl FrameworkHost {
         match kind {
             project_event::ProjectEventKind::Closed => {
                 self.project_panel_lifecycle.close_project();
+                if let Some(panel_id) = self.project_panel_id.as_ref() {
+                    self.tree_viewers.insert(panel_id.clone(), tree_viewer::TreeModel::default());
+                }
             }
             project_event::ProjectEventKind::Opened
             | project_event::ProjectEventKind::Created
