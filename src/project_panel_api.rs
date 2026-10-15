@@ -166,3 +166,40 @@ pub fn dispatch_project_panel_action(
         result => result,
     }
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct ProjectPanelLifecycle {
+    project_root: Option<std::path::PathBuf>,
+    invalidation: ProjectPanelInvalidation,
+}
+
+impl ProjectPanelLifecycle {
+    /// A successful open or Save As changes the active project context.
+    pub fn activate_project(&mut self, project: &ProjectContext) {
+        if self.project_root.as_ref() != Some(&project.root) {
+            self.invalidation.clear_on_project_change();
+            self.project_root = Some(project.root.clone());
+        }
+        self.invalidation.invalidate_application_project_panel();
+    }
+
+    /// Drop pending work on close, including any project-specific state.
+    pub fn close_project(&mut self) {
+        self.project_root = None;
+        self.invalidation.clear_on_project_change();
+    }
+
+    /// Called after the application project adapter finishes restoring its state.
+    pub fn invalidate_application_project_panel(&mut self) {
+        if self.project_root.is_some() {
+            self.invalidation.invalidate_application_project_panel();
+        }
+    }
+
+    pub fn take_refresh_request(&mut self) -> Option<ProjectContext> {
+        if !self.invalidation.take_pending() {
+            return None;
+        }
+        self.project_root.clone().map(ProjectContext::new)
+    }
+}
