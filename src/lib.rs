@@ -227,6 +227,9 @@ struct ControllerPropertyLink {
     property_panel_id: String,
 }
 
+type ProjectPanelRegistrySource =
+    Box<dyn Fn(&project::ProjectContext) -> resource_registry::ResourceRegistry>;
+
 pub struct Application {
     unsaved_notification: unsaved_notification::UnsavedNotification,
     config: ApplicationConfig,
@@ -235,7 +238,7 @@ pub struct Application {
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
     project_panel_provider: Option<Box<dyn project_panel_api::ApplicationProjectPanelProvider>>,
-    project_panel_registry: Option<Box<dyn Fn(&project::ProjectContext) -> resource_registry::ResourceRegistry>>,
+    project_panel_registry: Option<ProjectPanelRegistrySource>,
     project_panel_id: Option<String>,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
@@ -821,7 +824,7 @@ struct FrameworkHost {
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
     project_panel_provider: Option<Box<dyn project_panel_api::ApplicationProjectPanelProvider>>,
-    project_panel_registry: Option<Box<dyn Fn(&project::ProjectContext) -> resource_registry::ResourceRegistry>>,
+    project_panel_registry: Option<ProjectPanelRegistrySource>,
     project_panel_id: Option<String>,
     project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
@@ -1709,7 +1712,8 @@ impl FrameworkHost {
             project_event::ProjectEventKind::Closed => {
                 self.project_panel_lifecycle.close_project();
                 if let Some(panel_id) = self.project_panel_id.as_ref() {
-                    self.tree_viewers.insert(panel_id.clone(), tree_viewer::TreeModel::default());
+                    self.tree_viewers
+                        .insert(panel_id.clone(), tree_viewer::TreeModel::default());
                 }
             }
             project_event::ProjectEventKind::Opened
