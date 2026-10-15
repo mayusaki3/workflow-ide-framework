@@ -237,8 +237,10 @@ fn workspace_layout_round_trips_split_tabs_floating_and_hidden_panels() {
             floating_geometry: None,
         }],
     };
-    let mut settings = FrameworkSettings::default();
-    settings.workspace_layouts = BTreeMap::from([("workspace-main".into(), layout)]);
+    let settings = FrameworkSettings {
+        workspace_layouts: BTreeMap::from([("workspace-main".into(), layout)]),
+        ..Default::default()
+    };
     let encoded = settings.to_toml().expect("serialize workspace layout");
     let decoded = FrameworkSettings::from_toml(&encoded).expect("parse workspace layout");
     assert_eq!(decoded, settings);
