@@ -240,6 +240,7 @@ pub struct Application {
     project_panel_provider: Option<Box<dyn project_panel_api::ApplicationProjectPanelProvider>>,
     project_panel_registry: Option<ProjectPanelRegistrySource>,
     project_panel_id: Option<String>,
+    project_panel_refresh: project_panel_api::ProjectPanelRefreshHandle,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: Vec<FlowPropertyLink>,
@@ -271,6 +272,7 @@ impl Application {
             project_panel_provider: None,
             project_panel_registry: None,
             project_panel_id: None,
+            project_panel_refresh: project_panel_api::ProjectPanelRefreshHandle::default(),
             flow_editors: std::collections::HashMap::new(),
             property_panels: std::collections::HashMap::new(),
             flow_property_links: Vec::new(),
@@ -326,6 +328,11 @@ impl Application {
     }
 
     /// Register an application-owned Project Panel and its registry snapshot source.
+    /// Share this handle with application code to request a Project Panel refresh.
+    pub fn project_panel_refresh_handle(&self) -> project_panel_api::ProjectPanelRefreshHandle {
+        self.project_panel_refresh.clone()
+    }
+
     pub fn application_project_panel(
         mut self,
         panel_id: impl Into<String>,
@@ -553,6 +560,7 @@ impl Application {
         let project_panel_provider = self.project_panel_provider;
         let project_panel_registry = self.project_panel_registry;
         let project_panel_id = self.project_panel_id;
+        let project_panel_refresh = self.project_panel_refresh;
         let flow_editors = self.flow_editors;
         let property_panels = self.property_panels;
         let flow_property_links = self.flow_property_links;
@@ -764,6 +772,7 @@ impl Application {
                     project_panel_provider,
                     project_panel_registry,
                     project_panel_id,
+                    project_panel_refresh,
                     project_panel_selection: tree_viewer::TreeSelection::default(),
                     project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle::default(),
                     flow_editors,
@@ -827,6 +836,7 @@ struct FrameworkHost {
     project_panel_provider: Option<Box<dyn project_panel_api::ApplicationProjectPanelProvider>>,
     project_panel_registry: Option<ProjectPanelRegistrySource>,
     project_panel_id: Option<String>,
+    project_panel_refresh: project_panel_api::ProjectPanelRefreshHandle,
     project_panel_selection: tree_viewer::TreeSelection,
     project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
@@ -1377,6 +1387,9 @@ impl FrameworkHost {
 
     fn project_save(&mut self) {
         self.sync_unsaved_notifications();
+        if self.project_panel_refresh.take_pending() {
+            self.project_panel_lifecycle.invalidate_application_project_panel();
+        }
         self.refresh_application_project_panel();
         if let Err(error) = self.capture_project_workspaces() {
             self.project_ui.message = Some(format!("Workspace layout capture failed: {error:?}"));
