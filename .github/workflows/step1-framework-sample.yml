@@ -46,3 +46,5 @@ jobs:
         run: cargo build --lib
       - name: Build Step 1 sample
         run: cargo build --example step1_minimal
+      - name: Run Rust tests
+        run: cargo test --all-targets --all-features
