@@ -13,6 +13,12 @@ use crate::{
 pub trait ApplicationProjectAdapter {
     type Error: std::fmt::Display;
 
+    /// Prepare application state for a new project without requiring a storage location.
+    /// The default implementation preserves compatibility with existing adapters.
+    fn initialize_unsaved_project(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
     fn initialize_project(&mut self, context: &ProjectContext) -> Result<(), Self::Error>;
 
     fn inspect_project_data(
