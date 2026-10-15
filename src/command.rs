@@ -496,33 +496,57 @@ mod stored_project_command_tests {
         let mut registry = CommandRegistry::default();
         let calls = ordinary_calls.clone();
         registry
-            .register(CommandDefinition::new("ordinary", "Ordinary", move || {
-                calls.set(calls.get() + 1);
-            }).shortcut("Ctrl+E"))
+            .register(
+                CommandDefinition::new("ordinary", "Ordinary", move || {
+                    calls.set(calls.get() + 1);
+                })
+                .shortcut("Ctrl+E"),
+            )
             .unwrap();
         let calls = stored_calls.clone();
         registry
-            .register(CommandDefinition::new("stored", "Stored", move || {
-                calls.set(calls.get() + 1);
-            }).shortcut("Ctrl+E").requires_stored_project())
+            .register(
+                CommandDefinition::new("stored", "Stored", move || {
+                    calls.set(calls.get() + 1);
+                })
+                .shortcut("Ctrl+E")
+                .requires_stored_project(),
+            )
             .unwrap();
 
         let shortcut = parse_shortcut("Ctrl+E").unwrap();
-        assert_eq!(registry.dispatch_shortcut_for_project(&shortcut, false), Some("ordinary".into()));
+        assert_eq!(
+            registry.dispatch_shortcut_for_project(&shortcut, false),
+            Some("ordinary".into())
+        );
         assert_eq!(ordinary_calls.get(), 1);
         assert_eq!(stored_calls.get(), 0);
-        assert_eq!(registry.dispatch_shortcut_for_project(&shortcut, true), Some("stored".into()));
+        assert_eq!(
+            registry.dispatch_shortcut_for_project(&shortcut, true),
+            Some("stored".into())
+        );
         assert_eq!(stored_calls.get(), 1);
     }
 
     #[test]
     fn stored_project_command_is_unavailable_without_storage() {
         let mut registry = CommandRegistry::default();
-        registry.register(CommandDefinition::new("import", "Import", || {})
-            .shortcut("Ctrl+I").requires_stored_project()).unwrap();
+        registry
+            .register(
+                CommandDefinition::new("import", "Import", || {})
+                    .shortcut("Ctrl+I")
+                    .requires_stored_project(),
+            )
+            .unwrap();
         let shortcut = parse_shortcut("Ctrl+I").unwrap();
-        assert_eq!(registry.dispatch_shortcut_for_project(&shortcut, false), None);
-        assert_eq!(registry.dispatch_shortcut_for_project(&shortcut, true), Some("import".into()));
+        assert_eq!(
+            registry.dispatch_shortcut_for_project(&shortcut, false),
+            None
+        );
+        assert_eq!(
+            registry.dispatch_shortcut_for_project(&shortcut, true),
+            Some("import".into())
+        );
     }
 }
 
