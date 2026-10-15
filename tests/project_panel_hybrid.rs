@@ -263,3 +263,23 @@ fn pp_hyb_014_fallback_only_on_not_handled() {
     assert_eq!(result, AppPanelActionResult::Handled);
     assert!(!called);
 }
+
+#[test]
+fn pp_hyb_012_project_lifecycle_drops_stale_notifications() {
+    use workflow_ide_framework::project_panel_api::ProjectPanelLifecycle;
+    let mut lifecycle = ProjectPanelLifecycle::default();
+    lifecycle.invalidate_application_project_panel();
+    assert!(lifecycle.take_refresh_request().is_none());
+
+    let first = ProjectContext::new("first-project");
+    lifecycle.activate_project(&first);
+    assert_eq!(lifecycle.take_refresh_request(), Some(first.clone()));
+    lifecycle.invalidate_application_project_panel();
+    lifecycle.close_project();
+    assert!(lifecycle.take_refresh_request().is_none());
+
+    let second = ProjectContext::new("second-project");
+    lifecycle.activate_project(&second);
+    assert_eq!(lifecycle.take_refresh_request(), Some(second));
+    assert!(lifecycle.take_refresh_request().is_none());
+}
