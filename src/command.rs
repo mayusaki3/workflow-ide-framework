@@ -102,6 +102,33 @@ pub struct CommandRegistry {
 }
 
 impl CommandRegistry {
+    /// Dispatch a shortcut only when both the command and its project requirement allow it.
+    pub fn dispatch_shortcut_for_project(
+        &mut self,
+        shortcut: &egui::KeyboardShortcut,
+        has_stored_project: bool,
+    ) -> Option<String> {
+        let id = self
+            .order
+            .iter()
+            .rev()
+            .find(|id| {
+                self.commands.get(*id).is_some_and(|command| {
+                    command.enabled
+                        && (!command.requires_stored_project || has_stored_project)
+                        && command
+                            .shortcut
+                            .as_deref()
+                            .and_then(parse_shortcut)
+                            .as_ref()
+                            == Some(shortcut)
+                })
+            })?
+            .clone();
+        let _ = self.dispatch(&id);
+        Some(id)
+    }
+
     /// Dispatch the most recently registered enabled command matching the shortcut.
     pub fn dispatch_shortcut(&mut self, shortcut: &egui::KeyboardShortcut) -> Option<String> {
         let id = self
