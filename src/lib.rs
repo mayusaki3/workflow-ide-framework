@@ -1095,7 +1095,9 @@ fn project_tree_context_menu(
             #[cfg(target_os = "macos")]
             let result = std::process::Command::new("open").arg(open_path).spawn();
             #[cfg(all(not(windows), not(target_os = "macos")))]
-            let result = std::process::Command::new("xdg-open").arg(open_path).spawn();
+            let result = std::process::Command::new("xdg-open")
+                .arg(open_path)
+                .spawn();
             if let Err(error) = result {
                 ui.label(error.to_string());
             }
