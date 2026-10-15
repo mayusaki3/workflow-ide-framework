@@ -1,11 +1,13 @@
 use workflow_ide_framework as wfide;
 
 fn main() {
-    let mut config = wfide::logging::LoggingConfig::default();
-    config.directory = "logs/step3-5-probe".into();
-    config.file_prefix = "wfide-step3-5-probe".into();
-    config.retention_days = 7;
-    config.memory_lines = 16;
+    let config = wfide::logging::LoggingConfig {
+        directory: "logs/step3-5-probe".into(),
+        file_prefix: "wfide-step3-5-probe".into(),
+        retention_days: 7,
+        memory_lines: 16,
+        ..Default::default()
+    };
 
     let guard =
         wfide::logging::init("step3-5-probe", &config).expect("failed to initialize WFIDE logging");
