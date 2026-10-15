@@ -254,6 +254,13 @@ impl ProjectController {
         }
     }
 
+    /// Storage availability is independent of whether project data is dirty.
+    pub fn has_stored_project(&self) -> bool {
+        self.session
+            .as_ref()
+            .is_some_and(|session| session.context().is_some())
+    }
+
     pub fn has_unsaved_changes(&self) -> bool {
         self.session
             .as_ref()
