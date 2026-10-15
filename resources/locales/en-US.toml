@@ -117,3 +117,5 @@ name = "English"
 "project.folder.delete_not_empty" = "Cannot delete the folder because it is not empty."
 "project.folder.delete_failed" = "Failed to delete the folder."
 "project.folder.os_error" = "OS details"
+
+"project.title.unsaved" = "Unsaved"
