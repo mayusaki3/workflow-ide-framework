@@ -133,7 +133,7 @@ fn pp_hyb_013_014_actions_and_not_handled_result() {
 #[test]
 fn pp_hyb_015_unknown_registry_resource_is_rejected() {
     use workflow_ide_framework::{
-        project_panel_api::{build_application_project_tree, AppPanelTreeError},
+        project_panel_api::{AppPanelTreeError, build_application_project_tree},
         resource_registry::ResourceRegistry,
     };
     let roots = RobotProvider.project_panel_roots(&ProjectContext::new("example"));
@@ -163,13 +163,16 @@ fn pp_hyb_002_registry_resources_are_resolved() {
     let roots = RobotProvider.project_panel_roots(&ProjectContext::new("example"));
     let tree = build_application_project_tree(&roots, &registry).unwrap();
     assert_eq!(tree.roots[0].children[0].children.len(), 2);
-    assert_eq!(tree.roots[0].children[0].node_type.as_deref(), Some("project.logical"));
+    assert_eq!(
+        tree.roots[0].children[0].node_type.as_deref(),
+        Some("project.logical")
+    );
 }
 
 #[test]
 fn pp_hyb_005_duplicate_node_id_is_rejected() {
     use workflow_ide_framework::{
-        project_panel_api::{build_application_project_tree, AppPanelTreeError},
+        project_panel_api::{AppPanelTreeError, build_application_project_tree},
         resource_registry::ResourceRegistry,
     };
     let nodes = vec![
