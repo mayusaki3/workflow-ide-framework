@@ -213,9 +213,16 @@ pub struct MenuItemDefinition {
     pub placement: MenuPlacement,
     pub top_level_placement: MenuPlacement,
     pub access_key: Option<char>,
+    pub requires_stored_project: bool,
 }
 
 impl MenuItemDefinition {
+    /// Require a stored project before the containing custom top-level menu can open.
+    pub fn requires_stored_project(mut self) -> Self {
+        self.requires_stored_project = true;
+        self
+    }
+
     /// Alt+letter opens this custom top-level menu.
     pub fn access_key(mut self, key: char) -> Self {
         self.access_key = Some(key.to_ascii_uppercase());
@@ -255,6 +262,7 @@ impl MenuItemDefinition {
             placement: MenuPlacement::Append,
             top_level_placement: MenuPlacement::Append,
             access_key: None,
+            requires_stored_project: false,
         }
     }
     pub fn help(command_id: impl Into<String>) -> Self {
@@ -266,6 +274,7 @@ impl MenuItemDefinition {
             placement: MenuPlacement::Append,
             top_level_placement: MenuPlacement::Append,
             access_key: None,
+            requires_stored_project: false,
         }
     }
     /// Register a custom menu using a localization key for its title.
@@ -290,6 +299,7 @@ impl MenuItemDefinition {
             placement: MenuPlacement::Append,
             top_level_placement: MenuPlacement::Append,
             access_key: None,
+            requires_stored_project: false,
         }
     }
 }
