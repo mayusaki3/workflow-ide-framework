@@ -184,8 +184,10 @@ fn framework_save_id_mismatch_requires_user_decision() {
     let context = ProjectContext::new(&r);
     write_project(&context, None);
     fs::create_dir_all(context.framework_directory()).unwrap();
-    let mut settings = FrameworkSettings::default();
-    settings.save_id = Some("different-save".into());
+    let settings = FrameworkSettings {
+        save_id: Some("different-save".into()),
+        ..Default::default()
+    };
     fs::write(
         context.framework_settings_path(),
         settings.to_toml().unwrap(),
