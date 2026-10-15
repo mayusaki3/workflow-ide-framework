@@ -283,3 +283,16 @@ fn pp_hyb_012_project_lifecycle_drops_stale_notifications() {
     assert_eq!(lifecycle.take_refresh_request(), Some(second));
     assert!(lifecycle.take_refresh_request().is_none());
 }
+
+#[test]
+fn pp_hyb_011_refresh_handle_coalesces_cross_clone_requests() {
+    use workflow_ide_framework::project_panel_api::ProjectPanelRefreshHandle;
+    let handle = ProjectPanelRefreshHandle::default();
+    let app_handle = handle.clone();
+    app_handle.invalidate_application_project_panel();
+    app_handle.invalidate_application_project_panel();
+    assert!(handle.take_pending());
+    assert!(!app_handle.take_pending());
+    handle.invalidate_application_project_panel();
+    assert!(app_handle.take_pending());
+}
