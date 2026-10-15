@@ -2825,7 +2825,10 @@ impl eframe::App for FrameworkHost {
                         .as_ref()
                         .is_some_and(|session| session.dirty.is_dirty());
                     let never_saved = controller.session.as_ref().is_some_and(|session| {
-                        matches!(session.storage, project_lifecycle::ProjectStorageState::Unsaved)
+                        matches!(
+                            session.storage,
+                            project_lifecycle::ProjectStorageState::Unsaved
+                        )
                     });
                     project_window_title(
                         application_title,
