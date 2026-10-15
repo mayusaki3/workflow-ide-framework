@@ -1140,6 +1140,32 @@ fn project_tree_context_menu(
 }
 
 impl FrameworkHost {
+    fn refresh_application_project_panel(&mut self) {
+        let Some(project) = self.project_panel_lifecycle.take_refresh_request() else {
+            return;
+        };
+        let (Some(panel_id), Some(provider), Some(registry_source)) = (
+            self.project_panel_id.as_ref(),
+            self.project_panel_provider.as_ref(),
+            self.project_panel_registry.as_ref(),
+        ) else {
+            return;
+        };
+        let roots = provider.project_panel_roots(&project);
+        let registry = registry_source(&project);
+        match project_panel_api::build_application_project_tree(&roots, &registry) {
+            Ok(mut model) => {
+                if let Some(previous) = self.tree_viewers.get(panel_id) {
+                    model.selected_id = previous.selected_id.clone();
+                }
+                self.tree_viewers.insert(panel_id.clone(), model);
+            }
+            Err(error) => {
+                tracing::warn!(target: "wfide::project_panel", ?error, "project panel refresh rejected");
+            }
+        }
+    }
+
     fn modal_dialog_open(&self) -> bool {
         self.project_ui.new_project.is_some()
             || self.project_ui.folder_dialog.is_some()
@@ -1345,6 +1371,7 @@ impl FrameworkHost {
 
     fn project_save(&mut self) {
         self.sync_unsaved_notifications();
+        self.refresh_application_project_panel();
         if let Err(error) = self.capture_project_workspaces() {
             self.project_ui.message = Some(format!("Workspace layout capture failed: {error:?}"));
             return;
