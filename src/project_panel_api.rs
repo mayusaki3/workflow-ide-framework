@@ -13,16 +13,30 @@ pub struct AppPanelNode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppPanelNodeKind {
-    Category { type_id: String },
-    LogicalResource { resource_id: String, type_id: String },
-    RegisteredResource { registry_resource_id: String },
+    Category {
+        type_id: String,
+    },
+    LogicalResource {
+        resource_id: String,
+        type_id: String,
+    },
+    RegisteredResource {
+        registry_resource_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppPanelAction {
-    Selected { node_ids: Vec<String> },
-    Activated { node_id: String },
-    ContextAction { node_ids: Vec<String>, action_id: String },
+    Selected {
+        node_ids: Vec<String>,
+    },
+    Activated {
+        node_id: String,
+    },
+    ContextAction {
+        node_ids: Vec<String>,
+        action_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
