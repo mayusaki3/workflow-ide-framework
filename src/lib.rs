@@ -1819,7 +1819,13 @@ impl FrameworkHost {
                 .collect();
             for shortcut in shortcuts {
                 if ui.input_mut(|input| input.consume_shortcut(&shortcut)) {
-                    let _ = self.commands.dispatch_shortcut(&shortcut);
+                    let has_stored_project = self
+                        .project_controller
+                        .as_ref()
+                        .is_some_and(|controller| controller.has_stored_project());
+                    let _ = self
+                        .commands
+                        .dispatch_shortcut_for_project(&shortcut, has_stored_project);
                     break;
                 }
             }
