@@ -234,6 +234,7 @@ pub struct Application {
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
+    project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: Vec<FlowPropertyLink>,
@@ -734,6 +735,7 @@ impl Application {
                     text_editor_options,
                     log_viewers,
                     tree_viewers,
+                    project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle::default(),
                     flow_editors,
                     property_panels,
                     flow_property_links,
@@ -1646,6 +1648,24 @@ impl FrameworkHost {
             .as_ref()
             .and_then(|controller| controller.project_name())
             .map(str::to_owned);
+        match kind {
+            project_event::ProjectEventKind::Closed => {
+                self.project_panel_lifecycle.close_project();
+            }
+            project_event::ProjectEventKind::Opened
+            | project_event::ProjectEventKind::Created
+            | project_event::ProjectEventKind::SavedAs => {
+                if let Some(ref root) = root {
+                    self.project_panel_lifecycle
+                        .activate_project(&project::ProjectContext::new(root.clone()));
+                } else {
+                    self.project_panel_lifecycle.close_project();
+                }
+            }
+            project_event::ProjectEventKind::Saved => {
+                self.project_panel_lifecycle.invalidate_application_project_panel();
+            }
+        }
         self.project_events
             .emit(project_event::ProjectEvent::new(kind, root, name));
     }
