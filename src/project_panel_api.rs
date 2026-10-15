@@ -203,3 +203,22 @@ impl ProjectPanelLifecycle {
         self.project_root.clone().map(ProjectContext::new)
     }
 }
+
+/// Thread-safe, cloneable signal for requesting a fresh application tree snapshot.
+/// Repeated requests are coalesced until the framework consumes the signal.
+#[derive(Debug, Clone, Default)]
+pub struct ProjectPanelRefreshHandle {
+    pending: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl ProjectPanelRefreshHandle {
+    pub fn invalidate_application_project_panel(&self) {
+        self.pending
+            .store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    pub fn take_pending(&self) -> bool {
+        self.pending
+            .swap(false, std::sync::atomic::Ordering::AcqRel)
+    }
+}
