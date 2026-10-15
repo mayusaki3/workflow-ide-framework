@@ -764,6 +764,7 @@ impl Application {
                     project_panel_provider,
                     project_panel_registry,
                     project_panel_id,
+                    project_panel_selection: tree_viewer::TreeSelection::default(),
                     project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle::default(),
                     flow_editors,
                     property_panels,
@@ -826,6 +827,7 @@ struct FrameworkHost {
     project_panel_provider: Option<Box<dyn project_panel_api::ApplicationProjectPanelProvider>>,
     project_panel_registry: Option<ProjectPanelRegistrySource>,
     project_panel_id: Option<String>,
+    project_panel_selection: tree_viewer::TreeSelection,
     project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
@@ -1161,6 +1163,7 @@ impl FrameworkHost {
                 if let Some(previous) = self.tree_viewers.get(panel_id) {
                     model.selected_id = previous.selected_id.clone();
                 }
+                self.project_panel_selection.retain_existing(&model);
                 self.tree_viewers.insert(panel_id.clone(), model);
             }
             Err(error) => {
@@ -1711,6 +1714,7 @@ impl FrameworkHost {
         match kind {
             project_event::ProjectEventKind::Closed => {
                 self.project_panel_lifecycle.close_project();
+                self.project_panel_selection = tree_viewer::TreeSelection::default();
                 if let Some(panel_id) = self.project_panel_id.as_ref() {
                     self.tree_viewers
                         .insert(panel_id.clone(), tree_viewer::TreeModel::default());
@@ -3268,10 +3272,38 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
         }
 
         if let Some(model) = self.tree_viewers.get_mut(tab) {
-            let response = tree_viewer::show(ui, model);
-            for action in response.actions {
-                match action {
-                    tree_viewer::TreeAction::Selected { node_id } => {
+            if self.project_panel_id.as_deref() == Some(tab.as_str()) {
+                let response = tree_viewer::show_with_selection(
+                    ui,
+                    model,
+                    &mut self.project_panel_selection,
+                );
+                let project = self
+                    .project_controller
+                    .as_ref()
+                    .and_then(|controller| controller.session.as_ref())
+                    .and_then(|session| session.context())
+                    .cloned();
+                if let (Some(project), Some(provider)) =
+                    (project, self.project_panel_provider.as_mut())
+                {
+                    for action in response.actions {
+                        if let Some(app_action) =
+                            project_panel_api::app_action_from_tree_action(&action)
+                        {
+                            let result = provider.handle_project_panel_action(&project, app_action);
+                            if let project_panel_api::AppPanelActionResult::Rejected { reason } =
+                                result
+                            {
+                                tracing::warn!(target: "wfide::project_panel", %reason, "action rejected");
+                            }
+                        }
+                    }
+                }
+            } else {
+                let response = tree_viewer::show(ui, model);
+                for action in response.actions {
+                    if let tree_viewer::TreeAction::Selected { node_id } = action {
                         tracing::info!(
                             target: "wfide::tree_viewer",
                             panel_id = %tab,
@@ -3279,9 +3311,6 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                             "tree node selected"
                         );
                     }
-                    tree_viewer::TreeAction::SelectionChanged { .. }
-                    | tree_viewer::TreeAction::Activated { .. }
-                    | tree_viewer::TreeAction::ContextRequested { .. } => {}
                 }
             }
             return;
