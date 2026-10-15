@@ -234,7 +234,6 @@ pub struct Application {
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
-    project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: Vec<FlowPropertyLink>,
@@ -794,6 +793,7 @@ struct FrameworkHost {
     text_editor_options: std::collections::HashMap<String, text_editor::TextEditorOptions>,
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
+    project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: Vec<FlowPropertyLink>,
@@ -1664,7 +1664,8 @@ impl FrameworkHost {
             }
             project_event::ProjectEventKind::CloseRequested => {}
             project_event::ProjectEventKind::Saved => {
-                self.project_panel_lifecycle.invalidate_application_project_panel();
+                self.project_panel_lifecycle
+                    .invalidate_application_project_panel();
             }
         }
         self.project_events
