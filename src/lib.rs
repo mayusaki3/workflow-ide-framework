@@ -1761,10 +1761,18 @@ impl FrameworkHost {
             project_event::ProjectEventKind::Opened
             | project_event::ProjectEventKind::Created
             | project_event::ProjectEventKind::SavedAs => {
+                // Project identity changed: never display the previous project's
+                // tree or selection while waiting for the new snapshot.
+                self.project_panel_selection = tree_viewer::TreeSelection::default();
+                if let Some(panel_id) = self.project_panel_id.as_ref() {
+                    self.tree_viewers
+                        .insert(panel_id.clone(), tree_viewer::TreeModel::default());
+                }
                 if let Some(ref root) = root {
                     self.project_panel_lifecycle
                         .activate_project(&project::ProjectContext::new(root.clone()));
                 } else {
+                    // An unsaved project has no storage-backed registry yet.
                     self.project_panel_lifecycle.close_project();
                 }
             }
