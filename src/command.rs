@@ -525,3 +525,22 @@ mod stored_project_command_tests {
         assert_eq!(registry.dispatch_shortcut_for_project(&shortcut, true), Some("import".into()));
     }
 }
+
+#[cfg(test)]
+mod stored_project_menu_tests {
+    use super::*;
+
+    #[test]
+    fn custom_menu_storage_requirement_is_opt_in() {
+        let ordinary = MenuItemDefinition::custom("menu.data", "Data", "data.import");
+        assert!(!ordinary.requires_stored_project);
+        let restricted = ordinary.requires_stored_project();
+        assert!(restricted.requires_stored_project);
+    }
+
+    #[test]
+    fn framework_menus_do_not_require_storage_by_default() {
+        assert!(!MenuItemDefinition::file("file.save").requires_stored_project);
+        assert!(!MenuItemDefinition::help("help.about").requires_stored_project);
+    }
+}
