@@ -146,11 +146,9 @@ pub fn app_action_from_tree_action(
                 node_ids: node_ids.clone(),
             })
         }
-        crate::tree_viewer::TreeAction::Activated { node_id } => {
-            Some(AppPanelAction::Activated {
-                node_id: node_id.clone(),
-            })
-        }
+        crate::tree_viewer::TreeAction::Activated { node_id } => Some(AppPanelAction::Activated {
+            node_id: node_id.clone(),
+        }),
         crate::tree_viewer::TreeAction::ContextRequested { .. } => None,
     }
 }
