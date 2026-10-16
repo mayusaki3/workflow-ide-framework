@@ -765,5 +765,4 @@ mod capture_tests {
             MAX_PENDING_DIALOGS as u64 + 3
         );
     }
-
 }
