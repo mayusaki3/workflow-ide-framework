@@ -715,8 +715,18 @@ mod capture_tests {
             let second_result = second.finish();
             assert_eq!(first_result.entries.len(), 2);
             assert_eq!(second_result.entries.len(), 1);
-            assert!(first_result.entries.iter().all(|entry| entry.operation_id == Some(first_result.operation_id)));
-            assert!(second_result.entries.iter().all(|entry| entry.operation_id == Some(second_result.operation_id)));
+            assert!(
+                first_result
+                    .entries
+                    .iter()
+                    .all(|entry| entry.operation_id == Some(first_result.operation_id))
+            );
+            assert!(
+                second_result
+                    .entries
+                    .iter()
+                    .all(|entry| entry.operation_id == Some(second_result.operation_id))
+            );
         });
     }
 
@@ -736,7 +746,10 @@ mod capture_tests {
         }
         assert_eq!(queue.len(), MAX_PENDING_DIALOGS);
         assert_eq!(queue.front().unwrap().operation_id, 4);
-        assert_eq!(queue.back().unwrap().operation_id, MAX_PENDING_DIALOGS as u64 + 3);
+        assert_eq!(
+            queue.back().unwrap().operation_id,
+            MAX_PENDING_DIALOGS as u64 + 3
+        );
         push_bounded_dialog(
             &mut queue,
             CapturedMessages {
@@ -747,7 +760,10 @@ mod capture_tests {
             },
         );
         assert_eq!(queue.len(), MAX_PENDING_DIALOGS);
-        assert_eq!(queue.back().unwrap().operation_id, MAX_PENDING_DIALOGS as u64 + 3);
+        assert_eq!(
+            queue.back().unwrap().operation_id,
+            MAX_PENDING_DIALOGS as u64 + 3
+        );
     }
 
 }
