@@ -176,12 +176,20 @@ fn build_application_node(
     for child in &node.children {
         tree = tree.child(build_application_node(child, registry, seen, project)?);
     }
-    if let AppPanelNodeKind::Directory { relative_path, filter } = &node.kind {
+    if let AppPanelNodeKind::Directory {
+        relative_path,
+        filter,
+    } = &node.kind
+    {
         let project = project.ok_or(AppPanelTreeError::ProjectContextRequired)?;
         if relative_path.as_os_str().is_empty()
-            || relative_path.components().any(|c| !matches!(c, Component::Normal(_)))
+            || relative_path
+                .components()
+                .any(|c| !matches!(c, Component::Normal(_)))
         {
-            return Err(AppPanelTreeError::InvalidDirectoryPath(relative_path.clone()));
+            return Err(AppPanelTreeError::InvalidDirectoryPath(
+                relative_path.clone(),
+            ));
         }
         let root = std::fs::canonicalize(&project.root)
             .map_err(|_| AppPanelTreeError::DirectoryReadFailed(project.root.clone()))?;
@@ -190,7 +198,9 @@ fn build_application_node(
             let canonical = std::fs::canonicalize(&path)
                 .map_err(|_| AppPanelTreeError::DirectoryReadFailed(relative_path.clone()))?;
             if !canonical.starts_with(&root) || !canonical.is_dir() {
-                return Err(AppPanelTreeError::InvalidDirectoryPath(relative_path.clone()));
+                return Err(AppPanelTreeError::InvalidDirectoryPath(
+                relative_path.clone(),
+            ));
             }
             append_directory(&mut tree, &canonical, &root, &node.id, filter, seen)?;
         }
@@ -227,12 +237,13 @@ fn append_directory(
         if !canonical.starts_with(root) {
             continue;
         }
-        let relative = canonical.strip_prefix(root)
+        let relative = canonical
+            .strip_prefix(root)
             .map_err(|_| AppPanelTreeError::InvalidDirectoryPath(path.clone()))?;
         let id = format!("{mount_id}:{}", relative.display());
         if metadata.is_dir() {
-            let mut child = crate::tree_viewer::TreeNode::new(&id, &name)
-                .node_type("project.directory_entry");
+            let mut child =
+                crate::tree_viewer::TreeNode::new(&id, &name).node_type("project.directory_entry");
             if filter.recursive {
                 append_directory(&mut child, &canonical, root, mount_id, filter, seen)?;
             }
@@ -246,18 +257,20 @@ fn append_directory(
             }
         } else if metadata.is_file() && filter.include_files {
             let matches = filter.extensions.is_empty()
-                || path.extension().and_then(|e| e.to_str()).is_some_and(|ext| {
-                    filter.extensions.iter().any(|allowed| {
-                        allowed.trim_start_matches('.').eq_ignore_ascii_case(ext)
-                    })
-                });
+                || path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|ext| {
+                        filter.extensions.iter().any(|allowed| {
+                            allowed.trim_start_matches('.').eq_ignore_ascii_case(ext)
+                        })
+                    });
             if matches {
                 if !seen.insert(id.clone()) {
                     return Err(AppPanelTreeError::DuplicateNodeId(id));
                 }
                 parent.children.push(
-                    crate::tree_viewer::TreeNode::new(id, name)
-                        .node_type("project.file_entry"),
+                    crate::tree_viewer::TreeNode::new(id, name).node_type("project.file_entry"),
                 );
             }
         }
