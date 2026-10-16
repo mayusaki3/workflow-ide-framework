@@ -16,3 +16,8 @@ name = "English"
 
 "sample.menu.i18n_title" = "Localization Test"
 "sample.menu.i18n_probe" = "Run Menu Test"
+
+"sample.dialog.title.warning" = "Warning test"
+"sample.dialog.title.error" = "Error test"
+"sample.dialog.title.background" = "Background error test"
+"sample.dialog.title.multiple" = "Multiple messages test"
