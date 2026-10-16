@@ -383,24 +383,36 @@ fn pp_dir_003_004_recursive_and_flattened_directory_nodes() {
     let registry = ResourceRegistry::default();
     let project = ProjectContext::new(&root);
     let recursive = build_application_project_tree_with_directories(
-        &[make_node(DirectoryFilter::default())], &registry, &project,
-    ).unwrap();
+        &[make_node(DirectoryFilter::default())],
+        &registry,
+        &project,
+    )
+    .unwrap();
     assert_eq!(recursive.roots[0].children[0].label, "nested");
-    assert_eq!(recursive.roots[0].children[0].children[0].label, "robot.urdf");
+    assert_eq!(
+        recursive.roots[0].children[0].children[0].label,
+        "robot.urdf"
+    );
     let flat = build_application_project_tree_with_directories(
         &[make_node(DirectoryFilter {
             include_directories: false,
             ..DirectoryFilter::default()
-        })], &registry, &project,
-    ).unwrap();
+        })],
+        &registry,
+        &project,
+    )
+    .unwrap();
     assert_eq!(flat.roots[0].children.len(), 1);
     assert_eq!(flat.roots[0].children[0].label, "robot.urdf");
     let non_recursive = build_application_project_tree_with_directories(
         &[make_node(DirectoryFilter {
             recursive: false,
             ..DirectoryFilter::default()
-        })], &registry, &project,
-    ).unwrap();
+        })],
+        &registry,
+        &project,
+    )
+    .unwrap();
     assert!(non_recursive.roots[0].children[0].children.is_empty());
     std::fs::remove_dir_all(root).unwrap();
 }
