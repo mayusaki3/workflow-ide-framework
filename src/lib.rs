@@ -2127,35 +2127,35 @@ impl FrameworkHost {
         } else {
             dialog.label.clone()
         })
-            .id(egui::Id::new("wfide_operation_log_dialog"))
-            .collapsible(false)
-            .resizable(true)
-            .default_size([560.0, 320.0])
-            .order(egui::Order::Foreground)
-            .show(ctx, |ui| {
-                egui::ScrollArea::vertical()
-                    .max_height(260.0)
-                    .show(ui, |ui| {
-                        for entry in &dialog.entries {
-                            let (symbol, color) = match entry.level {
-                                logging::LogLevel::Error => ("⛔", ui.visuals().error_fg_color),
-                                logging::LogLevel::Warn => ("⚠", ui.visuals().warn_fg_color),
-                                _ => continue,
-                            };
-                            let message = entry.message.as_deref().unwrap_or("");
-                            ui.horizontal_wrapped(|ui| {
-                                ui.colored_label(color, symbol);
-                                ui.label(localization::text(message));
-                            });
-                        }
-                        if dialog.dropped > 0 {
-                            ui.label(format!("{} additional messages omitted", dialog.dropped));
-                        }
-                    });
-                if ui.button(localization::text("dialog.confirm")).clicked() {
-                    dismiss = true;
-                }
-            });
+        .id(egui::Id::new("wfide_operation_log_dialog"))
+        .collapsible(false)
+        .resizable(true)
+        .default_size([560.0, 320.0])
+        .order(egui::Order::Foreground)
+        .show(ctx, |ui| {
+            egui::ScrollArea::vertical()
+                .max_height(260.0)
+                .show(ui, |ui| {
+                    for entry in &dialog.entries {
+                        let (symbol, color) = match entry.level {
+                            logging::LogLevel::Error => ("⛔", ui.visuals().error_fg_color),
+                            logging::LogLevel::Warn => ("⚠", ui.visuals().warn_fg_color),
+                            _ => continue,
+                        };
+                        let message = entry.message.as_deref().unwrap_or("");
+                        ui.horizontal_wrapped(|ui| {
+                            ui.colored_label(color, symbol);
+                            ui.label(localization::text(message));
+                        });
+                    }
+                    if dialog.dropped > 0 {
+                        ui.label(format!("{} additional messages omitted", dialog.dropped));
+                    }
+                });
+            if ui.button(localization::text("dialog.confirm")).clicked() {
+                dismiss = true;
+            }
+        });
         if dismiss {
             self.active_log_dialog = None;
             ctx.request_repaint();
