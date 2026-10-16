@@ -38,12 +38,14 @@ const MAX_CAPTURE_MESSAGES: usize = 256;
 pub struct CapturedMessages {
     pub operation_id: u64,
     pub label: String,
+    pub label_is_key: bool,
     pub entries: Vec<LogEntry>,
     pub dropped: usize,
 }
 
 struct CaptureState {
     label: String,
+    label_is_key: bool,
     entries: Vec<LogEntry>,
     dropped: usize,
 }
@@ -89,6 +91,7 @@ fn take_capture(id: u64) -> Option<CapturedMessages> {
         .map(|state| CapturedMessages {
             operation_id: id,
             label: state.label,
+            label_is_key: state.label_is_key,
             entries: state.entries,
             dropped: state.dropped,
         })
@@ -98,6 +101,7 @@ fn complete_capture(id: u64) -> CapturedMessages {
     take_capture(id).unwrap_or_else(|| CapturedMessages {
         operation_id: id,
         label: String::new(),
+        label_is_key: false,
         entries: Vec::new(),
         dropped: 0,
     })
@@ -164,6 +168,15 @@ fn captures() -> &'static Mutex<HashMap<u64, CaptureState>> {
 
 /// Starts collecting warning/error events for a single operation.
 pub fn dialog_on(label: &str) -> DialogCapture {
+    start_dialog_capture(label, false)
+}
+
+/// Captures an operation with a title resolved from application or framework locale resources at display time.
+pub fn dialog_on_key(label_key: &str) -> DialogCapture {
+    start_dialog_capture(label_key, true)
+}
+
+fn start_dialog_capture(label: &str, label_is_key: bool) -> DialogCapture {
     let id = NEXT_OPERATION_ID.fetch_add(1, Ordering::Relaxed);
     captures()
         .lock()
@@ -172,6 +185,7 @@ pub fn dialog_on(label: &str) -> DialogCapture {
             id,
             CaptureState {
                 label: label.to_owned(),
+                label_is_key,
                 entries: Vec::new(),
                 dropped: 0,
             },
@@ -765,6 +779,7 @@ mod capture_tests {
                 CapturedMessages {
                     operation_id: id,
                     label: format!("operation {id}"),
+                    label_is_key: false,
                     entries: Vec::new(),
                     dropped: 1,
                 },
