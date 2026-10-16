@@ -360,3 +360,47 @@ fn pp_dir_008_rejects_parent_traversal() {
         Err(AppPanelTreeError::InvalidDirectoryPath(_))
     ));
 }
+
+#[test]
+fn pp_dir_003_004_recursive_and_flattened_directory_nodes() {
+    use workflow_ide_framework::{
+        project_panel_api::{DirectoryFilter, build_application_project_tree_with_directories},
+        resource_registry::ResourceRegistry,
+    };
+    let root = std::env::temp_dir().join(format!("wfide-pp-recursive-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("models/nested")).unwrap();
+    std::fs::write(root.join("models/nested/robot.urdf"), "robot").unwrap();
+    let make_node = |filter| AppPanelNode {
+        id: "mount".into(),
+        label: "Models".into(),
+        kind: AppPanelNodeKind::Directory {
+            relative_path: "models".into(),
+            filter,
+        },
+        children: vec![],
+    };
+    let registry = ResourceRegistry::default();
+    let project = ProjectContext::new(&root);
+    let recursive = build_application_project_tree_with_directories(
+        &[make_node(DirectoryFilter::default())], &registry, &project,
+    ).unwrap();
+    assert_eq!(recursive.roots[0].children[0].label, "nested");
+    assert_eq!(recursive.roots[0].children[0].children[0].label, "robot.urdf");
+    let flat = build_application_project_tree_with_directories(
+        &[make_node(DirectoryFilter {
+            include_directories: false,
+            ..DirectoryFilter::default()
+        })], &registry, &project,
+    ).unwrap();
+    assert_eq!(flat.roots[0].children.len(), 1);
+    assert_eq!(flat.roots[0].children[0].label, "robot.urdf");
+    let non_recursive = build_application_project_tree_with_directories(
+        &[make_node(DirectoryFilter {
+            recursive: false,
+            ..DirectoryFilter::default()
+        })], &registry, &project,
+    ).unwrap();
+    assert!(non_recursive.roots[0].children[0].children.is_empty());
+    std::fs::remove_dir_all(root).unwrap();
+}
