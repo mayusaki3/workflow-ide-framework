@@ -300,7 +300,7 @@ fn pp_hyb_011_refresh_handle_coalesces_cross_clone_requests() {
 #[test]
 fn pp_dir_001_002_project_directory_and_extension_filter() {
     use workflow_ide_framework::{
-        project_panel_api::{build_application_project_tree_with_directories, DirectoryFilter},
+        project_panel_api::{DirectoryFilter, build_application_project_tree_with_directories},
         resource_registry::ResourceRegistry,
     };
     let root = std::env::temp_dir().join(format!("wfide-pp-dir-{}", std::process::id()));
@@ -322,8 +322,11 @@ fn pp_dir_001_002_project_directory_and_extension_filter() {
     };
     let registry = ResourceRegistry::default();
     let tree = build_application_project_tree_with_directories(
-        &[node], &registry, &ProjectContext::new(&root)
-    ).unwrap();
+        &[node],
+        &registry,
+        &ProjectContext::new(&root),
+    )
+    .unwrap();
     assert_eq!(tree.roots[0].children.len(), 1);
     assert_eq!(tree.roots[0].children[0].label, "robot.urdf");
     assert!(registry.entries().is_empty());
@@ -333,7 +336,9 @@ fn pp_dir_001_002_project_directory_and_extension_filter() {
 #[test]
 fn pp_dir_008_rejects_parent_traversal() {
     use workflow_ide_framework::{
-        project_panel_api::{build_application_project_tree_with_directories, AppPanelTreeError, DirectoryFilter},
+        project_panel_api::{
+            AppPanelTreeError, DirectoryFilter, build_application_project_tree_with_directories,
+        },
         resource_registry::ResourceRegistry,
     };
     let node = AppPanelNode {
@@ -346,7 +351,12 @@ fn pp_dir_008_rejects_parent_traversal() {
         children: vec![],
     };
     let result = build_application_project_tree_with_directories(
-        &[node], &ResourceRegistry::default(), &ProjectContext::new(".")
+        &[node],
+        &ResourceRegistry::default(),
+        &ProjectContext::new("."),
     );
-    assert!(matches!(result, Err(AppPanelTreeError::InvalidDirectoryPath(_))));
+    assert!(matches!(
+        result,
+        Err(AppPanelTreeError::InvalidDirectoryPath(_))
+    ));
 }
