@@ -416,3 +416,36 @@ fn pp_dir_003_004_recursive_and_flattened_directory_nodes() {
     assert!(non_recursive.roots[0].children[0].children.is_empty());
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn pp_dir_005_rescan_reflects_filesystem_changes() {
+    use workflow_ide_framework::{
+        project_panel_api::{DirectoryFilter, build_application_project_tree_with_directories},
+        resource_registry::ResourceRegistry,
+    };
+    let root = std::env::temp_dir().join(format!("wfide-pp-rescan-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("models")).unwrap();
+    let node = AppPanelNode {
+        id: "models".into(),
+        label: "Models".into(),
+        kind: AppPanelNodeKind::Directory {
+            relative_path: "models".into(),
+            filter: DirectoryFilter::default(),
+        },
+        children: vec![],
+    };
+    let registry = ResourceRegistry::default();
+    let project = ProjectContext::new(&root);
+    let build = || build_application_project_tree_with_directories(
+        std::slice::from_ref(&node),
+        &registry,
+        &project,
+    ).unwrap();
+    assert!(build().roots[0].children.is_empty());
+    std::fs::write(root.join("models/robot.urdf"), "robot").unwrap();
+    assert_eq!(build().roots[0].children[0].label, "robot.urdf");
+    std::fs::remove_file(root.join("models/robot.urdf")).unwrap();
+    assert!(build().roots[0].children.is_empty());
+    std::fs::remove_dir_all(root).unwrap();
+}
