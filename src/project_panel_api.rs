@@ -199,8 +199,8 @@ fn build_application_node(
                 .map_err(|_| AppPanelTreeError::DirectoryReadFailed(relative_path.clone()))?;
             if !canonical.starts_with(&root) || !canonical.is_dir() {
                 return Err(AppPanelTreeError::InvalidDirectoryPath(
-                relative_path.clone(),
-            ));
+                    relative_path.clone(),
+                ));
             }
             append_directory(&mut tree, &canonical, &root, &node.id, filter, seen)?;
         }
