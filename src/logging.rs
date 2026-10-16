@@ -128,7 +128,6 @@ pub fn take_pending_dialog() -> Option<CapturedMessages> {
         .pop_front()
 }
 
-
 fn captures() -> &'static Mutex<HashMap<u64, CaptureState>> {
     CAPTURES.get_or_init(|| Mutex::new(HashMap::new()))
 }
