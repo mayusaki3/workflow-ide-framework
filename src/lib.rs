@@ -2152,7 +2152,7 @@ impl FrameworkHost {
                             ui.label(format!("{} additional messages omitted", dialog.dropped));
                         }
                     });
-                if ui.button(localization::text("common.ok")).clicked() {
+                if ui.button(localization::text("dialog.confirm")).clicked() {
                     dismiss = true;
                 }
             });
