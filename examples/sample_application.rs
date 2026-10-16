@@ -189,7 +189,7 @@ fn main() -> eframe::Result<()> {
         .version(env!("CARGO_PKG_VERSION"))
         // Diagnostic-only commands for validating operation-scoped log dialogs.
         .command(CommandDefinition::new("sample.dialog_warning", "Warning", || {
-            let capture = logging::dialog_on("Sample Warning");
+            let capture = logging::dialog_on_key("sample.dialog.title.warning");
             {
                 let _entered = capture.span().enter();
                 tracing::info!("informational message should not appear in dialog");
@@ -201,7 +201,7 @@ fn main() -> eframe::Result<()> {
             "sample.dialog_tests", "Log Dialog Tests", "sample.dialog_warning",
         ).menu_before("menu.help"))
         .command(CommandDefinition::new("sample.dialog_error", "Error", || {
-            let capture = logging::dialog_on("Sample Error");
+            let capture = logging::dialog_on_key("sample.dialog.title.error");
             {
                 let _entered = capture.span().enter();
                 tracing::error!("sample error for dialog validation");
@@ -212,7 +212,7 @@ fn main() -> eframe::Result<()> {
             "sample.dialog_tests", "Log Dialog Tests", "sample.dialog_error",
         ))
         .command(CommandDefinition::new("sample.dialog_background", "Background Error", || {
-            let capture = logging::dialog_on("Sample Background Error");
+            let capture = logging::dialog_on_key("sample.dialog.title.background");
             let span = capture.span().clone();
             let dispatcher = tracing::dispatcher::get_default(|dispatcher| dispatcher.clone());
             std::thread::spawn(move || {
@@ -227,7 +227,20 @@ fn main() -> eframe::Result<()> {
         .menu_item(MenuItemDefinition::custom(
             "sample.dialog_tests", "Log Dialog Tests", "sample.dialog_background",
         ))
-        .command(CommandDefinition::new("sample.dialog_multiple", "Multiple Operations", || {
+        .command(CommandDefinition::new("sample.dialog_multiple", "Multiple Messages", || {
+            let capture = logging::dialog_on_key("sample.dialog.title.multiple");
+            {
+                let _entered = capture.span().enter();
+                tracing::warn!("first warning in one operation");
+                tracing::error!("error in the same operation");
+                tracing::warn!("second warning in the same operation");
+            }
+            capture.finish();
+        }))
+        .menu_item(MenuItemDefinition::custom(
+            "sample.dialog_tests", "Log Dialog Tests", "sample.dialog_multiple",
+        ))
+        .command(CommandDefinition::new("sample.dialog_separate", "Separate Operations", || {
             let first = logging::dialog_on("Sample Operation A");
             let second = logging::dialog_on("Sample Operation B");
             {
@@ -242,7 +255,7 @@ fn main() -> eframe::Result<()> {
             second.finish();
         }))
         .menu_item(MenuItemDefinition::custom(
-            "sample.dialog_tests", "Log Dialog Tests", "sample.dialog_multiple",
+            "sample.dialog_tests", "Log Dialog Tests", "sample.dialog_separate",
         ))
         .command(CommandDefinition::new("sample.dialog_clean", "No Warning", || {
             let capture = logging::dialog_on("Sample Clean Operation");
