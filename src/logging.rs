@@ -106,17 +106,21 @@ fn pending_dialogs() -> &'static Mutex<VecDeque<CapturedMessages>> {
     PENDING_DIALOGS.get_or_init(|| Mutex::new(VecDeque::new()))
 }
 
-fn queue_dialog(result: &CapturedMessages) {
+fn push_bounded_dialog(queue: &mut VecDeque<CapturedMessages>, result: CapturedMessages) {
     if result.entries.is_empty() && result.dropped == 0 {
         return;
     }
+    if queue.len() >= MAX_PENDING_DIALOGS {
+        queue.pop_front();
+    }
+    queue.push_back(result);
+}
+
+fn queue_dialog(result: &CapturedMessages) {
     let mut pending = pending_dialogs()
         .lock()
         .unwrap_or_else(|error| error.into_inner());
-    if pending.len() >= MAX_PENDING_DIALOGS {
-        pending.pop_front();
-    }
-    pending.push_back(result.clone());
+    push_bounded_dialog(&mut pending, result.clone());
 }
 
 /// Consume the next completed warning/error dialog on the UI thread.
@@ -690,4 +694,60 @@ mod capture_tests {
             );
         });
     }
+    #[test]
+    fn interleaved_operations_remain_separate() {
+        with_logging(|| {
+            let first = dialog_on("interleaved first");
+            let second = dialog_on("interleaved second");
+            {
+                let _guard = first.span().enter();
+                tracing::warn!("first A");
+            }
+            {
+                let _guard = second.span().enter();
+                tracing::error!("second A");
+            }
+            {
+                let _guard = first.span().enter();
+                tracing::error!("first B");
+            }
+            let first_result = first.finish();
+            let second_result = second.finish();
+            assert_eq!(first_result.entries.len(), 2);
+            assert_eq!(second_result.entries.len(), 1);
+            assert!(first_result.entries.iter().all(|entry| entry.operation_id == Some(first_result.operation_id)));
+            assert!(second_result.entries.iter().all(|entry| entry.operation_id == Some(second_result.operation_id)));
+        });
+    }
+
+    #[test]
+    fn bounded_queue_keeps_newest_64_operations() {
+        let mut queue = VecDeque::new();
+        for id in 1..=(MAX_PENDING_DIALOGS as u64 + 3) {
+            push_bounded_dialog(
+                &mut queue,
+                CapturedMessages {
+                    operation_id: id,
+                    label: format!("operation {id}"),
+                    entries: Vec::new(),
+                    dropped: 1,
+                },
+            );
+        }
+        assert_eq!(queue.len(), MAX_PENDING_DIALOGS);
+        assert_eq!(queue.front().unwrap().operation_id, 4);
+        assert_eq!(queue.back().unwrap().operation_id, MAX_PENDING_DIALOGS as u64 + 3);
+        push_bounded_dialog(
+            &mut queue,
+            CapturedMessages {
+                operation_id: 999,
+                label: "clean".to_owned(),
+                entries: Vec::new(),
+                dropped: 0,
+            },
+        );
+        assert_eq!(queue.len(), MAX_PENDING_DIALOGS);
+        assert_eq!(queue.back().unwrap().operation_id, MAX_PENDING_DIALOGS as u64 + 3);
+    }
+
 }
