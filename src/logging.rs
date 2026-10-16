@@ -29,6 +29,8 @@ static CURRENT_LEVEL: OnceLock<Mutex<LogLevel>> = OnceLock::new();
 static LEVEL_CHANGE_LOCK: Mutex<()> = Mutex::new(());
 static NEXT_OPERATION_ID: AtomicU64 = AtomicU64::new(1);
 static CAPTURES: OnceLock<Mutex<HashMap<u64, CaptureState>>> = OnceLock::new();
+static PENDING_DIALOGS: OnceLock<Mutex<VecDeque<CapturedMessages>>> = OnceLock::new();
+const MAX_PENDING_DIALOGS: usize = 64;
 const MAX_CAPTURE_MESSAGES: usize = 256;
 
 #[derive(Debug, Clone)]
@@ -63,23 +65,69 @@ impl DialogCapture {
     }
 
     pub fn finish(self) -> CapturedMessages {
-        let state = captures()
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .remove(&self.operation_id);
-        let state = state.unwrap_or_else(|| CaptureState {
-            label: String::new(),
-            entries: Vec::new(),
-            dropped: 0,
-        });
-        CapturedMessages {
-            operation_id: self.operation_id,
-            label: state.label,
-            entries: state.entries,
-            dropped: state.dropped,
+        let result = complete_capture(self.operation_id);
+        queue_dialog(&result);
+        result
+    }
+}
+
+impl Drop for DialogCapture {
+    fn drop(&mut self) {
+        // finish() already removed the session; this also covers early returns.
+        if let Some(result) = take_capture(self.operation_id) {
+            queue_dialog(&result);
         }
     }
 }
+
+fn take_capture(id: u64) -> Option<CapturedMessages> {
+    captures()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .remove(&id)
+        .map(|state| CapturedMessages {
+            operation_id: id,
+            label: state.label,
+            entries: state.entries,
+            dropped: state.dropped,
+        })
+}
+
+fn complete_capture(id: u64) -> CapturedMessages {
+    take_capture(id).unwrap_or_else(|| CapturedMessages {
+        operation_id: id,
+        label: String::new(),
+        entries: Vec::new(),
+        dropped: 0,
+    })
+}
+
+fn pending_dialogs() -> &'static Mutex<VecDeque<CapturedMessages>> {
+    PENDING_DIALOGS.get_or_init(|| Mutex::new(VecDeque::new()))
+}
+
+fn queue_dialog(result: &CapturedMessages) {
+    if result.entries.is_empty() && result.dropped == 0 {
+        return;
+    }
+    let mut pending = pending_dialogs()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    if pending.len() >= MAX_PENDING_DIALOGS {
+        pending.pop_front();
+    }
+    pending.push_back(result.clone());
+}
+
+/// Consume the next completed warning/error dialog on the UI thread.
+/// Returns None when there is nothing to display.
+pub fn take_pending_dialog() -> Option<CapturedMessages> {
+    pending_dialogs()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .pop_front()
+}
+
 
 fn captures() -> &'static Mutex<HashMap<u64, CaptureState>> {
     CAPTURES.get_or_init(|| Mutex::new(HashMap::new()))
@@ -99,7 +147,7 @@ pub fn dialog_on(label: &str) -> DialogCapture {
                 dropped: 0,
             },
         );
-    let span = tracing::info_span!(
+    let span = tracing::error_span!(
         "wfide_operation",
         operation_id = id,
         operation_label = label
