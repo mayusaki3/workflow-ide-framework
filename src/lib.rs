@@ -2137,13 +2137,16 @@ impl FrameworkHost {
                     .max_height(260.0)
                     .show(ui, |ui| {
                         for entry in &dialog.entries {
-                            let level = match entry.level {
-                                logging::LogLevel::Error => "ERROR",
-                                logging::LogLevel::Warn => "WARNING",
+                            let (symbol, color) = match entry.level {
+                                logging::LogLevel::Error => ("⛔", ui.visuals().error_fg_color),
+                                logging::LogLevel::Warn => ("⚠", ui.visuals().warn_fg_color),
                                 _ => continue,
                             };
                             let message = entry.message.as_deref().unwrap_or("");
-                            ui.label(format!("{level}: {message}"));
+                            ui.horizontal_wrapped(|ui| {
+                                ui.colored_label(color, symbol);
+                                ui.label(localization::text(message));
+                            });
                         }
                         if dialog.dropped > 0 {
                             ui.label(format!("{} additional messages omitted", dialog.dropped));
