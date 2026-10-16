@@ -813,6 +813,7 @@ impl Application {
                     application_events,
                     project_events,
                     project_ui: ProjectUiState::default(),
+                    active_log_dialog: None,
                     recent_projects,
                     theme_editor: None,
                     fonts_initialized: false,
@@ -877,6 +878,7 @@ struct FrameworkHost {
     application_events: application_event::ApplicationEventDispatcher,
     project_events: project_event::ProjectEventDispatcher,
     project_ui: ProjectUiState,
+    active_log_dialog: Option<logging::CapturedMessages>,
     recent_projects: recent_projects::RecentProjects,
     theme_editor: Option<theme::ThemeEditor>,
     fonts_initialized: bool,
@@ -2112,6 +2114,42 @@ impl FrameworkHost {
         }
     }
 
+    fn operation_log_dialog(&mut self, ctx: &egui::Context) {
+        if self.active_log_dialog.is_none() {
+            self.active_log_dialog = logging::take_pending_dialog();
+        }
+        let Some(dialog) = self.active_log_dialog.as_ref() else {
+            return;
+        };
+        let mut dismiss = false;
+        egui::Window::new(format!("Operation messages: {}", dialog.label))
+            .id(egui::Id::new("wfide_operation_log_dialog"))
+            .collapsible(false)
+            .resizable(true)
+            .default_size([560.0, 320.0])
+            .order(egui::Order::Foreground)
+            .show(ctx, |ui| {
+                ui.label(format!("Operation ID: {}", dialog.operation_id));
+                egui::ScrollArea::vertical()
+                    .max_height(260.0)
+                    .show(ui, |ui| {
+                        for entry in &dialog.entries {
+                            ui.label(entry.display_text());
+                        }
+                        if dialog.dropped > 0 {
+                            ui.label(format!("{} additional messages omitted", dialog.dropped));
+                        }
+                    });
+                if ui.button(localization::text("common.ok")).clicked() {
+                    dismiss = true;
+                }
+            });
+        if dismiss {
+            self.active_log_dialog = None;
+            ctx.request_repaint();
+        }
+    }
+
     fn project_dialogs(&mut self, ctx: &egui::Context) {
         if self.project_ui.folder_dialog.is_some() {
             let mut navigate_to = None;
@@ -2833,6 +2871,7 @@ impl eframe::App for FrameworkHost {
 
         self.application_menu(ui);
         self.project_dialogs(ui.ctx());
+        self.operation_log_dialog(ui.ctx());
         self.application_status(ui);
 
         let application_title = self
