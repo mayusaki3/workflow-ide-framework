@@ -487,7 +487,6 @@ impl Write for CombinedWriter {
 #[cfg(test)]
 mod capture_tests {
     use super::*;
-    use tracing_subscriber::prelude::*;
 
     fn with_logging(test: impl FnOnce()) {
         let layer = MemoryLayer {
@@ -519,8 +518,16 @@ mod capture_tests {
             assert_eq!(a.label, "first");
             assert_eq!(a.entries.len(), 2);
             assert_eq!(b.entries.len(), 1);
-            assert!(a.entries.iter().all(|entry| entry.operation_id == Some(a.operation_id)));
-            assert!(b.entries.iter().all(|entry| entry.operation_id == Some(b.operation_id)));
+            assert!(
+                a.entries
+                    .iter()
+                    .all(|entry| entry.operation_id == Some(a.operation_id))
+            );
+            assert!(
+                b.entries
+                    .iter()
+                    .all(|entry| entry.operation_id == Some(b.operation_id))
+            );
         });
     }
 
@@ -529,7 +536,9 @@ mod capture_tests {
         with_logging(|| {
             let capture = dialog_on("worker");
             let span = capture.span().clone();
+            let subscriber = tracing::dispatcher::get_default(|dispatcher| dispatcher.clone());
             std::thread::spawn(move || {
+                let _subscriber_guard = tracing::dispatcher::set_default(&subscriber);
                 let _guard = span.enter();
                 tracing::warn!("worker warning");
             })
@@ -559,7 +568,12 @@ mod capture_tests {
                 let _guard = span.enter();
                 tracing::error!("after finish");
             }
-            assert!(!captures().lock().unwrap().contains_key(&result.operation_id));
+            assert!(
+                !captures()
+                    .lock()
+                    .unwrap()
+                    .contains_key(&result.operation_id)
+            );
         });
     }
 }
