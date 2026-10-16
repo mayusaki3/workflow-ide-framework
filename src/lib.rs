@@ -1193,7 +1193,9 @@ impl FrameworkHost {
         };
         let roots = provider.project_panel_roots(&project);
         let registry = registry_source(&project);
-        match project_panel_api::build_application_project_tree_with_directories(&roots, &registry, &project) {
+        match project_panel_api::build_application_project_tree_with_directories(
+            &roots, &registry, &project,
+        ) {
             Ok(mut model) => {
                 if let Some(previous) = self.tree_viewers.get(panel_id) {
                     model.selected_id = previous.selected_id.clone();
