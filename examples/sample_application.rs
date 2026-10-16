@@ -193,7 +193,7 @@ fn main() -> eframe::Result<()> {
             {
                 let _entered = capture.span().enter();
                 tracing::info!("informational message should not appear in dialog");
-                tracing::warn!("sample warning for dialog validation");
+                tracing::warn!("sample.dialog.message.warning");
             }
             capture.finish();
         }))
@@ -204,7 +204,7 @@ fn main() -> eframe::Result<()> {
             let capture = logging::dialog_on_key("sample.dialog.title.error");
             {
                 let _entered = capture.span().enter();
-                tracing::error!("sample error for dialog validation");
+                tracing::error!("sample.dialog.message.error");
             }
             capture.finish();
         }))
@@ -219,7 +219,7 @@ fn main() -> eframe::Result<()> {
                 let _subscriber_guard = tracing::dispatcher::set_default(&dispatcher);
                 {
                     let _entered = span.enter();
-                    tracing::error!("sample background worker error");
+                    tracing::error!("sample.dialog.message.background");
                 }
                 capture.finish();
             });
@@ -231,9 +231,9 @@ fn main() -> eframe::Result<()> {
             let capture = logging::dialog_on_key("sample.dialog.title.multiple");
             {
                 let _entered = capture.span().enter();
-                tracing::warn!("first warning in one operation");
-                tracing::error!("error in the same operation");
-                tracing::warn!("second warning in the same operation");
+                tracing::warn!("sample.dialog.message.first_warning");
+                tracing::error!("sample.dialog.message.multiple_error");
+                tracing::warn!("sample.dialog.message.second_warning");
             }
             capture.finish();
         }))
@@ -245,11 +245,11 @@ fn main() -> eframe::Result<()> {
             let second = logging::dialog_on("Sample Operation B");
             {
                 let _entered = first.span().enter();
-                tracing::warn!("warning from operation A only");
+                tracing::warn!("sample.dialog.message.operation_a");
             }
             {
                 let _entered = second.span().enter();
-                tracing::error!("error from operation B only");
+                tracing::error!("sample.dialog.message.operation_b");
             }
             first.finish();
             second.finish();
