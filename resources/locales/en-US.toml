@@ -81,6 +81,7 @@ name = "English"
 "project.error.title" = "Project error"
 "common.cancel" = "Cancel"
 "common.ok" = "OK"
+"dialog.confirm" = "OK"
 
 "text_editor.save" = "Save"
 "text_editor.read_only" = "Read only"
