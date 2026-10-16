@@ -3,7 +3,10 @@ use std::{
     fs,
     io::{self, Write},
     path::PathBuf,
-    sync::{atomic::{AtomicU64, Ordering}, Arc, Mutex, OnceLock},
+    sync::{
+        Arc, Mutex, OnceLock,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use tracing::{Event, Subscriber};
@@ -30,7 +33,11 @@ static NEXT_OPERATION_ID: AtomicU64 = AtomicU64::new(1);
 /// instrument spawned futures explicitly to preserve context across tasks.
 pub fn operation_span(label: &str) -> tracing::Span {
     let id = NEXT_OPERATION_ID.fetch_add(1, Ordering::Relaxed);
-    tracing::info_span!("wfide_operation", operation_id = id, operation_label = label)
+    tracing::info_span!(
+        "wfide_operation",
+        operation_id = id,
+        operation_label = label
+    )
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -52,7 +59,6 @@ impl tracing::field::Visit for OperationIdVisitor {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogLevel {
@@ -129,13 +135,18 @@ impl<S> Layer<S> for MemoryLayer
 where
     S: Subscriber + for<'lookup> LookupSpan<'lookup>,
 {
-    fn on_new_span(&self, attrs: &tracing::span::Attributes<'_>, id: &tracing::span::Id, ctx: Context<'_, S>) {
+    fn on_new_span(
+        &self,
+        attrs: &tracing::span::Attributes<'_>,
+        id: &tracing::span::Id,
+        ctx: Context<'_, S>,
+    ) {
         let mut visitor = OperationIdVisitor::default();
         attrs.record(&mut visitor);
-        if let Some(operation_id) = visitor.0 {
-            if let Some(span) = ctx.span(id) {
-                span.extensions_mut().insert(OperationId(operation_id));
-            }
+        if let Some(operation_id) = visitor.0
+            && let Some(span) = ctx.span(id)
+        {
+            span.extensions_mut().insert(OperationId(operation_id));
         }
     }
 
@@ -176,9 +187,10 @@ where
 
         let current_thread = std::thread::current();
         let operation_id = ctx.event_scope(event).and_then(|scope| {
-            scope.from_root().filter_map(|span| {
-                span.extensions().get::<OperationId>().map(|id| id.0)
-            }).last()
+            scope
+                .from_root()
+                .filter_map(|span| span.extensions().get::<OperationId>().map(|id| id.0))
+                .last()
         });
         let entry = LogEntry {
             time,
