@@ -623,4 +623,60 @@ mod capture_tests {
             );
         });
     }
+    #[test]
+    fn dropped_capture_queues_warnings_once() {
+        with_logging(|| {
+            let capture = dialog_on("early return");
+            let id = capture.operation_id();
+            {
+                let _guard = capture.span().enter();
+                tracing::warn!("early warning");
+            }
+            drop(capture);
+            let queued = take_pending_dialog().expect("dropped capture must be queued");
+            assert_eq!(queued.operation_id, id);
+            assert_eq!(queued.entries.len(), 1);
+            assert!(!captures().lock().unwrap().contains_key(&id));
+        });
+    }
+
+    #[test]
+    fn clean_capture_does_not_queue_dialog() {
+        with_logging(|| {
+            let capture = dialog_on("clean");
+            let id = capture.operation_id();
+            {
+                let _guard = capture.span().enter();
+                tracing::info!("not a warning");
+            }
+            let result = capture.finish();
+            assert_eq!(result.operation_id, id);
+            assert!(result.entries.is_empty());
+            assert!(!pending_dialogs()
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|queued| queued.operation_id == id));
+        });
+    }
+
+    #[test]
+    fn finished_capture_queues_exactly_once() {
+        with_logging(|| {
+            let capture = dialog_on("once");
+            let id = capture.operation_id();
+            {
+                let _guard = capture.span().enter();
+                tracing::error!("failure");
+            }
+            let result = capture.finish();
+            assert_eq!(result.entries.len(), 1);
+            let pending = pending_dialogs().lock().unwrap();
+            assert_eq!(
+                pending.iter().filter(|queued| queued.operation_id == id).count(),
+                1
+            );
+        });
+    }
+
 }
