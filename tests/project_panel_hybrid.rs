@@ -296,3 +296,57 @@ fn pp_hyb_011_refresh_handle_coalesces_cross_clone_requests() {
     handle.invalidate_application_project_panel();
     assert!(app_handle.take_pending());
 }
+
+#[test]
+fn pp_dir_001_002_project_directory_and_extension_filter() {
+    use workflow_ide_framework::{
+        project_panel_api::{build_application_project_tree_with_directories, DirectoryFilter},
+        resource_registry::ResourceRegistry,
+    };
+    let root = std::env::temp_dir().join(format!("wfide-pp-dir-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("models")).unwrap();
+    std::fs::write(root.join("models/robot.urdf"), "robot").unwrap();
+    std::fs::write(root.join("models/readme.txt"), "notes").unwrap();
+    let node = AppPanelNode {
+        id: "models".into(),
+        label: "Models".into(),
+        kind: AppPanelNodeKind::Directory {
+            relative_path: "models".into(),
+            filter: DirectoryFilter {
+                extensions: vec!["urdf".into()],
+                ..DirectoryFilter::default()
+            },
+        },
+        children: vec![],
+    };
+    let registry = ResourceRegistry::default();
+    let tree = build_application_project_tree_with_directories(
+        &[node], &registry, &ProjectContext::new(&root)
+    ).unwrap();
+    assert_eq!(tree.roots[0].children.len(), 1);
+    assert_eq!(tree.roots[0].children[0].label, "robot.urdf");
+    assert!(registry.entries().is_empty());
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn pp_dir_008_rejects_parent_traversal() {
+    use workflow_ide_framework::{
+        project_panel_api::{build_application_project_tree_with_directories, AppPanelTreeError, DirectoryFilter},
+        resource_registry::ResourceRegistry,
+    };
+    let node = AppPanelNode {
+        id: "escape".into(),
+        label: "Escape".into(),
+        kind: AppPanelNodeKind::Directory {
+            relative_path: "../outside".into(),
+            filter: DirectoryFilter::default(),
+        },
+        children: vec![],
+    };
+    let result = build_application_project_tree_with_directories(
+        &[node], &ResourceRegistry::default(), &ProjectContext::new(".")
+    );
+    assert!(matches!(result, Err(AppPanelTreeError::InvalidDirectoryPath(_))));
+}
