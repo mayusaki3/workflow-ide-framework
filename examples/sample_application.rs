@@ -6,7 +6,7 @@ use workflow_ide_framework::{
     },
     flow_editor::{FlowEdge, FlowModel, FlowNode, FlowPort, PortDirection},
     localization,
-    logging::LogLevel,
+    logging::{self, LogLevel},
     project::ProjectContext,
     project_adapter::ApplicationProjectAdapter,
     project_panel::{ProjectPanelModel, ProjectPanelNode, ProvidedResource, ResourceProviderKind},
@@ -187,6 +187,74 @@ fn main() -> eframe::Result<()> {
     Application::new("org.workflow-ide-framework.sample", "Workflow IDE Framework Sample Application")
         .user_config_directory_name("WorkflowIDESample")
         .version(env!("CARGO_PKG_VERSION"))
+        // Diagnostic-only commands for validating operation-scoped log dialogs.
+        .command(CommandDefinition::new("sample.dialog_warning", "Warning", || {
+            let capture = logging::dialog_on("Sample Warning");
+            {
+                let _entered = capture.span().enter();
+                tracing::info!("informational message should not appear in dialog");
+                tracing::warn!("sample warning for dialog validation");
+            }
+            capture.finish();
+        }))
+        .menu_item(MenuItemDefinition::custom(
+            "sample.dialog_tests", "Log Dialog Tests", "sample.dialog_warning",
+        ).menu_before("menu.help"))
+        .command(CommandDefinition::new("sample.dialog_error", "Error", || {
+            let capture = logging::dialog_on("Sample Error");
+            {
+                let _entered = capture.span().enter();
+                tracing::error!("sample error for dialog validation");
+            }
+            capture.finish();
+        }))
+        .menu_item(MenuItemDefinition::custom(
+            "sample.dialog_tests", "Log Dialog Tests", "sample.dialog_error",
+        ))
+        .command(CommandDefinition::new("sample.dialog_background", "Background Error", || {
+            let capture = logging::dialog_on("Sample Background Error");
+            let span = capture.span().clone();
+            let dispatcher = tracing::dispatcher::get_default(|dispatcher| dispatcher.clone());
+            std::thread::spawn(move || {
+                let _subscriber_guard = tracing::dispatcher::set_default(&dispatcher);
+                {
+                    let _entered = span.enter();
+                    tracing::error!("sample background worker error");
+                }
+                capture.finish();
+            });
+        }))
+        .menu_item(MenuItemDefinition::custom(
+            "sample.dialog_tests", "Log Dialog Tests", "sample.dialog_background",
+        ))
+        .command(CommandDefinition::new("sample.dialog_multiple", "Multiple Operations", || {
+            let first = logging::dialog_on("Sample Operation A");
+            let second = logging::dialog_on("Sample Operation B");
+            {
+                let _entered = first.span().enter();
+                tracing::warn!("warning from operation A only");
+            }
+            {
+                let _entered = second.span().enter();
+                tracing::error!("error from operation B only");
+            }
+            first.finish();
+            second.finish();
+        }))
+        .menu_item(MenuItemDefinition::custom(
+            "sample.dialog_tests", "Log Dialog Tests", "sample.dialog_multiple",
+        ))
+        .command(CommandDefinition::new("sample.dialog_clean", "No Warning", || {
+            let capture = logging::dialog_on("Sample Clean Operation");
+            {
+                let _entered = capture.span().enter();
+                tracing::info!("clean operation: no dialog expected");
+            }
+            capture.finish();
+        }))
+        .menu_item(MenuItemDefinition::custom(
+            "sample.dialog_tests", "Log Dialog Tests", "sample.dialog_clean",
+        ))
         // MENU-I18N-002: verify labels change with the Language panel.
         .command(CommandDefinition::new("sample.i18n_probe", "Probe", || {
             tracing::info!("sample localized menu command invoked");
