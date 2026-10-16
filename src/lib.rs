@@ -2816,8 +2816,15 @@ impl FrameworkHost {
     }
 }
 
+impl Drop for FrameworkHost {
+    fn drop(&mut self) {
+        logging::set_dialog_repaint_context(None);
+    }
+}
+
 impl eframe::App for FrameworkHost {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        logging::set_dialog_repaint_context(Some(ui.ctx().clone()));
         self.sync_unsaved_notifications();
         if self.project_panel_refresh.take_pending() {
             self.project_panel_lifecycle
