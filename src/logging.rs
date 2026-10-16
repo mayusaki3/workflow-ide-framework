@@ -3,7 +3,7 @@ use std::{
     fs,
     io::{self, Write},
     path::PathBuf,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{atomic::{AtomicU64, Ordering}, Arc, Mutex, OnceLock},
 };
 
 use tracing::{Event, Subscriber};
@@ -24,6 +24,35 @@ static LEVEL_RELOAD: OnceLock<reload::Handle<LevelFilter, tracing_subscriber::Re
     OnceLock::new();
 static CURRENT_LEVEL: OnceLock<Mutex<LogLevel>> = OnceLock::new();
 static LEVEL_CHANGE_LOCK: Mutex<()> = Mutex::new(());
+static NEXT_OPERATION_ID: AtomicU64 = AtomicU64::new(1);
+
+/// Creates a correlated operation span. Enter it for synchronous work or
+/// instrument spawned futures explicitly to preserve context across tasks.
+pub fn operation_span(label: &str) -> tracing::Span {
+    let id = NEXT_OPERATION_ID.fetch_add(1, Ordering::Relaxed);
+    tracing::info_span!("wfide_operation", operation_id = id, operation_label = label)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct OperationId(u64);
+
+#[derive(Default)]
+struct OperationIdVisitor(Option<u64>);
+
+impl tracing::field::Visit for OperationIdVisitor {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "operation_id" {
+            self.0 = format!("{value:?}").parse().ok();
+        }
+    }
+
+    fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
+        if field.name() == "operation_id" {
+            self.0 = Some(value);
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogLevel {
@@ -42,6 +71,7 @@ pub struct LogEntry {
     pub process_id: u32,
     pub thread_id: String,
     pub thread_name: Option<String>,
+    pub operation_id: Option<u64>,
     pub message: Option<String>,
     pub fields: Vec<(String, String)>,
 }
@@ -55,6 +85,9 @@ impl LogEntry {
         if let Some(name) = &self.thread_name {
             text.push_str(" thread=");
             text.push_str(name);
+        }
+        if let Some(id) = self.operation_id {
+            text.push_str(&format!(" operation={id}"));
         }
         if let Some(message) = &self.message {
             text.push_str(": ");
@@ -96,7 +129,17 @@ impl<S> Layer<S> for MemoryLayer
 where
     S: Subscriber + for<'lookup> LookupSpan<'lookup>,
 {
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+    fn on_new_span(&self, attrs: &tracing::span::Attributes<'_>, id: &tracing::span::Id, ctx: Context<'_, S>) {
+        let mut visitor = OperationIdVisitor::default();
+        attrs.record(&mut visitor);
+        if let Some(operation_id) = visitor.0 {
+            if let Some(span) = ctx.span(id) {
+                span.extensions_mut().insert(OperationId(operation_id));
+            }
+        }
+    }
+
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
         let metadata = event.metadata();
         let level = match *metadata.level() {
             tracing::Level::ERROR => LogLevel::Error,
@@ -132,6 +175,11 @@ where
         }
 
         let current_thread = std::thread::current();
+        let operation_id = ctx.event_scope(event).and_then(|scope| {
+            scope.from_root().filter_map(|span| {
+                span.extensions().get::<OperationId>().map(|id| id.0)
+            }).last()
+        });
         let entry = LogEntry {
             time,
             level,
@@ -139,6 +187,7 @@ where
             process_id: std::process::id(),
             thread_id: format!("{:?}", current_thread.id()),
             thread_name: current_thread.name().map(str::to_owned),
+            operation_id,
             message: visitor.message,
             fields,
         };
