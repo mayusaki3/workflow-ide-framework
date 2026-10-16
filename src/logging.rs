@@ -796,6 +796,7 @@ mod capture_tests {
             CapturedMessages {
                 operation_id: 999,
                 label: "clean".to_owned(),
+                label_is_key: false,
                 entries: Vec::new(),
                 dropped: 0,
             },
