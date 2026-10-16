@@ -81,6 +81,7 @@ name = "日本語"
 "project.error.title" = "プロジェクトエラー"
 "common.cancel" = "キャンセル"
 "common.ok" = "OK"
+"dialog.confirm" = "確認"
 
 "text_editor.save" = "保存"
 "text_editor.read_only" = "読み取り専用"
