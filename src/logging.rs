@@ -30,7 +30,7 @@ static LEVEL_CHANGE_LOCK: Mutex<()> = Mutex::new(());
 static NEXT_OPERATION_ID: AtomicU64 = AtomicU64::new(1);
 static CAPTURES: OnceLock<Mutex<HashMap<u64, CaptureState>>> = OnceLock::new();
 static PENDING_DIALOGS: OnceLock<Mutex<VecDeque<CapturedMessages>>> = OnceLock::new();
-static DIALOG_REPAINT: OnceLock<Mutex<Option<egui::Context>>> = OnceLock::new();
+static DIALOG_REPAINT: OnceLock<Mutex<Option<eframe::egui::Context>>> = OnceLock::new();
 const MAX_PENDING_DIALOGS: usize = 64;
 const MAX_CAPTURE_MESSAGES: usize = 256;
 
@@ -137,13 +137,13 @@ fn queue_dialog(result: &CapturedMessages) {
     }
 }
 
-fn dialog_repaint_context() -> &'static Mutex<Option<egui::Context>> {
+fn dialog_repaint_context() -> &'static Mutex<Option<eframe::egui::Context>> {
     DIALOG_REPAINT.get_or_init(|| Mutex::new(None))
 }
 
 /// Register the active UI context so completed worker operations wake the UI.
 /// Pass None when the host is dropped to avoid retaining a stale context.
-pub fn set_dialog_repaint_context(context: Option<egui::Context>) {
+pub fn set_dialog_repaint_context(context: Option<eframe::egui::Context>) {
     *dialog_repaint_context()
         .lock()
         .unwrap_or_else(|error| error.into_inner()) = context;
