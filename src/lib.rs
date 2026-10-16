@@ -2122,19 +2122,28 @@ impl FrameworkHost {
             return;
         };
         let mut dismiss = false;
-        egui::Window::new(format!("Operation messages: {}", dialog.label))
+        egui::Window::new(if dialog.label_is_key {
+            localization::text(&dialog.label)
+        } else {
+            dialog.label.clone()
+        })
             .id(egui::Id::new("wfide_operation_log_dialog"))
             .collapsible(false)
             .resizable(true)
             .default_size([560.0, 320.0])
             .order(egui::Order::Foreground)
             .show(ctx, |ui| {
-                ui.label(format!("Operation ID: {}", dialog.operation_id));
                 egui::ScrollArea::vertical()
                     .max_height(260.0)
                     .show(ui, |ui| {
                         for entry in &dialog.entries {
-                            ui.label(entry.display_text());
+                            let level = match entry.level {
+                                logging::LogLevel::Error => "ERROR",
+                                logging::LogLevel::Warn => "WARNING",
+                                _ => continue,
+                            };
+                            let message = entry.message.as_deref().unwrap_or("");
+                            ui.label(format!("{level}: {message}"));
                         }
                         if dialog.dropped > 0 {
                             ui.label(format!("{} additional messages omitted", dialog.dropped));
