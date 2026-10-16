@@ -63,9 +63,21 @@ impl DialogCapture {
     }
 
     pub fn finish(self) -> CapturedMessages {
-        let state = captures().lock().unwrap_or_else(|error| error.into_inner()).remove(&self.operation_id);
-        let state = state.unwrap_or_else(|| CaptureState { label: String::new(), entries: Vec::new(), dropped: 0 });
-        CapturedMessages { operation_id: self.operation_id, label: state.label, entries: state.entries, dropped: state.dropped }
+        let state = captures()
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .remove(&self.operation_id);
+        let state = state.unwrap_or_else(|| CaptureState {
+            label: String::new(),
+            entries: Vec::new(),
+            dropped: 0,
+        });
+        CapturedMessages {
+            operation_id: self.operation_id,
+            label: state.label,
+            entries: state.entries,
+            dropped: state.dropped,
+        }
     }
 }
 
@@ -76,11 +88,27 @@ fn captures() -> &'static Mutex<HashMap<u64, CaptureState>> {
 /// Starts collecting warning/error events for a single operation.
 pub fn dialog_on(label: &str) -> DialogCapture {
     let id = NEXT_OPERATION_ID.fetch_add(1, Ordering::Relaxed);
-    captures().lock().unwrap_or_else(|error| error.into_inner()).insert(id, CaptureState { label: label.to_owned(), entries: Vec::new(), dropped: 0 });
-    let span = tracing::info_span!("wfide_operation", operation_id = id, operation_label = label);
-    DialogCapture { operation_id: id, span }
+    captures()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .insert(
+            id,
+            CaptureState {
+                label: label.to_owned(),
+                entries: Vec::new(),
+                dropped: 0,
+            },
+        );
+    let span = tracing::info_span!(
+        "wfide_operation",
+        operation_id = id,
+        operation_label = label
+    );
+    DialogCapture {
+        operation_id: id,
+        span,
+    }
 }
-
 
 /// Creates a correlated operation span. Enter it for synchronous work or
 /// instrument spawned futures explicitly to preserve context across tasks.
