@@ -16,3 +16,8 @@ name = "日本語"
 
 "sample.menu.i18n_title" = "翻訳テスト"
 "sample.menu.i18n_probe" = "メニューテスト実行"
+
+"sample.dialog.title.warning" = "警告の検証"
+"sample.dialog.title.error" = "エラーの検証"
+"sample.dialog.title.background" = "バックグラウンドエラーの検証"
+"sample.dialog.title.multiple" = "複数メッセージの検証"
