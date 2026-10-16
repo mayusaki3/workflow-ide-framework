@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     fs,
     io::{self, Write},
     path::PathBuf,
@@ -28,6 +28,59 @@ static LEVEL_RELOAD: OnceLock<reload::Handle<LevelFilter, tracing_subscriber::Re
 static CURRENT_LEVEL: OnceLock<Mutex<LogLevel>> = OnceLock::new();
 static LEVEL_CHANGE_LOCK: Mutex<()> = Mutex::new(());
 static NEXT_OPERATION_ID: AtomicU64 = AtomicU64::new(1);
+static CAPTURES: OnceLock<Mutex<HashMap<u64, CaptureState>>> = OnceLock::new();
+const MAX_CAPTURE_MESSAGES: usize = 256;
+
+#[derive(Debug, Clone)]
+pub struct CapturedMessages {
+    pub operation_id: u64,
+    pub label: String,
+    pub entries: Vec<LogEntry>,
+    pub dropped: usize,
+}
+
+struct CaptureState {
+    label: String,
+    entries: Vec<LogEntry>,
+    dropped: usize,
+}
+
+/// A log capture session. Enter `span()` around the UI operation and
+/// explicitly propagate that span to worker tasks. Call `finish()` after
+/// all participating tasks have completed.
+pub struct DialogCapture {
+    operation_id: u64,
+    span: tracing::Span,
+}
+
+impl DialogCapture {
+    pub fn span(&self) -> &tracing::Span {
+        &self.span
+    }
+
+    pub fn operation_id(&self) -> u64 {
+        self.operation_id
+    }
+
+    pub fn finish(self) -> CapturedMessages {
+        let state = captures().lock().unwrap_or_else(|error| error.into_inner()).remove(&self.operation_id);
+        let state = state.unwrap_or_else(|| CaptureState { label: String::new(), entries: Vec::new(), dropped: 0 });
+        CapturedMessages { operation_id: self.operation_id, label: state.label, entries: state.entries, dropped: state.dropped }
+    }
+}
+
+fn captures() -> &'static Mutex<HashMap<u64, CaptureState>> {
+    CAPTURES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Starts collecting warning/error events for a single operation.
+pub fn dialog_on(label: &str) -> DialogCapture {
+    let id = NEXT_OPERATION_ID.fetch_add(1, Ordering::Relaxed);
+    captures().lock().unwrap_or_else(|error| error.into_inner()).insert(id, CaptureState { label: label.to_owned(), entries: Vec::new(), dropped: 0 });
+    let span = tracing::info_span!("wfide_operation", operation_id = id, operation_label = label);
+    DialogCapture { operation_id: id, span }
+}
+
 
 /// Creates a correlated operation span. Enter it for synchronous work or
 /// instrument spawned futures explicitly to preserve context across tasks.
@@ -203,6 +256,18 @@ where
             message: visitor.message,
             fields,
         };
+        if matches!(entry.level, LogLevel::Warn | LogLevel::Error)
+            && let Some(id) = entry.operation_id
+        {
+            let mut sessions = captures().lock().unwrap_or_else(|error| error.into_inner());
+            if let Some(capture) = sessions.get_mut(&id) {
+                if capture.entries.len() < MAX_CAPTURE_MESSAGES {
+                    capture.entries.push(entry.clone());
+                } else {
+                    capture.dropped += 1;
+                }
+            }
+        }
         if let Ok(mut buffer) = self.buffer.lock() {
             while buffer.len() >= self.capacity {
                 buffer.pop_front();
