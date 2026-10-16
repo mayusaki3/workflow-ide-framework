@@ -483,3 +483,83 @@ impl Write for CombinedWriter {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod capture_tests {
+    use super::*;
+    use tracing_subscriber::prelude::*;
+
+    fn with_logging(test: impl FnOnce()) {
+        let layer = MemoryLayer {
+            buffer: Arc::new(Mutex::new(VecDeque::new())),
+            capacity: 8,
+        };
+        let subscriber = tracing_subscriber::registry().with(layer);
+        tracing::subscriber::with_default(subscriber, test);
+    }
+
+    #[test]
+    fn capture_only_warnings_and_errors_for_its_operation() {
+        with_logging(|| {
+            let first = dialog_on("first");
+            let second = dialog_on("second");
+            {
+                let _guard = first.span().enter();
+                tracing::info!("ignored");
+                tracing::warn!("first warning");
+                {
+                    let _nested = second.span().enter();
+                    tracing::error!("second error");
+                }
+                tracing::error!("first error");
+            }
+            tracing::warn!("unscoped");
+            let a = first.finish();
+            let b = second.finish();
+            assert_eq!(a.label, "first");
+            assert_eq!(a.entries.len(), 2);
+            assert_eq!(b.entries.len(), 1);
+            assert!(a.entries.iter().all(|entry| entry.operation_id == Some(a.operation_id)));
+            assert!(b.entries.iter().all(|entry| entry.operation_id == Some(b.operation_id)));
+        });
+    }
+
+    #[test]
+    fn capture_propagates_to_explicitly_instrumented_thread() {
+        with_logging(|| {
+            let capture = dialog_on("worker");
+            let span = capture.span().clone();
+            std::thread::spawn(move || {
+                let _guard = span.enter();
+                tracing::warn!("worker warning");
+            })
+            .join()
+            .unwrap();
+            let result = capture.finish();
+            assert_eq!(result.entries.len(), 1);
+            assert_eq!(result.entries[0].operation_id, Some(result.operation_id));
+        });
+    }
+
+    #[test]
+    fn capture_caps_messages_and_stops_at_finish() {
+        with_logging(|| {
+            let capture = dialog_on("limit");
+            let span = capture.span().clone();
+            {
+                let _guard = span.enter();
+                for _ in 0..(MAX_CAPTURE_MESSAGES + 3) {
+                    tracing::warn!("limited");
+                }
+            }
+            let result = capture.finish();
+            assert_eq!(result.entries.len(), MAX_CAPTURE_MESSAGES);
+            assert_eq!(result.dropped, 3);
+            {
+                let _guard = span.enter();
+                tracing::error!("after finish");
+            }
+            assert!(!captures().lock().unwrap().contains_key(&result.operation_id));
+        });
+    }
+}
