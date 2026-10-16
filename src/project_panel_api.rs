@@ -2,6 +2,7 @@
 //! Existing ProjectPanelModel remains available for legacy callers.
 
 use crate::project::ProjectContext;
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppPanelNode {
@@ -23,6 +24,31 @@ pub enum AppPanelNodeKind {
     RegisteredResource {
         registry_resource_id: String,
     },
+    Directory {
+        relative_path: PathBuf,
+        filter: DirectoryFilter,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirectoryFilter {
+    pub extensions: Vec<String>,
+    pub include_files: bool,
+    pub include_directories: bool,
+    pub recursive: bool,
+    pub show_hidden: bool,
+}
+
+impl Default for DirectoryFilter {
+    fn default() -> Self {
+        Self {
+            extensions: Vec::new(),
+            include_files: true,
+            include_directories: true,
+            recursive: true,
+            show_hidden: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,6 +110,9 @@ impl ProjectPanelInvalidation {
 pub enum AppPanelTreeError {
     DuplicateNodeId(String),
     UnknownRegisteredResource(String),
+    ProjectContextRequired,
+    InvalidDirectoryPath(PathBuf),
+    DirectoryReadFailed(PathBuf),
 }
 
 /// Resolve application-owned nodes against the existing Registry without
@@ -92,10 +121,26 @@ pub fn build_application_project_tree(
     roots: &[AppPanelNode],
     registry: &crate::resource_registry::ResourceRegistry,
 ) -> Result<crate::tree_viewer::TreeModel, AppPanelTreeError> {
+    build_tree_internal(roots, registry, None)
+}
+
+pub fn build_application_project_tree_with_directories(
+    roots: &[AppPanelNode],
+    registry: &crate::resource_registry::ResourceRegistry,
+    project: &ProjectContext,
+) -> Result<crate::tree_viewer::TreeModel, AppPanelTreeError> {
+    build_tree_internal(roots, registry, Some(project))
+}
+
+fn build_tree_internal(
+    roots: &[AppPanelNode],
+    registry: &crate::resource_registry::ResourceRegistry,
+    project: Option<&ProjectContext>,
+) -> Result<crate::tree_viewer::TreeModel, AppPanelTreeError> {
     let mut seen = std::collections::HashSet::new();
     let roots = roots
         .iter()
-        .map(|node| build_application_node(node, registry, &mut seen))
+        .map(|node| build_application_node(node, registry, &mut seen, project))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(crate::tree_viewer::TreeModel {
         roots,
@@ -107,12 +152,14 @@ fn build_application_node(
     node: &AppPanelNode,
     registry: &crate::resource_registry::ResourceRegistry,
     seen: &mut std::collections::HashSet<String>,
+    project: Option<&ProjectContext>,
 ) -> Result<crate::tree_viewer::TreeNode, AppPanelTreeError> {
     if !seen.insert(node.id.clone()) {
         return Err(AppPanelTreeError::DuplicateNodeId(node.id.clone()));
     }
     let node_type = match &node.kind {
         AppPanelNodeKind::Category { .. } => "project.category",
+        AppPanelNodeKind::Directory { .. } => "project.directory",
         AppPanelNodeKind::LogicalResource { .. } => "project.logical",
         AppPanelNodeKind::RegisteredResource {
             registry_resource_id,
@@ -127,9 +174,95 @@ fn build_application_node(
     };
     let mut tree = crate::tree_viewer::TreeNode::new(&node.id, &node.label).node_type(node_type);
     for child in &node.children {
-        tree = tree.child(build_application_node(child, registry, seen)?);
+        tree = tree.child(build_application_node(child, registry, seen, project)?);
+    }
+    if let AppPanelNodeKind::Directory { relative_path, filter } = &node.kind {
+        let project = project.ok_or(AppPanelTreeError::ProjectContextRequired)?;
+        if relative_path.as_os_str().is_empty()
+            || relative_path.components().any(|c| !matches!(c, Component::Normal(_)))
+        {
+            return Err(AppPanelTreeError::InvalidDirectoryPath(relative_path.clone()));
+        }
+        let root = std::fs::canonicalize(&project.root)
+            .map_err(|_| AppPanelTreeError::DirectoryReadFailed(project.root.clone()))?;
+        let path = project.root.join(relative_path);
+        if path.exists() {
+            let canonical = std::fs::canonicalize(&path)
+                .map_err(|_| AppPanelTreeError::DirectoryReadFailed(relative_path.clone()))?;
+            if !canonical.starts_with(&root) || !canonical.is_dir() {
+                return Err(AppPanelTreeError::InvalidDirectoryPath(relative_path.clone()));
+            }
+            append_directory(&mut tree, &canonical, &root, &node.id, filter, seen)?;
+        }
     }
     Ok(tree)
+}
+
+fn append_directory(
+    parent: &mut crate::tree_viewer::TreeNode,
+    directory: &Path,
+    root: &Path,
+    mount_id: &str,
+    filter: &DirectoryFilter,
+    seen: &mut std::collections::HashSet<String>,
+) -> Result<(), AppPanelTreeError> {
+    let mut entries = std::fs::read_dir(directory)
+        .map_err(|_| AppPanelTreeError::DirectoryReadFailed(directory.to_path_buf()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| AppPanelTreeError::DirectoryReadFailed(directory.to_path_buf()))?;
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !filter.show_hidden && name.starts_with('.') {
+            continue;
+        }
+        let metadata = std::fs::symlink_metadata(&path)
+            .map_err(|_| AppPanelTreeError::DirectoryReadFailed(path.clone()))?;
+        if metadata.file_type().is_symlink() {
+            continue;
+        }
+        let canonical = std::fs::canonicalize(&path)
+            .map_err(|_| AppPanelTreeError::DirectoryReadFailed(path.clone()))?;
+        if !canonical.starts_with(root) {
+            continue;
+        }
+        let relative = canonical.strip_prefix(root)
+            .map_err(|_| AppPanelTreeError::InvalidDirectoryPath(path.clone()))?;
+        let id = format!("{mount_id}:{}", relative.display());
+        if metadata.is_dir() {
+            let mut child = crate::tree_viewer::TreeNode::new(&id, &name)
+                .node_type("project.directory_entry");
+            if filter.recursive {
+                append_directory(&mut child, &canonical, root, mount_id, filter, seen)?;
+            }
+            if filter.include_directories {
+                if !seen.insert(id.clone()) {
+                    return Err(AppPanelTreeError::DuplicateNodeId(id));
+                }
+                parent.children.push(child);
+            } else if filter.recursive {
+                parent.children.extend(child.children);
+            }
+        } else if metadata.is_file() && filter.include_files {
+            let matches = filter.extensions.is_empty()
+                || path.extension().and_then(|e| e.to_str()).is_some_and(|ext| {
+                    filter.extensions.iter().any(|allowed| {
+                        allowed.trim_start_matches('.').eq_ignore_ascii_case(ext)
+                    })
+                });
+            if matches {
+                if !seen.insert(id.clone()) {
+                    return Err(AppPanelTreeError::DuplicateNodeId(id));
+                }
+                parent.children.push(
+                    crate::tree_viewer::TreeNode::new(id, name)
+                        .node_type("project.file_entry"),
+                );
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Convert extended Tree Viewer events into application-facing events.
