@@ -121,6 +121,67 @@ impl ProjectController {
         ProjectCommandResult::Completed
     }
 
+    /// Read-only snapshot of resources owned by the active project.
+    pub fn resource_registry(&self) -> Option<&ResourceRegistry> {
+        self.session.as_ref().map(|_| &self.resource_registry)
+    }
+
+    /// Register a resource in the active project, reusing the ID of an existing reference.
+    /// A generated ID is stable after Save/Open and independent of Project Panel node IDs.
+    pub fn register_resource(
+        &mut self,
+        reference: crate::project_resource::ResourceReference,
+    ) -> Result<String, &'static str> {
+        if self.session.is_none() {
+            return Err("no project is open");
+        }
+        if let Some(existing) = self.resource_registry.find_by_reference(&reference) {
+            return Ok(existing.resource_id.clone());
+        }
+        static NEXT_ID: std::sync::atomic::AtomicU64 =
+            std::sync::atomic::AtomicU64::new(1);
+        let id = loop {
+            let sequence = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let timestamp = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
+            let candidate = format!("resource-{timestamp:x}-{sequence:x}");
+            if self.resource_registry.find_by_id(&candidate).is_none() {
+                break candidate;
+            }
+        };
+        self.resource_registry.register(id.clone(), reference);
+        if let Some(session) = self.session.as_mut() {
+            session.mark_framework_dirty();
+        }
+        Ok(id)
+    }
+
+    /// Change a registered reference without changing its stable ID.
+    /// Reject collisions instead of merging distinct resource identities.
+    pub fn update_resource_reference(
+        &mut self,
+        resource_id: &str,
+        reference: crate::project_resource::ResourceReference,
+    ) -> Result<bool, &'static str> {
+        if self.session.is_none() {
+            return Err("no project is open");
+        }
+        let Some(old) = self.resource_registry.find_by_id(resource_id) else {
+            return Err("resource ID not found");
+        };
+        if old.reference == reference {
+            return Ok(false);
+        }
+        if self.resource_registry.find_by_reference(&reference).is_some() {
+            return Err("resource reference already registered");
+        }
+        let old_reference = old.reference.clone();
+        self.resource_registry.replace_reference(&old_reference, reference);
+        if let Some(session) = self.session.as_mut() {
+            session.mark_framework_dirty();
+        }
+        Ok(true)
+    }
+
     /// Capture the live layout of every workspace before saving the project.
     /// The settings map is replaced only when every snapshot succeeds.
     pub fn capture_workspace_layouts(
