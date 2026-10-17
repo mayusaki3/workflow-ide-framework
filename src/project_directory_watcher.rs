@@ -32,6 +32,7 @@ impl ProjectDirectoryWatcher {
             }
             let target = canonical_root.join(relative);
             if !target.exists() {
+                // Watch the project root so a missing mount can appear later.
                 continue;
             }
             let canonical = std::fs::canonicalize(&target)?;
@@ -49,8 +50,13 @@ impl ProjectDirectoryWatcher {
                     tracing::warn!(target: "wfide::project_panel", ?error, "directory watch error");
                 }
             })?;
-        for path in &paths {
-            watcher.watch(path, RecursiveMode::Recursive)?;
+        // Watching the root also survives removal and recreation of mount directories.
+        // Individual directory watches are lost when the watched directory is deleted.
+        if !requested_paths.is_empty() {
+            watcher.watch(&canonical_root, RecursiveMode::Recursive)?;
+        }
+        if !requested_paths.is_empty() {
+            paths = vec![canonical_root.clone()];
         }
         Ok(Self {
             _watcher: watcher,
