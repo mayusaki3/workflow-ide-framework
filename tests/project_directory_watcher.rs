@@ -100,3 +100,40 @@ fn pp_dir_005_watcher_identity_tracks_project_and_mounts() {
     std::fs::remove_dir_all(first).unwrap();
     std::fs::remove_dir_all(second).unwrap();
 }
+
+#[test]
+fn pp_dir_005_missing_mount_appears_and_notifies() {
+    let root = temporary_project();
+    let handle = ProjectPanelRefreshHandle::default();
+    let watcher =
+        ProjectDirectoryWatcher::start(&root, &[PathBuf::from("future")], handle.clone()).unwrap();
+    assert_eq!(watcher.watched_paths().len(), 1);
+
+    std::fs::create_dir(root.join("future")).unwrap();
+    assert!(await_refresh(&handle), "creating a missing mount did not notify");
+    drop(watcher);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn pp_dir_005_mount_deletion_and_recreation_notifies() {
+    let root = temporary_project();
+    let handle = ProjectPanelRefreshHandle::default();
+    let watcher =
+        ProjectDirectoryWatcher::start(&root, &[PathBuf::from("models")], handle.clone()).unwrap();
+
+    std::fs::remove_dir(root.join("models")).unwrap();
+    assert!(await_refresh(&handle), "removing mount did not notify");
+    std::thread::sleep(Duration::from_millis(150));
+    handle.take_pending();
+
+    std::fs::create_dir(root.join("models")).unwrap();
+    assert!(await_refresh(&handle), "recreating mount did not notify");
+    std::thread::sleep(Duration::from_millis(150));
+    handle.take_pending();
+
+    std::fs::write(root.join("models/restored.urdf"), "robot").unwrap();
+    assert!(await_refresh(&handle), "new file in restored mount did not notify");
+    drop(watcher);
+    std::fs::remove_dir_all(root).unwrap();
+}
