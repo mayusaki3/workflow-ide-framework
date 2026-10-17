@@ -353,6 +353,39 @@ mod unsaved_notification_tests {
     use crate::project_lifecycle::ProjectSession;
 
     #[test]
+    fn close_discards_registry_entries() {
+        use crate::project_resource::{ResourceReference, ResourceScope};
+        let mut controller = ProjectController::new("sample", "Sample");
+        controller.session = Some(ProjectSession::default());
+        controller.resource_registry.register(
+            "resource-1",
+            ResourceReference::new(ResourceScope::Project, "robot.urdf").unwrap(),
+        );
+        assert_eq!(controller.resource_registry.entries().len(), 1);
+        assert_eq!(controller.close(true), super::ProjectCommandResult::Completed);
+        assert!(controller.resource_registry.entries().is_empty());
+    }
+
+    #[test]
+    fn framework_settings_round_trip_restores_registry_entries() {
+        use crate::project_resource::{ResourceReference, ResourceScope};
+        let mut controller = ProjectController::new("sample", "Sample");
+        controller.resource_registry.register(
+            "resource-1",
+            ResourceReference::new(ResourceScope::Project, "robot.urdf").unwrap(),
+        );
+        let mut settings = controller.framework_settings.clone();
+        settings.resources = controller
+            .resource_registry
+            .entries()
+            .iter()
+            .map(crate::framework_settings::StoredResourceEntry::from_resource)
+            .collect();
+        let restored = settings.to_registry().unwrap();
+        assert_eq!(restored, controller.resource_registry);
+    }
+
+    #[test]
     fn notification_without_open_project_is_noop() {
         let mut controller = ProjectController::new("sample", "Sample");
         controller.mark_unsaved();
