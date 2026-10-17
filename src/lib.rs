@@ -16,11 +16,11 @@ pub mod project;
 pub mod project_adapter;
 pub mod project_adapter_erased;
 pub mod project_controller;
+pub mod project_directory_watcher;
 pub mod project_event;
 pub mod project_io;
 pub mod project_lifecycle;
 pub mod project_open;
-pub mod project_directory_watcher;
 pub mod project_panel;
 pub mod project_panel_api;
 pub mod project_resource;
@@ -2873,7 +2873,8 @@ impl eframe::App for FrameworkHost {
         logging::set_dialog_repaint_context(Some(ui.ctx().clone()));
         self.sync_unsaved_notifications();
         if self.project_directory_watcher.is_some() {
-            ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(250));
         }
         if self.project_panel_refresh.take_pending() {
             self.project_panel_lifecycle
