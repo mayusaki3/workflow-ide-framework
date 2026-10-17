@@ -84,3 +84,19 @@ fn pp_dir_005_dropped_watcher_stops_notifications() {
     assert!(!handle.take_pending(), "dropped watcher still notified");
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn pp_dir_005_watcher_identity_tracks_project_and_mounts() {
+    let first = temporary_project();
+    let second = temporary_project();
+    let handle = ProjectPanelRefreshHandle::default();
+    let watcher =
+        ProjectDirectoryWatcher::start(&first, &[PathBuf::from("models")], handle).unwrap();
+
+    assert!(watcher.matches(&first, &[PathBuf::from("models")]));
+    assert!(!watcher.matches(&second, &[PathBuf::from("models")]));
+    assert!(!watcher.matches(&first, &[PathBuf::from("other")]));
+    drop(watcher);
+    std::fs::remove_dir_all(first).unwrap();
+    std::fs::remove_dir_all(second).unwrap();
+}
