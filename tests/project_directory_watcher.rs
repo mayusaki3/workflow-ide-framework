@@ -110,7 +110,10 @@ fn pp_dir_005_missing_mount_appears_and_notifies() {
     assert_eq!(watcher.watched_paths().len(), 1);
 
     std::fs::create_dir(root.join("future")).unwrap();
-    assert!(await_refresh(&handle), "creating a missing mount did not notify");
+    assert!(
+        await_refresh(&handle),
+        "creating a missing mount did not notify"
+    );
     drop(watcher);
     std::fs::remove_dir_all(root).unwrap();
 }
@@ -133,7 +136,10 @@ fn pp_dir_005_mount_deletion_and_recreation_notifies() {
     handle.take_pending();
 
     std::fs::write(root.join("models/restored.urdf"), "robot").unwrap();
-    assert!(await_refresh(&handle), "new file in restored mount did not notify");
+    assert!(
+        await_refresh(&handle),
+        "new file in restored mount did not notify"
+    );
     drop(watcher);
     std::fs::remove_dir_all(root).unwrap();
 }
