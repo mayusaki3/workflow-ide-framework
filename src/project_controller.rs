@@ -138,8 +138,7 @@ impl ProjectController {
         if let Some(existing) = self.resource_registry.find_by_reference(&reference) {
             return Ok(existing.resource_id.clone());
         }
-        static NEXT_ID: std::sync::atomic::AtomicU64 =
-            std::sync::atomic::AtomicU64::new(1);
+        static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let id = loop {
             let sequence = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let timestamp = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
@@ -171,11 +170,16 @@ impl ProjectController {
         if old.reference == reference {
             return Ok(false);
         }
-        if self.resource_registry.find_by_reference(&reference).is_some() {
+        if self
+            .resource_registry
+            .find_by_reference(&reference)
+            .is_some()
+        {
             return Err("resource reference already registered");
         }
         let old_reference = old.reference.clone();
-        self.resource_registry.replace_reference(&old_reference, reference);
+        self.resource_registry
+            .replace_reference(&old_reference, reference);
         if let Some(session) = self.session.as_mut() {
             session.mark_framework_dirty();
         }
@@ -256,7 +260,12 @@ impl ProjectController {
             return ProjectCommandResult::Failed("project metadata is unavailable".into());
         };
         let mut settings = self.framework_settings.clone();
-        settings.resources = self.resource_registry.entries().iter().map(crate::framework_settings::StoredResourceEntry::from_resource).collect();
+        settings.resources = self
+            .resource_registry
+            .entries()
+            .iter()
+            .map(crate::framework_settings::StoredResourceEntry::from_resource)
+            .collect();
         match save_project(
             session,
             &context,
@@ -266,7 +275,10 @@ impl ProjectController {
             save_id,
             saved_at,
         ) {
-            Ok(()) => { self.framework_settings = settings; ProjectCommandResult::Completed },
+            Ok(()) => {
+                self.framework_settings = settings;
+                ProjectCommandResult::Completed
+            }
             Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
         }
     }
@@ -287,7 +299,12 @@ impl ProjectController {
         };
         let previous_name = std::mem::replace(&mut project_file.project.name, project_name.into());
         let mut settings = self.framework_settings.clone();
-        settings.resources = self.resource_registry.entries().iter().map(crate::framework_settings::StoredResourceEntry::from_resource).collect();
+        settings.resources = self
+            .resource_registry
+            .entries()
+            .iter()
+            .map(crate::framework_settings::StoredResourceEntry::from_resource)
+            .collect();
         let result = save_project_as(
             session,
             destination,
@@ -301,7 +318,10 @@ impl ProjectController {
             project_file.project.name = previous_name;
         }
         match result {
-            Ok(()) => { self.framework_settings = settings; ProjectCommandResult::Completed },
+            Ok(()) => {
+                self.framework_settings = settings;
+                ProjectCommandResult::Completed
+            }
             Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
         }
     }
@@ -423,7 +443,10 @@ mod unsaved_notification_tests {
             ResourceReference::new(ResourceScope::Project, "robot.urdf").unwrap(),
         );
         assert_eq!(controller.resource_registry.entries().len(), 1);
-        assert_eq!(controller.close(true), super::ProjectCommandResult::Completed);
+        assert_eq!(
+            controller.close(true),
+            super::ProjectCommandResult::Completed
+        );
         assert!(controller.resource_registry.entries().is_empty());
     }
 
@@ -469,8 +492,19 @@ mod unsaved_notification_tests {
         let id = controller.register_resource(first).unwrap();
         controller.register_resource(second.clone()).unwrap();
         assert!(controller.update_resource_reference(&id, second).is_err());
-        assert!(controller.update_resource_reference(&id, moved.clone()).unwrap());
-        assert_eq!(controller.resource_registry.find_by_id(&id).unwrap().reference, moved);
+        assert!(
+            controller
+                .update_resource_reference(&id, moved.clone())
+                .unwrap()
+        );
+        assert_eq!(
+            controller
+                .resource_registry
+                .find_by_id(&id)
+                .unwrap()
+                .reference,
+            moved
+        );
         assert!(!controller.update_resource_reference(&id, moved).unwrap());
     }
 
@@ -480,7 +514,11 @@ mod unsaved_notification_tests {
         let mut controller = ProjectController::new("sample", "Sample");
         let reference = ResourceReference::new(ResourceScope::Project, "robot.urdf").unwrap();
         assert!(controller.register_resource(reference.clone()).is_err());
-        assert!(controller.update_resource_reference("missing", reference).is_err());
+        assert!(
+            controller
+                .update_resource_reference("missing", reference)
+                .is_err()
+        );
         assert!(controller.resource_registry().is_none());
     }
 
