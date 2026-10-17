@@ -22,6 +22,7 @@ pub mod project_lifecycle;
 pub mod project_open;
 pub mod project_panel;
 pub mod project_panel_api;
+pub mod project_directory_watcher;
 pub mod project_resource;
 pub mod project_save;
 pub mod project_save_as;
@@ -798,6 +799,7 @@ impl Application {
                     project_panel_refresh,
                     project_panel_selection: tree_viewer::TreeSelection::default(),
                     project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle::default(),
+                    project_directory_watcher: None,
                     flow_editors,
                     property_panels,
                     flow_property_links,
@@ -863,6 +865,7 @@ struct FrameworkHost {
     project_panel_refresh: project_panel_api::ProjectPanelRefreshHandle,
     project_panel_selection: tree_viewer::TreeSelection,
     project_panel_lifecycle: project_panel_api::ProjectPanelLifecycle,
+    project_directory_watcher: Option<project_directory_watcher::ProjectDirectoryWatcher>,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: Vec<FlowPropertyLink>,
@@ -1192,6 +1195,27 @@ impl FrameworkHost {
             return;
         };
         let roots = provider.project_panel_roots(&project);
+        let mut directories = Vec::new();
+        fn collect_directories(nodes: &[project_panel_api::AppPanelNode], paths: &mut Vec<std::path::PathBuf>) {
+            for node in nodes {
+                if let project_panel_api::AppPanelNodeKind::Directory { relative_path, .. } = &node.kind {
+                    paths.push(relative_path.clone());
+                }
+                collect_directories(&node.children, paths);
+            }
+        }
+        collect_directories(&roots, &mut directories);
+        self.project_directory_watcher = None;
+        if !directories.is_empty() {
+            match project_directory_watcher::ProjectDirectoryWatcher::start(
+                &project.root,
+                &directories,
+                self.project_panel_refresh.clone(),
+            ) {
+                Ok(watcher) => self.project_directory_watcher = Some(watcher),
+                Err(error) => tracing::warn!(target: "wfide::project_panel", ?error, "directory watcher unavailable"),
+            }
+        }
         let registry = registry_source(&project);
         match project_panel_api::build_application_project_tree_with_directories(
             &roots, &registry, &project,
@@ -1756,6 +1780,7 @@ impl FrameworkHost {
         match kind {
             project_event::ProjectEventKind::Closed => {
                 self.project_panel_lifecycle.close_project();
+                self.project_directory_watcher = None;
                 self.project_panel_selection = tree_viewer::TreeSelection::default();
                 if let Some(panel_id) = self.project_panel_id.as_ref() {
                     self.tree_viewers
@@ -2840,6 +2865,9 @@ impl eframe::App for FrameworkHost {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         logging::set_dialog_repaint_context(Some(ui.ctx().clone()));
         self.sync_unsaved_notifications();
+        if self.project_directory_watcher.is_some() {
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
+        }
         if self.project_panel_refresh.take_pending() {
             self.project_panel_lifecycle
                 .invalidate_application_project_panel();
