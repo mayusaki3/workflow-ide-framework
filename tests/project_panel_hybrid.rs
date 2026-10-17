@@ -437,11 +437,14 @@ fn pp_dir_005_rescan_reflects_filesystem_changes() {
     };
     let registry = ResourceRegistry::default();
     let project = ProjectContext::new(&root);
-    let build = || build_application_project_tree_with_directories(
-        std::slice::from_ref(&node),
-        &registry,
-        &project,
-    ).unwrap();
+    let build = || {
+        build_application_project_tree_with_directories(
+            std::slice::from_ref(&node),
+            &registry,
+            &project,
+        )
+        .unwrap()
+    };
     assert!(build().roots[0].children.is_empty());
     std::fs::write(root.join("models/robot.urdf"), "robot").unwrap();
     assert_eq!(build().roots[0].children[0].label, "robot.urdf");
