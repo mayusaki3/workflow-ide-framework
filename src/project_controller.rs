@@ -447,6 +447,44 @@ mod unsaved_notification_tests {
     }
 
     #[test]
+    fn registry_registration_reuses_id_and_marks_framework_dirty() {
+        use crate::project_resource::{ResourceReference, ResourceScope};
+        let mut controller = ProjectController::new("sample", "Sample");
+        controller.session = Some(ProjectSession::default());
+        let reference = ResourceReference::new(ResourceScope::Project, "robot.urdf").unwrap();
+        let id = controller.register_resource(reference.clone()).unwrap();
+        assert_eq!(controller.register_resource(reference).unwrap(), id);
+        assert_eq!(controller.resource_registry.entries().len(), 1);
+        assert!(controller.session.as_ref().unwrap().dirty.framework);
+    }
+
+    #[test]
+    fn registry_reference_update_preserves_id_and_rejects_collision() {
+        use crate::project_resource::{ResourceReference, ResourceScope};
+        let mut controller = ProjectController::new("sample", "Sample");
+        controller.session = Some(ProjectSession::default());
+        let first = ResourceReference::new(ResourceScope::Project, "first.urdf").unwrap();
+        let second = ResourceReference::new(ResourceScope::Project, "second.urdf").unwrap();
+        let moved = ResourceReference::new(ResourceScope::Project, "moved.urdf").unwrap();
+        let id = controller.register_resource(first).unwrap();
+        controller.register_resource(second.clone()).unwrap();
+        assert!(controller.update_resource_reference(&id, second).is_err());
+        assert!(controller.update_resource_reference(&id, moved.clone()).unwrap());
+        assert_eq!(controller.resource_registry.find_by_id(&id).unwrap().reference, moved);
+        assert!(!controller.update_resource_reference(&id, moved).unwrap());
+    }
+
+    #[test]
+    fn registry_operations_require_open_project() {
+        use crate::project_resource::{ResourceReference, ResourceScope};
+        let mut controller = ProjectController::new("sample", "Sample");
+        let reference = ResourceReference::new(ResourceScope::Project, "robot.urdf").unwrap();
+        assert!(controller.register_resource(reference.clone()).is_err());
+        assert!(controller.update_resource_reference("missing", reference).is_err());
+        assert!(controller.resource_registry().is_none());
+    }
+
+    #[test]
     fn notification_without_open_project_is_noop() {
         let mut controller = ProjectController::new("sample", "Sample");
         controller.mark_unsaved();
