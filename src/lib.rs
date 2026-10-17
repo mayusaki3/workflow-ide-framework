@@ -20,9 +20,9 @@ pub mod project_event;
 pub mod project_io;
 pub mod project_lifecycle;
 pub mod project_open;
+pub mod project_directory_watcher;
 pub mod project_panel;
 pub mod project_panel_api;
-pub mod project_directory_watcher;
 pub mod project_resource;
 pub mod project_save;
 pub mod project_save_as;
@@ -1196,9 +1196,14 @@ impl FrameworkHost {
         };
         let roots = provider.project_panel_roots(&project);
         let mut directories = Vec::new();
-        fn collect_directories(nodes: &[project_panel_api::AppPanelNode], paths: &mut Vec<std::path::PathBuf>) {
+        fn collect_directories(
+            nodes: &[project_panel_api::AppPanelNode],
+            paths: &mut Vec<std::path::PathBuf>,
+        ) {
             for node in nodes {
-                if let project_panel_api::AppPanelNodeKind::Directory { relative_path, .. } = &node.kind {
+                if let project_panel_api::AppPanelNodeKind::Directory { relative_path, .. } =
+                    &node.kind
+                {
                     paths.push(relative_path.clone());
                 }
                 collect_directories(&node.children, paths);
@@ -1213,7 +1218,9 @@ impl FrameworkHost {
                 self.project_panel_refresh.clone(),
             ) {
                 Ok(watcher) => self.project_directory_watcher = Some(watcher),
-                Err(error) => tracing::warn!(target: "wfide::project_panel", ?error, "directory watcher unavailable"),
+                Err(error) => {
+                    tracing::warn!(target: "wfide::project_panel", ?error, "directory watcher unavailable");
+                }
             }
         }
         let registry = registry_source(&project);
