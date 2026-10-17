@@ -29,12 +29,8 @@ fn await_refresh(handle: &ProjectPanelRefreshHandle) -> bool {
 fn pp_dir_005_os_notifications_for_create_rename_and_delete() {
     let root = temporary_project();
     let handle = ProjectPanelRefreshHandle::default();
-    let watcher = ProjectDirectoryWatcher::start(
-        &root,
-        &[PathBuf::from("models")],
-        handle.clone(),
-    )
-    .unwrap();
+    let watcher =
+        ProjectDirectoryWatcher::start(&root, &[PathBuf::from("models")], handle.clone()).unwrap();
     assert_eq!(watcher.watched_paths().len(), 1);
 
     std::fs::write(root.join("models/first.urdf"), "robot").unwrap();
@@ -42,7 +38,11 @@ fn pp_dir_005_os_notifications_for_create_rename_and_delete() {
     std::thread::sleep(Duration::from_millis(150));
     handle.take_pending();
 
-    std::fs::rename(root.join("models/first.urdf"), root.join("models/second.urdf")).unwrap();
+    std::fs::rename(
+        root.join("models/first.urdf"),
+        root.join("models/second.urdf"),
+    )
+    .unwrap();
     assert!(await_refresh(&handle), "rename did not trigger refresh");
     std::thread::sleep(Duration::from_millis(150));
     handle.take_pending();
@@ -57,12 +57,8 @@ fn pp_dir_005_os_notifications_for_create_rename_and_delete() {
 fn pp_dir_005_refresh_requests_coalesce() {
     let root = temporary_project();
     let handle = ProjectPanelRefreshHandle::default();
-    let watcher = ProjectDirectoryWatcher::start(
-        &root,
-        &[PathBuf::from("models")],
-        handle.clone(),
-    )
-    .unwrap();
+    let watcher =
+        ProjectDirectoryWatcher::start(&root, &[PathBuf::from("models")], handle.clone()).unwrap();
 
     for index in 0..5 {
         std::fs::write(root.join(format!("models/{index}.urdf")), "robot").unwrap();
@@ -79,12 +75,8 @@ fn pp_dir_005_refresh_requests_coalesce() {
 fn pp_dir_005_dropped_watcher_stops_notifications() {
     let root = temporary_project();
     let handle = ProjectPanelRefreshHandle::default();
-    let watcher = ProjectDirectoryWatcher::start(
-        &root,
-        &[PathBuf::from("models")],
-        handle.clone(),
-    )
-    .unwrap();
+    let watcher =
+        ProjectDirectoryWatcher::start(&root, &[PathBuf::from("models")], handle.clone()).unwrap();
     drop(watcher);
     handle.take_pending();
     std::fs::write(root.join("models/after-drop.urdf"), "robot").unwrap();
