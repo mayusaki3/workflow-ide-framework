@@ -19,9 +19,9 @@ impl ProjectDirectoryWatcher {
         let mut paths = Vec::new();
         for relative in relative_paths {
             if relative.as_os_str().is_empty()
-                || relative.components().any(|component| {
-                    !matches!(component, std::path::Component::Normal(_))
-                })
+                || relative
+                    .components()
+                    .any(|component| !matches!(component, std::path::Component::Normal(_)))
             {
                 return Err(notify::Error::generic("invalid project directory path"));
             }
@@ -37,12 +37,13 @@ impl ProjectDirectoryWatcher {
                 paths.push(canonical);
             }
         }
-        let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-            match event {
+        let mut watcher =
+            notify::recommended_watcher(move |event: notify::Result<notify::Event>| match event {
                 Ok(_) => refresh.invalidate_application_project_panel(),
-                Err(error) => tracing::warn!(target: "wfide::project_panel", ?error, "directory watch error"),
-            }
-        })?;
+                Err(error) => {
+                    tracing::warn!(target: "wfide::project_panel", ?error, "directory watch error");
+                }
+            })?;
         for path in &paths {
             watcher.watch(path, RecursiveMode::Recursive)?;
         }
