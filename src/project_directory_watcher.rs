@@ -47,7 +47,10 @@ impl ProjectDirectoryWatcher {
         for path in &paths {
             watcher.watch(path, RecursiveMode::Recursive)?;
         }
-        Ok(Self { _watcher: watcher, paths })
+        Ok(Self {
+            _watcher: watcher,
+            paths,
+        })
     }
 
     pub fn watched_paths(&self) -> &[PathBuf] {
