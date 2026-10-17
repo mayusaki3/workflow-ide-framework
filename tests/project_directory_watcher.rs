@@ -69,7 +69,8 @@ fn pp_dir_005_refresh_requests_coalesce() {
     }
     assert!(await_refresh(&handle));
     std::thread::sleep(Duration::from_millis(300));
-    assert!(!handle.take_pending() || !handle.take_pending());
+    handle.take_pending();
+    assert!(!handle.take_pending(), "pending refresh was not coalesced");
     drop(watcher);
     std::fs::remove_dir_all(root).unwrap();
 }
