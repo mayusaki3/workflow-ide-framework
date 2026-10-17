@@ -1210,16 +1210,22 @@ impl FrameworkHost {
             }
         }
         collect_directories(&roots, &mut directories);
-        self.project_directory_watcher = None;
-        if !directories.is_empty() {
-            match project_directory_watcher::ProjectDirectoryWatcher::start(
-                &project.root,
-                &directories,
-                self.project_panel_refresh.clone(),
-            ) {
-                Ok(watcher) => self.project_directory_watcher = Some(watcher),
-                Err(error) => {
-                    tracing::warn!(target: "wfide::project_panel", ?error, "directory watcher unavailable");
+        let watcher_matches = self
+            .project_directory_watcher
+            .as_ref()
+            .is_some_and(|watcher| watcher.matches(&project.root, &directories));
+        if !watcher_matches {
+            self.project_directory_watcher = None;
+            if !directories.is_empty() {
+                match project_directory_watcher::ProjectDirectoryWatcher::start(
+                    &project.root,
+                    &directories,
+                    self.project_panel_refresh.clone(),
+                ) {
+                    Ok(watcher) => self.project_directory_watcher = Some(watcher),
+                    Err(error) => {
+                        tracing::warn!(target: "wfide::project_panel", ?error, "directory watcher unavailable");
+                    }
                 }
             }
         }
@@ -1797,6 +1803,7 @@ impl FrameworkHost {
             project_event::ProjectEventKind::Opened
             | project_event::ProjectEventKind::Created
             | project_event::ProjectEventKind::SavedAs => {
+                self.project_directory_watcher = None;
                 // Project identity changed: never display the previous project's
                 // tree or selection while waiting for the new snapshot.
                 self.project_panel_selection = tree_viewer::TreeSelection::default();
