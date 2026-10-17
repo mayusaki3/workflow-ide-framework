@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 pub struct ProjectDirectoryWatcher {
     _watcher: RecommendedWatcher,
     paths: Vec<PathBuf>,
+    root: PathBuf,
+    requested_paths: Vec<PathBuf>,
 }
 
 impl ProjectDirectoryWatcher {
@@ -16,6 +18,9 @@ impl ProjectDirectoryWatcher {
         refresh: ProjectPanelRefreshHandle,
     ) -> notify::Result<Self> {
         let canonical_root = std::fs::canonicalize(root)?;
+        let mut requested_paths = relative_paths.to_vec();
+        requested_paths.sort();
+        requested_paths.dedup();
         let mut paths = Vec::new();
         for relative in relative_paths {
             if relative.as_os_str().is_empty()
@@ -50,7 +55,20 @@ impl ProjectDirectoryWatcher {
         Ok(Self {
             _watcher: watcher,
             paths,
+            root: canonical_root,
+            requested_paths,
         })
+    }
+
+    /// Keep an existing watcher when the project and requested mounts are unchanged.
+    pub fn matches(&self, root: &Path, relative_paths: &[PathBuf]) -> bool {
+        let Ok(root) = std::fs::canonicalize(root) else {
+            return false;
+        };
+        let mut requested = relative_paths.to_vec();
+        requested.sort();
+        requested.dedup();
+        self.root == root && self.requested_paths == requested
     }
 
     pub fn watched_paths(&self) -> &[PathBuf] {
