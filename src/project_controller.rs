@@ -12,6 +12,7 @@ use crate::{
     project_resource::NewProjectStoragePolicy,
     project_save::save_project,
     project_save_as::save_project_as,
+    resource_registry::ResourceRegistry,
     workspace::{WorkspaceError, WorkspaceRegistry},
     workspace_dock::{
         WorkspaceDockProjection, restore_workspace_layout, snapshot_workspace_layout,
@@ -36,6 +37,7 @@ pub struct ProjectController {
     pub session: Option<ProjectSession>,
     pub project_file: Option<ProjectFile>,
     pub framework_settings: FrameworkSettings,
+    pub resource_registry: ResourceRegistry,
 }
 
 impl ProjectController {
@@ -46,6 +48,7 @@ impl ProjectController {
             session: None,
             project_file: None,
             framework_settings: FrameworkSettings::default(),
+            resource_registry: ResourceRegistry::default(),
         }
     }
 
@@ -74,6 +77,7 @@ impl ProjectController {
         }
         self.project_file = Some(self.project_template(name, language, description));
         self.framework_settings = FrameworkSettings::default();
+        self.resource_registry = ResourceRegistry::default();
         self.session = Some(session);
         ProjectCommandResult::Completed
     }
@@ -102,10 +106,16 @@ impl ProjectController {
             Ok(session) => session,
             Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
         };
-        self.framework_settings = match &result.framework_settings {
+        let settings = match &result.framework_settings {
             FrameworkSettingsOpen::Loaded(settings) => settings.clone(),
             _ => FrameworkSettings::default(),
         };
+        let registry = match settings.to_registry() {
+            Ok(registry) => registry,
+            Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
+        };
+        self.framework_settings = settings;
+        self.resource_registry = registry;
         self.project_file = Some(result.project_file);
         self.session = Some(session);
         ProjectCommandResult::Completed
@@ -184,16 +194,18 @@ impl ProjectController {
         let Some(project_file) = self.project_file.as_mut() else {
             return ProjectCommandResult::Failed("project metadata is unavailable".into());
         };
+        let mut settings = self.framework_settings.clone();
+        settings.resources = self.resource_registry.entries().iter().map(crate::framework_settings::StoredResourceEntry::from_resource).collect();
         match save_project(
             session,
             &context,
             project_file,
-            &self.framework_settings,
+            &settings,
             application,
             save_id,
             saved_at,
         ) {
-            Ok(()) => ProjectCommandResult::Completed,
+            Ok(()) => { self.framework_settings = settings; ProjectCommandResult::Completed },
             Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
         }
     }
@@ -213,11 +225,13 @@ impl ProjectController {
             return ProjectCommandResult::Failed("project metadata is unavailable".into());
         };
         let previous_name = std::mem::replace(&mut project_file.project.name, project_name.into());
+        let mut settings = self.framework_settings.clone();
+        settings.resources = self.resource_registry.entries().iter().map(crate::framework_settings::StoredResourceEntry::from_resource).collect();
         let result = save_project_as(
             session,
             destination,
             project_file,
-            &self.framework_settings,
+            &settings,
             application,
             save_id,
             saved_at,
@@ -226,7 +240,7 @@ impl ProjectController {
             project_file.project.name = previous_name;
         }
         match result {
-            Ok(()) => ProjectCommandResult::Completed,
+            Ok(()) => { self.framework_settings = settings; ProjectCommandResult::Completed },
             Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
         }
     }
@@ -243,6 +257,7 @@ impl ProjectController {
         self.session = None;
         self.project_file = None;
         self.framework_settings = FrameworkSettings::default();
+        self.resource_registry = ResourceRegistry::default();
         ProjectCommandResult::Completed
     }
 
