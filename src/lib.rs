@@ -251,9 +251,6 @@ struct ControllerPropertyLink {
     property_panel_id: String,
 }
 
-type ProjectPanelRegistrySource =
-    Box<dyn Fn(&project::ProjectContext) -> resource_registry::ResourceRegistry>;
-
 pub struct Application {
     unsaved_notification: unsaved_notification::UnsavedNotification,
     config: ApplicationConfig,
@@ -262,7 +259,6 @@ pub struct Application {
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
     project_panel_provider: Option<Box<dyn project_panel_api::ApplicationProjectPanelProvider>>,
-    project_panel_registry: Option<ProjectPanelRegistrySource>,
     project_panel_id: Option<String>,
     project_panel_refresh: project_panel_api::ProjectPanelRefreshHandle,
     flow_editors: std::collections::HashMap<String, flow_editor::FlowModel>,
@@ -294,7 +290,6 @@ impl Application {
             log_viewers: std::collections::HashMap::new(),
             tree_viewers: std::collections::HashMap::new(),
             project_panel_provider: None,
-            project_panel_registry: None,
             project_panel_id: None,
             project_panel_refresh: project_panel_api::ProjectPanelRefreshHandle::default(),
             flow_editors: std::collections::HashMap::new(),
@@ -351,7 +346,7 @@ impl Application {
         self
     }
 
-    /// Register an application-owned Project Panel and its registry snapshot source.
+    /// Register an application-owned Project Panel using the Framework-managed registry.
     /// Share this handle with application code to request a Project Panel refresh.
     pub fn project_panel_refresh_handle(&self) -> project_panel_api::ProjectPanelRefreshHandle {
         self.project_panel_refresh.clone()
@@ -361,13 +356,11 @@ impl Application {
         mut self,
         panel_id: impl Into<String>,
         provider: impl project_panel_api::ApplicationProjectPanelProvider + 'static,
-        registry: impl Fn(&project::ProjectContext) -> resource_registry::ResourceRegistry + 'static,
     ) -> Self {
         let panel_id = panel_id.into();
         self.tree_viewers.entry(panel_id.clone()).or_default();
         self.project_panel_id = Some(panel_id);
         self.project_panel_provider = Some(Box::new(provider));
-        self.project_panel_registry = Some(Box::new(registry));
         self
     }
 
@@ -582,7 +575,6 @@ impl Application {
         let log_viewers = self.log_viewers;
         let tree_viewers = self.tree_viewers;
         let project_panel_provider = self.project_panel_provider;
-        let project_panel_registry = self.project_panel_registry;
         let project_panel_id = self.project_panel_id;
         let project_panel_refresh = self.project_panel_refresh;
         let flow_editors = self.flow_editors;
@@ -794,7 +786,6 @@ impl Application {
                     log_viewers,
                     tree_viewers,
                     project_panel_provider,
-                    project_panel_registry,
                     project_panel_id,
                     project_panel_refresh,
                     project_panel_selection: tree_viewer::TreeSelection::default(),
@@ -860,7 +851,6 @@ struct FrameworkHost {
     log_viewers: std::collections::HashMap<String, log_viewer::LogViewerOptions>,
     tree_viewers: std::collections::HashMap<String, tree_viewer::TreeModel>,
     project_panel_provider: Option<Box<dyn project_panel_api::ApplicationProjectPanelProvider>>,
-    project_panel_registry: Option<ProjectPanelRegistrySource>,
     project_panel_id: Option<String>,
     project_panel_refresh: project_panel_api::ProjectPanelRefreshHandle,
     project_panel_selection: tree_viewer::TreeSelection,
@@ -1187,10 +1177,10 @@ impl FrameworkHost {
         let Some(project) = self.project_panel_lifecycle.take_refresh_request() else {
             return;
         };
-        let (Some(panel_id), Some(provider), Some(registry_source)) = (
+        let (Some(panel_id), Some(provider), Some(registry)) = (
             self.project_panel_id.as_ref(),
             self.project_panel_provider.as_ref(),
-            self.project_panel_registry.as_ref(),
+            self.project_controller.as_ref().and_then(|controller| controller.resource_registry()),
         ) else {
             return;
         };
@@ -1229,9 +1219,8 @@ impl FrameworkHost {
                 }
             }
         }
-        let registry = registry_source(&project);
         match project_panel_api::build_application_project_tree_with_directories(
-            &roots, &registry, &project,
+            &roots, registry, &project,
         ) {
             Ok(mut model) => {
                 if let Some(previous) = self.tree_viewers.get(panel_id) {
