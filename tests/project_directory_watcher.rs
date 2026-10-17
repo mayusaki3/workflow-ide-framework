@@ -1,0 +1,93 @@
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
+use workflow_ide_framework::project_directory_watcher::ProjectDirectoryWatcher;
+use workflow_ide_framework::project_panel_api::ProjectPanelRefreshHandle;
+
+fn temporary_project() -> PathBuf {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let root = std::env::temp_dir().join(format!(
+        "wfide-watch-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    std::fs::create_dir_all(root.join("models")).unwrap();
+    root
+}
+
+fn await_refresh(handle: &ProjectPanelRefreshHandle) -> bool {
+    let until = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < until {
+        if handle.take_pending() {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    false
+}
+
+#[test]
+fn pp_dir_005_os_notifications_for_create_rename_and_delete() {
+    let root = temporary_project();
+    let handle = ProjectPanelRefreshHandle::default();
+    let watcher = ProjectDirectoryWatcher::start(
+        &root,
+        &[PathBuf::from("models")],
+        handle.clone(),
+    )
+    .unwrap();
+    assert_eq!(watcher.watched_paths().len(), 1);
+
+    std::fs::write(root.join("models/first.urdf"), "robot").unwrap();
+    assert!(await_refresh(&handle), "create did not trigger refresh");
+    std::thread::sleep(Duration::from_millis(150));
+    handle.take_pending();
+
+    std::fs::rename(root.join("models/first.urdf"), root.join("models/second.urdf")).unwrap();
+    assert!(await_refresh(&handle), "rename did not trigger refresh");
+    std::thread::sleep(Duration::from_millis(150));
+    handle.take_pending();
+
+    std::fs::remove_file(root.join("models/second.urdf")).unwrap();
+    assert!(await_refresh(&handle), "delete did not trigger refresh");
+    drop(watcher);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn pp_dir_005_refresh_requests_coalesce() {
+    let root = temporary_project();
+    let handle = ProjectPanelRefreshHandle::default();
+    let watcher = ProjectDirectoryWatcher::start(
+        &root,
+        &[PathBuf::from("models")],
+        handle.clone(),
+    )
+    .unwrap();
+
+    for index in 0..5 {
+        std::fs::write(root.join(format!("models/{index}.urdf")), "robot").unwrap();
+    }
+    assert!(await_refresh(&handle));
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(!handle.take_pending() || !handle.take_pending());
+    drop(watcher);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn pp_dir_005_dropped_watcher_stops_notifications() {
+    let root = temporary_project();
+    let handle = ProjectPanelRefreshHandle::default();
+    let watcher = ProjectDirectoryWatcher::start(
+        &root,
+        &[PathBuf::from("models")],
+        handle.clone(),
+    )
+    .unwrap();
+    drop(watcher);
+    handle.take_pending();
+    std::fs::write(root.join("models/after-drop.urdf"), "robot").unwrap();
+    std::thread::sleep(Duration::from_millis(400));
+    assert!(!handle.take_pending(), "dropped watcher still notified");
+    std::fs::remove_dir_all(root).unwrap();
+}
