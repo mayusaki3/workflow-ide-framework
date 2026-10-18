@@ -35,6 +35,25 @@
 | REG-PANEL-005 | 存在しないResource IDをRegisteredResourceで参照 | 診断可能なエラー |
 | REG-PANEL-006 | Registry登録・参照先変更後にProject Panelを更新 | 変更時のみ再構築要求、変更なしの場合は要求しない |
 
+## アプリ向けRegistry操作API（REG-APP：実装前テスト）
+
+FrameworkHost内のProjectControllerをアプリが直接所有・ロックしない。アプリへ渡すHandleは要求の送信口とし、Frameworkが自身のProjectControllerに適用する。読み取り結果・エラーを呼び出し側が取得できること。
+
+| ID | 操作・入力 | 期待結果 |
+|---|---|---|
+| REG-APP-001 | アプリからResourceReference登録要求 | Framework所有Registryへ登録され、生成IDを取得できる |
+| REG-APP-002 | 同一参照を再登録 | 同一ID、dirty増加なし、Project Panel再通知なし |
+| REG-APP-003 | Resource IDで参照を取得 | 現在Projectの参照先を取得できる |
+| REG-APP-004 | Resource IDで参照先更新 | ID維持、Framework dirty、Project Panel更新要求 |
+| REG-APP-005 | Project未Openで登録・参照・更新 | 明示的なNoProjectエラー、状態不変 |
+| REG-APP-006 | Project Aで発行した要求をProject Bへ切替後に処理 | Aの要求をBへ誤適用しない |
+| REG-APP-007 | 更新対象不在・参照先衝突 | 明示的エラー、Registry不変 |
+| REG-APP-008 | Save直前にアプリから登録要求 | 要求の適用順序を保証し、Saveで登録内容を永続化 |
+| REG-APP-009 | アプリのProject Panel providerがFramework Registryを参照 | アプリ側Registry複製を要求しない |
+| REG-APP-010 | Handle複製と複数要求 | 要求の順序・結果対応が保持される |
+
+注: 同期呼び出し／キュー処理のいずれを採用する場合も、登録IDの取得タイミング、UIスレッドの再入、Project切替境界を明文化してから実装する。
+
 ## 検証条件
 - 本実装前の仕様テストと、実装後のカバレッジテストを区別する。
 - Windows/Linux/macOSを対象とし、未検証環境は未検証と明記する。
