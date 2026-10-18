@@ -79,6 +79,18 @@ pub trait ApplicationProjectPanelProvider {
         project: &ProjectContext,
         action: AppPanelAction,
     ) -> AppPanelActionResult;
+
+    /// Called by the Framework for Project Panel actions with synchronous access
+    /// to the active project's Resource Registry. Existing providers may continue
+    /// implementing handle_project_panel_action only.
+    fn handle_project_panel_action_with_registry(
+        &mut self,
+        project: &ProjectContext,
+        action: AppPanelAction,
+        _registry: &mut crate::project_controller::RegistryAccess<'_>,
+    ) -> AppPanelActionResult {
+        self.handle_project_panel_action(project, action)
+    }
 }
 
 /// Coalesces application notifications until the framework consumes the snapshot request.
