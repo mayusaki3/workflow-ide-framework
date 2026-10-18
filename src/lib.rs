@@ -3468,7 +3468,24 @@ impl egui_dock::TabViewer for FrameworkTabViewer<'_> {
                         if let Some(app_action) =
                             project_panel_api::app_action_from_tree_action(&action)
                         {
-                            let result = provider.handle_project_panel_action(&project, app_action);
+                            let result = if let Some(controller) =
+                                self.project_controller.as_mut()
+                            {
+                                match controller.registry_access() {
+                                    Ok(mut registry) => provider.handle_project_panel_action_with_registry(
+                                        &project,
+                                        app_action,
+                                        &mut registry,
+                                    ),
+                                    Err(reason) => project_panel_api::AppPanelActionResult::Rejected {
+                                        reason: reason.to_owned(),
+                                    },
+                                }
+                            } else {
+                                project_panel_api::AppPanelActionResult::Rejected {
+                                    reason: "project controller unavailable".to_owned(),
+                                }
+                            };
                             if let project_panel_api::AppPanelActionResult::Rejected { reason } =
                                 result
                             {
