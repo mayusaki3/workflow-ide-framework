@@ -370,15 +370,14 @@ fn reg_panel_005_unknown_registered_resource_returns_diagnostic_error() {
         },
         children: vec![],
     }];
-    assert_eq!(
+    assert!(matches!(
         build_application_project_tree_with_directories(
             &roots,
             &ResourceRegistry::default(),
             &root
         ),
-        Err(AppPanelTreeError::UnknownRegisteredResource(
-            "unknown-resource-id".into()
-        ))
-    );
+        Err(AppPanelTreeError::UnknownRegisteredResource(id))
+            if id == "unknown-resource-id"
+    ));
     let _ = fs::remove_dir_all(root.root());
 }
