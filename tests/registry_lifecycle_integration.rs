@@ -355,3 +355,30 @@ fn reg_panel_006_registry_mutations_invalidate_only_on_effective_changes() {
     assert_ne!(id, other);
     let _ = fs::remove_dir_all(root.root());
 }
+
+#[test]
+fn reg_panel_005_unknown_registered_resource_returns_diagnostic_error() {
+    use workflow_ide_framework::project_panel_api::AppPanelTreeError;
+    use workflow_ide_framework::resource_registry::ResourceRegistry;
+
+    let root = context("panel-unknown");
+    let roots = vec![AppPanelNode {
+        id: "missing.node".into(),
+        label: "Missing resource".into(),
+        kind: AppPanelNodeKind::RegisteredResource {
+            registry_resource_id: "unknown-resource-id".into(),
+        },
+        children: vec![],
+    }];
+    assert_eq!(
+        build_application_project_tree_with_directories(
+            &roots,
+            &ResourceRegistry::default(),
+            &root
+        ),
+        Err(AppPanelTreeError::UnknownRegisteredResource(
+            "unknown-resource-id".into()
+        ))
+    );
+    let _ = fs::remove_dir_all(root.root());
+}
