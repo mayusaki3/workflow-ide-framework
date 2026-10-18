@@ -1180,7 +1180,9 @@ impl FrameworkHost {
         let (Some(panel_id), Some(provider), Some(registry)) = (
             self.project_panel_id.as_ref(),
             self.project_panel_provider.as_ref(),
-            self.project_controller.as_ref().and_then(|controller| controller.resource_registry()),
+            self.project_controller
+                .as_ref()
+                .and_then(|controller| controller.resource_registry()),
         ) else {
             return;
         };

@@ -1,9 +1,12 @@
 use std::fs;
 use workflow_ide_framework::{
     project::ProjectContext,
-    project_panel_api::{AppPanelNode, AppPanelNodeKind, ApplicationProjectPanelProvider, AppPanelAction, AppPanelActionResult, build_application_project_tree_with_directories},
     project_adapter::ApplicationProjectAdapter,
     project_controller::{ProjectCommandResult, ProjectController},
+    project_panel_api::{
+        AppPanelAction, AppPanelActionResult, AppPanelNode, AppPanelNodeKind,
+        ApplicationProjectPanelProvider, build_application_project_tree_with_directories,
+    },
     project_resource::{
         NewProjectStoragePolicy, ProjectDataCompatibility, ProjectDataConsistency,
         ResourceReference, ResourceScope,
@@ -222,23 +225,36 @@ fn reg_panel_001_restored_framework_registry_resolves_registered_project_panel_n
     let mut app = App;
     let mut controller = ProjectController::new("org.test.registry", "Registry");
     new_project(&mut controller, &mut app, root.clone());
-    let registry_id = controller.register_resource(reference("models/robot.urdf")).unwrap();
-    let provider = PersistedRegistryProvider { registry_id: registry_id.clone() };
+    let registry_id = controller
+        .register_resource(reference("models/robot.urdf"))
+        .unwrap();
+    let provider = PersistedRegistryProvider {
+        registry_id: registry_id.clone(),
+    };
 
     assert_eq!(
         controller.save(&mut app, "reg-panel-001", "2026-10-18T00:00:00Z"),
         ProjectCommandResult::Completed
     );
     assert_eq!(controller.close(false), ProjectCommandResult::Completed);
-    assert_eq!(controller.open(root.clone(), &mut app), ProjectCommandResult::Completed);
+    assert_eq!(
+        controller.open(root.clone(), &mut app),
+        ProjectCommandResult::Completed
+    );
 
     let roots = provider.project_panel_roots(&root);
     let registry = controller.resource_registry().unwrap();
     let tree = build_application_project_tree_with_directories(&roots, registry, &root).unwrap();
     assert_eq!(tree.roots.len(), 1);
     assert_eq!(tree.roots[0].id, "robot.node");
-    assert_eq!(tree.roots[0].node_type.as_deref(), Some("project.registered_resource"));
-    assert_eq!(registry.find_by_id(&registry_id).unwrap().reference, reference("models/robot.urdf"));
+    assert_eq!(
+        tree.roots[0].node_type.as_deref(),
+        Some("project.registered_resource")
+    );
+    assert_eq!(
+        registry.find_by_id(&registry_id).unwrap().reference,
+        reference("models/robot.urdf")
+    );
     let _ = fs::remove_dir_all(root.root());
 }
 
@@ -286,15 +302,20 @@ fn reg_panel_003_same_registered_resource_can_appear_in_multiple_nodes() {
     assert_eq!(tree.roots.len(), 2);
     assert_ne!(tree.roots[0].id, tree.roots[1].id);
     assert_eq!(registry.entries().len(), 1);
-    assert_eq!(registry.find_by_id(&id).unwrap().reference, reference("models/shared.urdf"));
+    assert_eq!(
+        registry.find_by_id(&id).unwrap().reference,
+        reference("models/shared.urdf")
+    );
     let _ = fs::remove_dir_all(root.root());
 }
 
 #[test]
 fn reg_panel_004_application_builder_accepts_two_argument_project_panel_api() {
     use workflow_ide_framework::Application;
-    let _application = Application::new("org.test.registry", "Registry")
-        .application_project_panel("project", PersistedRegistryProvider {
+    let _application = Application::new("org.test.registry", "Registry").application_project_panel(
+        "project",
+        PersistedRegistryProvider {
             registry_id: "test-resource".into(),
-        });
+        },
+    );
 }
