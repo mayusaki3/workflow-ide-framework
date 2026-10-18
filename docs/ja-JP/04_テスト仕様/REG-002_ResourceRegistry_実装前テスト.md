@@ -28,10 +28,12 @@
 | REG-I18N-006 | 既定Localeのファイルも欠落 | 未解決を返す |
 | REG-I18N-007 | 不正Locale・親ディレクトリ遷移 | 拒否する |
 | REG-I18N-008 | 多言語項目をSave/Open | 言語キーとテンプレートを復元 |
-| REG-PANEL-001 | 登録Resource IDを複数ノードに表示 | 同一Resource ID、別Node ID |
+| REG-PANEL-001 | Save→Close→Open後、登録Resource IDをProject Panelで参照 | Framework復元Registryで解決できる |
 | REG-PANEL-002 | Registry未登録の論理ノードを表示 | 正常表示 |
-| REG-PANEL-003 | 存在しないResource IDをRegisteredResourceで参照 | 診断可能なエラー |
-| REG-PANEL-004 | 2引数Project Panel API | Framework所有Registryで検証 |
+| REG-PANEL-003 | 登録Resource IDを複数ノードに表示 | 同一Resource ID、別Node ID |
+| REG-PANEL-004 | 2引数Project Panel API | Applicationのビルダーで2引数APIが利用できる |
+| REG-PANEL-005 | 存在しないResource IDをRegisteredResourceで参照 | 診断可能なエラー |
+| REG-PANEL-006 | Registry登録・参照先変更後にProject Panelを更新 | 変更時のみ再構築要求、変更なしの場合は要求しない |
 
 ## 検証条件
 - 本実装前の仕様テストと、実装後のカバレッジテストを区別する。
