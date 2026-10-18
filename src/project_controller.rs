@@ -470,14 +470,18 @@ impl RegistryAccess<'_> {
     }
 
     pub fn find_by_id(&self, id: &str) -> Option<&crate::project_resource::ResourceEntry> {
-        self.controller.resource_registry().and_then(|registry| registry.find_by_id(id))
+        self.controller
+            .resource_registry()
+            .and_then(|registry| registry.find_by_id(id))
     }
 
     pub fn find_by_reference(
         &self,
         reference: &crate::project_resource::ResourceReference,
     ) -> Option<&crate::project_resource::ResourceEntry> {
-        self.controller.resource_registry().and_then(|registry| registry.find_by_reference(reference))
+        self.controller
+            .resource_registry()
+            .and_then(|registry| registry.find_by_reference(reference))
     }
 
     pub fn update_reference(
@@ -600,4 +604,3 @@ mod unsaved_notification_tests {
         assert!(controller.has_unsaved_changes());
     }
 }
-
