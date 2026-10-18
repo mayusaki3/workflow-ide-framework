@@ -1,6 +1,7 @@
 use std::fs;
 use workflow_ide_framework::{
     project::ProjectContext,
+    project_panel_api::{AppPanelNode, AppPanelNodeKind, ApplicationProjectPanelProvider, AppPanelAction, AppPanelActionResult, build_application_project_tree_with_directories},
     project_adapter::ApplicationProjectAdapter,
     project_controller::{ProjectCommandResult, ProjectController},
     project_resource::{
@@ -188,4 +189,74 @@ fn reg_life_003_new_project_does_not_inherit_previous_registry() {
     );
     let _ = fs::remove_dir_all(first.root());
     let _ = fs::remove_dir_all(second.root());
+}
+
+struct PersistedRegistryProvider {
+    registry_id: String,
+}
+
+impl ApplicationProjectPanelProvider for PersistedRegistryProvider {
+    fn project_panel_roots(&self, _project: &ProjectContext) -> Vec<AppPanelNode> {
+        vec![AppPanelNode {
+            id: "robot.node".into(),
+            label: "Robot model".into(),
+            kind: AppPanelNodeKind::RegisteredResource {
+                registry_resource_id: self.registry_id.clone(),
+            },
+            children: vec![],
+        }]
+    }
+
+    fn handle_project_panel_action(
+        &mut self,
+        _project: &ProjectContext,
+        _action: AppPanelAction,
+    ) -> AppPanelActionResult {
+        AppPanelActionResult::NotHandled
+    }
+}
+
+#[test]
+fn reg_panel_001_restored_framework_registry_resolves_registered_project_panel_node() {
+    let root = context("panel-reopen");
+    let mut app = App;
+    let mut controller = ProjectController::new("org.test.registry", "Registry");
+    new_project(&mut controller, &mut app, root.clone());
+    let registry_id = controller.register_resource(reference("models/robot.urdf")).unwrap();
+    let provider = PersistedRegistryProvider { registry_id: registry_id.clone() };
+
+    assert_eq!(
+        controller.save(&mut app, "reg-panel-001", "2026-10-18T00:00:00Z"),
+        ProjectCommandResult::Completed
+    );
+    assert_eq!(controller.close(false), ProjectCommandResult::Completed);
+    assert_eq!(controller.open(root.clone(), &mut app), ProjectCommandResult::Completed);
+
+    let roots = provider.project_panel_roots(&root);
+    let registry = controller.resource_registry().unwrap();
+    let tree = build_application_project_tree_with_directories(&roots, registry, &root).unwrap();
+    assert_eq!(tree.roots.len(), 1);
+    assert_eq!(tree.roots[0].id, "robot.node");
+    assert_eq!(tree.roots[0].node_type.as_deref(), Some("project.registered_resource"));
+    assert_eq!(registry.find_by_id(&registry_id).unwrap().reference, reference("models/robot.urdf"));
+    let _ = fs::remove_dir_all(root.root());
+}
+
+#[test]
+fn reg_panel_002_logical_nodes_do_not_require_registry_registration() {
+    let root = context("panel-logical");
+    let registry = workflow_ide_framework::resource_registry::ResourceRegistry::default();
+    let roots = vec![AppPanelNode {
+        id: "robot.logical".into(),
+        label: "Robot".into(),
+        kind: AppPanelNodeKind::LogicalResource {
+            resource_id: "application-robot-id".into(),
+            type_id: "meridian.robot".into(),
+        },
+        children: vec![],
+    }];
+    let tree = build_application_project_tree_with_directories(&roots, &registry, &root).unwrap();
+    assert_eq!(tree.roots[0].node_type.as_deref(), Some("project.logical"));
+    assert!(registry.entries().is_empty());
+    let _ = fs::remove_dir_all(root.root());
 }
