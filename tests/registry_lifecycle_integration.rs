@@ -442,13 +442,20 @@ fn reg_app_005_006_registry_access_is_scoped_to_active_project() {
     assert_eq!(controller.close(true), ProjectCommandResult::Completed);
     assert!(controller.registry_access().is_err());
     new_project(&mut controller, &mut app, second_root.clone());
-    let mut access = controller.registry_access().unwrap();
-    assert!(access.find_by_id(&first_id).is_none());
-    assert!(access
-        .update_reference(&first_id, reference("models/should-not-appear.urdf"))
-        .is_err());
-    assert!(access.find_by_reference(&reference("models/should-not-appear.urdf")).is_none());
-    drop(access);
+    {
+        let mut access = controller.registry_access().unwrap();
+        assert!(access.find_by_id(&first_id).is_none());
+        assert!(
+            access
+                .update_reference(&first_id, reference("models/should-not-appear.urdf"))
+                .is_err()
+        );
+        assert!(
+            access
+                .find_by_reference(&reference("models/should-not-appear.urdf"))
+                .is_none()
+        );
+    }
     assert!(controller.resource_registry().unwrap().entries().is_empty());
 
     let _ = fs::remove_dir_all(first_root.root());
