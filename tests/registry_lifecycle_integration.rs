@@ -423,3 +423,34 @@ fn reg_app_001_003_004_synchronous_registry_access_round_trip() {
     assert!(controller.has_unsaved_changes());
     let _ = fs::remove_dir_all(root.root());
 }
+
+#[test]
+fn reg_app_005_006_registry_access_is_scoped_to_active_project() {
+    let first_root = context("registry-access-project-a");
+    let second_root = context("registry-access-project-b");
+    let mut app = App;
+    let mut controller = ProjectController::new("org.test.registry", "Registry");
+
+    assert!(controller.registry_access().is_err());
+    new_project(&mut controller, &mut app, first_root.clone());
+    let first_id = controller
+        .registry_access()
+        .unwrap()
+        .register(reference("models/project-a.urdf"))
+        .unwrap();
+
+    controller.close(true).unwrap();
+    assert!(controller.registry_access().is_err());
+    new_project(&mut controller, &mut app, second_root.clone());
+    let mut access = controller.registry_access().unwrap();
+    assert!(access.find_by_id(&first_id).is_none());
+    assert!(access
+        .update_reference(&first_id, reference("models/should-not-appear.urdf"))
+        .is_err());
+    assert!(access.find_by_reference(&reference("models/should-not-appear.urdf")).is_none());
+    drop(access);
+    assert!(controller.resource_registry().unwrap().entries().is_empty());
+
+    let _ = fs::remove_dir_all(first_root.root());
+    let _ = fs::remove_dir_all(second_root.root());
+}
