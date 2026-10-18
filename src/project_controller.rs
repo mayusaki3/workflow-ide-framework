@@ -123,6 +123,15 @@ impl ProjectController {
         ProjectCommandResult::Completed
     }
 
+    /// Borrow the active Framework-owned registry through a synchronous,
+    /// project-scoped API. The returned facade cannot outlive this borrow.
+    pub fn registry_access(&mut self) -> Result<RegistryAccess<'_>, &'static str> {
+        if self.session.is_none() {
+            return Err("no project is open");
+        }
+        Ok(RegistryAccess { controller: self })
+    }
+
     /// Connect registry mutations to the coalescing Project Panel refresh mechanism.
     pub fn set_registry_refresh_handle(
         &mut self,
@@ -555,5 +564,39 @@ mod unsaved_notification_tests {
         controller.mark_unsaved();
         controller.mark_unsaved();
         assert!(controller.has_unsaved_changes());
+    }
+}
+
+/// Synchronous application-facing operations on the active Framework registry.
+/// This facade borrows the controller and cannot be retained across project switches.
+pub struct RegistryAccess<'a> {
+    controller: &'a mut ProjectController,
+}
+
+impl RegistryAccess<'_> {
+    pub fn register(
+        &mut self,
+        reference: crate::project_resource::ResourceReference,
+    ) -> Result<String, &'static str> {
+        self.controller.register_resource(reference)
+    }
+
+    pub fn find_by_id(&self, id: &str) -> Option<&crate::project_resource::ResourceEntry> {
+        self.controller.resource_registry().and_then(|registry| registry.find_by_id(id))
+    }
+
+    pub fn find_by_reference(
+        &self,
+        reference: &crate::project_resource::ResourceReference,
+    ) -> Option<&crate::project_resource::ResourceEntry> {
+        self.controller.resource_registry().and_then(|registry| registry.find_by_reference(reference))
+    }
+
+    pub fn update_reference(
+        &mut self,
+        id: &str,
+        reference: crate::project_resource::ResourceReference,
+    ) -> Result<bool, &'static str> {
+        self.controller.update_resource_reference(id, reference)
     }
 }
