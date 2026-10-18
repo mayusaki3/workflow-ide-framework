@@ -343,14 +343,32 @@ fn reg_panel_006_registry_mutations_invalidate_only_on_effective_changes() {
     assert!(!refresh.take_pending());
 
     let renamed = reference("models/renamed.urdf");
-    assert!(controller.update_resource_reference(&id, renamed.clone()).unwrap());
+    assert!(
+        controller
+            .update_resource_reference(&id, renamed.clone())
+            .unwrap()
+    );
     assert!(refresh.take_pending());
     assert!(!refresh.take_pending());
-    assert_eq!(controller.resource_registry().unwrap().find_by_id(&id).unwrap().reference, renamed);
+    assert_eq!(
+        controller
+            .resource_registry()
+            .unwrap()
+            .find_by_id(&id)
+            .unwrap()
+            .reference,
+        renamed
+    );
 
-    let other = controller.register_resource(reference("models/other.urdf")).unwrap();
+    let other = controller
+        .register_resource(reference("models/other.urdf"))
+        .unwrap();
     assert!(refresh.take_pending());
-    assert!(controller.update_resource_reference(&id, reference("models/other.urdf")).is_err());
+    assert!(
+        controller
+            .update_resource_reference(&id, reference("models/other.urdf"))
+            .is_err()
+    );
     assert!(!refresh.take_pending());
     assert_ne!(id, other);
     let _ = fs::remove_dir_all(root.root());
