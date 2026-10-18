@@ -5,7 +5,8 @@ use workflow_ide_framework::{
     project_controller::{ProjectCommandResult, ProjectController},
     project_panel_api::{
         AppPanelAction, AppPanelActionResult, AppPanelNode, AppPanelNodeKind,
-        ApplicationProjectPanelProvider, build_application_project_tree_with_directories,
+        ApplicationProjectPanelProvider, ProjectPanelRefreshHandle,
+        build_application_project_tree_with_directories,
     },
     project_resource::{
         NewProjectStoragePolicy, ProjectDataCompatibility, ProjectDataConsistency,
@@ -318,4 +319,39 @@ fn reg_panel_004_application_builder_accepts_two_argument_project_panel_api() {
             registry_id: "test-resource".into(),
         },
     );
+}
+
+#[test]
+fn reg_panel_006_registry_mutations_invalidate_only_on_effective_changes() {
+    let root = context("panel-refresh");
+    let mut app = App;
+    let mut controller = ProjectController::new("org.test.registry", "Registry");
+    let refresh = ProjectPanelRefreshHandle::default();
+    controller.set_registry_refresh_handle(refresh.clone());
+    new_project(&mut controller, &mut app, root.clone());
+    assert!(!refresh.take_pending());
+
+    let original = reference("models/robot.urdf");
+    let id = controller.register_resource(original.clone()).unwrap();
+    assert!(refresh.take_pending());
+    assert!(!refresh.take_pending());
+
+    assert_eq!(controller.register_resource(original.clone()).unwrap(), id);
+    assert!(!refresh.take_pending());
+
+    assert!(!controller.update_resource_reference(&id, original).unwrap());
+    assert!(!refresh.take_pending());
+
+    let renamed = reference("models/renamed.urdf");
+    assert!(controller.update_resource_reference(&id, renamed.clone()).unwrap());
+    assert!(refresh.take_pending());
+    assert!(!refresh.take_pending());
+    assert_eq!(controller.resource_registry().unwrap().find_by_id(&id).unwrap().reference, renamed);
+
+    let other = controller.register_resource(reference("models/other.urdf")).unwrap();
+    assert!(refresh.take_pending());
+    assert!(controller.update_resource_reference(&id, reference("models/other.urdf")).is_err());
+    assert!(!refresh.take_pending());
+    assert_ne!(id, other);
+    let _ = fs::remove_dir_all(root.root());
 }
