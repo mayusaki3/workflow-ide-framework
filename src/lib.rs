@@ -2987,6 +2987,7 @@ impl eframe::App for FrameworkHost {
                 project_panel_id: self.project_panel_id.as_deref(),
                 project_panel_selection: &mut self.project_panel_selection,
                 project_panel_provider: &mut self.project_panel_provider,
+                project_controller: &mut self.project_controller,
                 project_panel_context: self
                     .project_controller
                     .as_ref()
@@ -3138,6 +3139,7 @@ struct FrameworkTabViewer<'a> {
     project_panel_provider:
         &'a mut Option<Box<dyn project_panel_api::ApplicationProjectPanelProvider>>,
     project_panel_context: Option<project::ProjectContext>,
+    project_controller: &'a mut Option<project_controller::ProjectController>,
     flow_editors: &'a mut std::collections::HashMap<String, flow_editor::FlowModel>,
     property_panels: &'a mut std::collections::HashMap<String, property_panel::PropertyModel>,
     flow_property_links: &'a [FlowPropertyLink],
