@@ -399,3 +399,27 @@ fn reg_panel_005_unknown_registered_resource_returns_diagnostic_error() {
     ));
     let _ = fs::remove_dir_all(root.root());
 }
+
+#[test]
+fn reg_app_001_003_004_synchronous_registry_access_round_trip() {
+    let root = context("registry-access");
+    let mut app = App;
+    let mut controller = ProjectController::new("org.test.registry", "Registry");
+    assert!(controller.registry_access().is_err());
+    new_project(&mut controller, &mut app, root.clone());
+
+    let first = reference("models/first.urdf");
+    let second = reference("models/second.urdf");
+    {
+        let mut access = controller.registry_access().unwrap();
+        let id = access.register(first.clone()).unwrap();
+        assert_eq!(access.register(first.clone()).unwrap(), id);
+        assert_eq!(access.find_by_reference(&first).unwrap().resource_id, id);
+        assert_eq!(access.find_by_id(&id).unwrap().reference, first);
+        assert!(!access.update_reference(&id, first).unwrap());
+        assert!(access.update_reference(&id, second.clone()).unwrap());
+        assert_eq!(access.find_by_id(&id).unwrap().reference, second);
+    }
+    assert!(controller.has_unsaved_changes());
+    let _ = fs::remove_dir_all(root.root());
+}
