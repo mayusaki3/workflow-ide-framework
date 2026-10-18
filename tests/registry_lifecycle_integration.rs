@@ -439,7 +439,7 @@ fn reg_app_005_006_registry_access_is_scoped_to_active_project() {
         .register(reference("models/project-a.urdf"))
         .unwrap();
 
-    controller.close(true).unwrap();
+    assert_eq!(controller.close(true), ProjectCommandResult::Completed);
     assert!(controller.registry_access().is_err());
     new_project(&mut controller, &mut app, second_root.clone());
     let mut access = controller.registry_access().unwrap();
