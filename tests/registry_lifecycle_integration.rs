@@ -292,8 +292,8 @@ fn reg_panel_003_same_registered_resource_can_appear_in_multiple_nodes() {
 
 #[test]
 fn reg_panel_004_application_builder_accepts_two_argument_project_panel_api() {
-    use workflow_ide_framework::{Application, ApplicationConfig};
-    let _application = Application::new(ApplicationConfig::default())
+    use workflow_ide_framework::Application;
+    let _application = Application::new("org.test.registry", "Registry")
         .application_project_panel("project", PersistedRegistryProvider {
             registry_id: "test-resource".into(),
         });
