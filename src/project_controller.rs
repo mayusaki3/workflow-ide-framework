@@ -38,6 +38,7 @@ pub struct ProjectController {
     pub project_file: Option<ProjectFile>,
     pub framework_settings: FrameworkSettings,
     pub resource_registry: ResourceRegistry,
+    registry_refresh: Option<crate::project_panel_api::ProjectPanelRefreshHandle>,
 }
 
 impl ProjectController {
@@ -49,6 +50,7 @@ impl ProjectController {
             project_file: None,
             framework_settings: FrameworkSettings::default(),
             resource_registry: ResourceRegistry::default(),
+            registry_refresh: None,
         }
     }
 
@@ -121,6 +123,20 @@ impl ProjectController {
         ProjectCommandResult::Completed
     }
 
+    /// Connect registry mutations to the coalescing Project Panel refresh mechanism.
+    pub fn set_registry_refresh_handle(
+        &mut self,
+        handle: crate::project_panel_api::ProjectPanelRefreshHandle,
+    ) {
+        self.registry_refresh = Some(handle);
+    }
+
+    fn notify_registry_changed(&self) {
+        if let Some(handle) = &self.registry_refresh {
+            handle.invalidate_application_project_panel();
+        }
+    }
+
     /// Read-only snapshot of resources owned by the active project.
     pub fn resource_registry(&self) -> Option<&ResourceRegistry> {
         self.session.as_ref().map(|_| &self.resource_registry)
@@ -151,6 +167,7 @@ impl ProjectController {
         if let Some(session) = self.session.as_mut() {
             session.mark_framework_dirty();
         }
+        self.notify_registry_changed();
         Ok(id)
     }
 
@@ -183,6 +200,7 @@ impl ProjectController {
         if let Some(session) = self.session.as_mut() {
             session.mark_framework_dirty();
         }
+        self.notify_registry_changed();
         Ok(true)
     }
 
