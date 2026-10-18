@@ -2967,6 +2967,12 @@ impl eframe::App for FrameworkHost {
 
         if !self.workspace_docks.normal.is_empty() || !self.workspace_docks.floating.is_empty() {
             ui.separator();
+            let project_panel_context = self
+                .project_controller
+                .as_ref()
+                .and_then(|controller| controller.session.as_ref())
+                .and_then(|session| session.context())
+                .cloned();
             let mut viewer = FrameworkTabViewer {
                 panels: &self.config.panels,
                 probe_enabled: self.config.probe_panel,
@@ -2988,12 +2994,7 @@ impl eframe::App for FrameworkHost {
                 project_panel_selection: &mut self.project_panel_selection,
                 project_panel_provider: &mut self.project_panel_provider,
                 project_controller: &mut self.project_controller,
-                project_panel_context: self
-                    .project_controller
-                    .as_ref()
-                    .and_then(|controller| controller.session.as_ref())
-                    .and_then(|session| session.context())
-                    .cloned(),
+                project_panel_context,
                 flow_editors: &mut self.flow_editors,
                 property_panels: &mut self.property_panels,
                 flow_property_links: &self.flow_property_links,
