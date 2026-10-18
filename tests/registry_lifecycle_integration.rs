@@ -260,3 +260,41 @@ fn reg_panel_002_logical_nodes_do_not_require_registry_registration() {
     assert!(registry.entries().is_empty());
     let _ = fs::remove_dir_all(root.root());
 }
+
+#[test]
+fn reg_panel_003_same_registered_resource_can_appear_in_multiple_nodes() {
+    let root = context("panel-shared");
+    let mut app = App;
+    let mut controller = ProjectController::new("org.test.registry", "Registry");
+    new_project(&mut controller, &mut app, root.clone());
+    let id = controller
+        .register_resource(reference("models/shared.urdf"))
+        .unwrap();
+    let roots = ["robot.a.model", "robot.b.model"]
+        .into_iter()
+        .map(|node_id| AppPanelNode {
+            id: node_id.into(),
+            label: node_id.into(),
+            kind: AppPanelNodeKind::RegisteredResource {
+                registry_resource_id: id.clone(),
+            },
+            children: vec![],
+        })
+        .collect::<Vec<_>>();
+    let registry = controller.resource_registry().unwrap();
+    let tree = build_application_project_tree_with_directories(&roots, registry, &root).unwrap();
+    assert_eq!(tree.roots.len(), 2);
+    assert_ne!(tree.roots[0].id, tree.roots[1].id);
+    assert_eq!(registry.entries().len(), 1);
+    assert_eq!(registry.find_by_id(&id).unwrap().reference, reference("models/shared.urdf"));
+    let _ = fs::remove_dir_all(root.root());
+}
+
+#[test]
+fn reg_panel_004_application_builder_accepts_two_argument_project_panel_api() {
+    use workflow_ide_framework::{Application, ApplicationConfig};
+    let _application = Application::new(ApplicationConfig::default())
+        .application_project_panel("project", PersistedRegistryProvider {
+            registry_id: "test-resource".into(),
+        });
+}
