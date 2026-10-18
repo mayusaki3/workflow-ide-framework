@@ -761,10 +761,12 @@ impl Application {
                 }
 
                 let project_controller = project_adapter.as_ref().map(|_| {
-                    project_controller::ProjectController::new(
+                    let mut controller = project_controller::ProjectController::new(
                         config.id.clone(),
                         config.name.clone(),
-                    )
+                    );
+                    controller.set_registry_refresh_handle(project_panel_refresh.clone());
+                    controller
                 });
 
                 let recent_projects = recent_projects::settings_path(
