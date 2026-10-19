@@ -5,7 +5,7 @@ use workflow_ide_framework::{
     project_resource::{
         ApplicationJournalData, ResourceOperationDecision, ResourceReference, ResourceScope,
     },
-    resource_executor::{execute_operation, execute_prepared_operation},
+    resource_executor::{ResourceExecutionError, execute_operation, execute_prepared_operation},
     resource_journal::{ResourceOperationJournal, journal_path},
     resource_operation::{
         ApplicationResourceOperationAdapter, PreparedResourceOperation, ResourceOperationItem,
@@ -482,5 +482,84 @@ fn failed_application_handled_replace_keeps_preallocated_target_id_in_journal() 
         journal.items[0].after_resource_id.as_deref(),
         Some("converted-id")
     );
+    let _ = fs::remove_dir_all(base);
+}
+
+#[test]
+fn conflicting_import_id_is_rejected_before_journal_or_file_copy() {
+    let (base, context, roots) = setup("collision-import");
+    let source_path = base.join("source.txt");
+    fs::write(&source_path, b"source").unwrap();
+    let source = ResourceReference::new(ResourceScope::External, source_path).unwrap();
+    let target = p("imported.txt");
+    let mut registry = ResourceRegistry::default();
+    registry.register("taken", p("other.txt"));
+    let original = registry.clone();
+    let mut uses = vec![];
+    let plan = ResourceOperationPlan {
+        operation_id: "collision-import".into(),
+        kind: ResourceOperationKind::Import,
+        items: vec![ResourceOperationItem {
+            before: Some(source),
+            after: Some(target),
+        }],
+    };
+    let result = execute_operation(
+        &context,
+        &roots,
+        &mut registry,
+        &mut uses,
+        &plan,
+        None,
+        || "taken".into(),
+    );
+    assert!(matches!(
+        result,
+        Err(ResourceExecutionError::ConflictingResourceId(id)) if id == "taken"
+    ));
+    assert_eq!(registry, original);
+    assert!(!roots.project.join("imported.txt").exists());
+    assert!(!journal_path(&context).exists());
+    let _ = fs::remove_dir_all(base);
+}
+
+#[test]
+fn move_to_registered_destination_is_rejected_before_file_move() {
+    let (base, context, roots) = setup("collision-move");
+    fs::write(roots.project.join("old.txt"), b"original").unwrap();
+    let mut registry = ResourceRegistry::default();
+    registry.register("source", p("old.txt"));
+    registry.register("target", p("target.txt"));
+    let original = registry.clone();
+    let mut uses = vec![FrameworkResourceUse {
+        owner_id: "editor".into(),
+        reference: p("old.txt"),
+    }];
+    let plan = ResourceOperationPlan {
+        operation_id: "collision-move".into(),
+        kind: ResourceOperationKind::Move,
+        items: vec![ResourceOperationItem {
+            before: Some(p("old.txt")),
+            after: Some(p("target.txt")),
+        }],
+    };
+    let result = execute_operation(
+        &context,
+        &roots,
+        &mut registry,
+        &mut uses,
+        &plan,
+        None,
+        || "unused".into(),
+    );
+    assert!(matches!(
+        result,
+        Err(ResourceExecutionError::ConflictingResourceId(id)) if id == "target"
+    ));
+    assert_eq!(registry, original);
+    assert_eq!(uses[0].reference, p("old.txt"));
+    assert_eq!(fs::read(roots.project.join("old.txt")).unwrap(), b"original");
+    assert!(!roots.project.join("target.txt").exists());
+    assert!(!journal_path(&context).exists());
     let _ = fs::remove_dir_all(base);
 }
