@@ -251,7 +251,6 @@ struct ControllerPropertyLink {
     property_panel_id: String,
 }
 
-
 #[cfg(test)]
 mod registry_callback_tests {
     use super::*;
@@ -322,7 +321,10 @@ mod registry_callback_tests {
         let mut handler = application.registry_access_handler;
         let mut controller =
             project_controller::ProjectController::new("org.test.registry.callback", "Registry");
-        assert!(!dispatch_registry_access(handler.as_mut(), Some(&mut controller)));
+        assert!(!dispatch_registry_access(
+            handler.as_mut(),
+            Some(&mut controller)
+        ));
         assert!(!dispatch_registry_access(handler.as_mut(), None));
         assert!(calls.borrow().is_empty());
 
@@ -346,22 +348,34 @@ mod registry_callback_tests {
             ),
             ProjectCommandResult::Completed
         );
-        assert!(dispatch_registry_access(handler.as_mut(), Some(&mut controller)));
+        assert!(dispatch_registry_access(
+            handler.as_mut(),
+            Some(&mut controller)
+        ));
         let id = calls.borrow()[0].clone();
         assert!(controller.has_unsaved_changes());
-        assert!(dispatch_registry_access(handler.as_mut(), Some(&mut controller)));
+        assert!(dispatch_registry_access(
+            handler.as_mut(),
+            Some(&mut controller)
+        ));
         assert_eq!(calls.borrow()[1], id);
         assert_eq!(
             controller.save(&mut adapter, "reg-app-010", "2026-10-19T00:00:00Z"),
             ProjectCommandResult::Completed
         );
         assert_eq!(controller.close(false), ProjectCommandResult::Completed);
-        assert!(!dispatch_registry_access(handler.as_mut(), Some(&mut controller)));
+        assert!(!dispatch_registry_access(
+            handler.as_mut(),
+            Some(&mut controller)
+        ));
         assert_eq!(
             controller.open(context, &mut adapter),
             ProjectCommandResult::Completed
         );
-        assert!(dispatch_registry_access(handler.as_mut(), Some(&mut controller)));
+        assert!(dispatch_registry_access(
+            handler.as_mut(),
+            Some(&mut controller)
+        ));
         assert_eq!(calls.borrow()[2], id);
         let _ = std::fs::remove_dir_all(path);
     }
