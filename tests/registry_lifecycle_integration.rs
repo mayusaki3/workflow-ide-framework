@@ -461,3 +461,118 @@ fn reg_app_005_006_registry_access_is_scoped_to_active_project() {
     let _ = fs::remove_dir_all(first_root.root());
     let _ = fs::remove_dir_all(second_root.root());
 }
+
+struct RegistryActionProvider {
+    resource_id: Option<String>,
+    legacy_called: bool,
+}
+
+impl ApplicationProjectPanelProvider for RegistryActionProvider {
+    fn project_panel_roots(&self, _project: &ProjectContext) -> Vec<AppPanelNode> {
+        Vec::new()
+    }
+
+    fn handle_project_panel_action(
+        &mut self,
+        _project: &ProjectContext,
+        _action: AppPanelAction,
+    ) -> AppPanelActionResult {
+        self.legacy_called = true;
+        AppPanelActionResult::NotHandled
+    }
+
+    fn handle_project_panel_action_with_registry(
+        &mut self,
+        _project: &ProjectContext,
+        action: AppPanelAction,
+        registry: &mut workflow_ide_framework::project_controller::RegistryAccess<'_>,
+    ) -> AppPanelActionResult {
+        match action {
+            AppPanelAction::ContextAction { action_id, .. } if action_id == "register" => {
+                self.resource_id = Some(registry.register(reference("models/robot.urdf")).unwrap());
+                AppPanelActionResult::Handled
+            }
+            AppPanelAction::ContextAction { action_id, .. } if action_id == "rename" => {
+                let id = self.resource_id.as_deref().unwrap();
+                assert!(registry.find_by_id(id).is_some());
+                assert!(registry
+                    .update_reference(id, reference("models/renamed.urdf"))
+                    .unwrap());
+                AppPanelActionResult::Handled
+            }
+            _ => AppPanelActionResult::NotHandled,
+        }
+    }
+}
+
+#[test]
+fn reg_app_009_project_panel_provider_registers_and_updates_framework_registry() {
+    let root = context("panel-action-registry");
+    let mut app = App;
+    let mut controller = ProjectController::new("org.test.registry", "Registry");
+    new_project(&mut controller, &mut app, root.clone());
+    let mut provider = RegistryActionProvider {
+        resource_id: None,
+        legacy_called: false,
+    };
+    {
+        let mut registry = controller.registry_access().unwrap();
+        assert_eq!(
+            provider.handle_project_panel_action_with_registry(
+                &root,
+                AppPanelAction::ContextAction {
+                    node_ids: vec!["robot.node".into()],
+                    action_id: "register".into(),
+                },
+                &mut registry,
+            ),
+            AppPanelActionResult::Handled
+        );
+        let id = provider.resource_id.as_ref().unwrap();
+        assert_eq!(
+            registry.find_by_reference(&reference("models/robot.urdf")).unwrap().resource_id,
+            *id
+        );
+        assert_eq!(
+            provider.handle_project_panel_action_with_registry(
+                &root,
+                AppPanelAction::ContextAction {
+                    node_ids: vec!["robot.node".into()],
+                    action_id: "rename".into(),
+                },
+                &mut registry,
+            ),
+            AppPanelActionResult::Handled
+        );
+        assert_eq!(
+            registry.find_by_id(id).unwrap().reference,
+            reference("models/renamed.urdf")
+        );
+    }
+    assert!(!provider.legacy_called);
+    assert!(controller.has_unsaved_changes());
+    let _ = fs::remove_dir_all(root.root());
+}
+
+#[test]
+fn reg_app_009_default_provider_registry_action_falls_back_to_legacy_handler() {
+    let root = context("panel-action-legacy");
+    let mut app = App;
+    let mut controller = ProjectController::new("org.test.registry", "Registry");
+    new_project(&mut controller, &mut app, root.clone());
+    let mut provider = PersistedRegistryProvider {
+        registry_id: "unused".into(),
+    };
+    let mut registry = controller.registry_access().unwrap();
+    assert_eq!(
+        provider.handle_project_panel_action_with_registry(
+            &root,
+            AppPanelAction::Selected {
+                node_ids: vec!["robot.node".into()],
+            },
+            &mut registry,
+        ),
+        AppPanelActionResult::NotHandled
+    );
+    let _ = fs::remove_dir_all(root.root());
+}
