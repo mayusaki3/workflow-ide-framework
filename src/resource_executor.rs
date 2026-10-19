@@ -187,6 +187,9 @@ fn apply_framework_state(
                     let _ = registry.remove(&entry.resource_id);
                     match registry.register(entry.resource_id, after.clone()) {
                         RegisterResult::Added(_) | RegisterResult::Existing(_) => {}
+                        RegisterResult::ConflictingId(entry) => {
+                            panic!("resource ID collision during rename/move: {}", entry.resource_id)
+                        }
                     }
                 }
                 replace_uses(framework_uses, before, after);
