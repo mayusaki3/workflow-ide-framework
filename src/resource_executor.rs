@@ -175,7 +175,9 @@ fn validate_registry_changes(
                     let id = stored.after_resource_id.as_ref().expect("target ID journaled");
                     match simulated.register(id.clone(), after.clone()) {
                         RegisterResult::ConflictingId(entry) => {
-                            return Err(ResourceExecutionError::ConflictingResourceId(entry.resource_id));
+                            return Err(ResourceExecutionError::ConflictingResourceId(
+                                entry.resource_id,
+                            ));
                         }
                         RegisterResult::Added(_) | RegisterResult::Existing(_) => {}
                     }
@@ -187,14 +189,18 @@ fn validate_registry_changes(
                 if let Some(entry) = simulated.find_by_reference(before).cloned() {
                     if let Some(existing) = simulated.find_by_reference(after) {
                         if existing.resource_id != entry.resource_id {
-                            return Err(ResourceExecutionError::ConflictingResourceId(existing.resource_id.clone()));
+                            return Err(ResourceExecutionError::ConflictingResourceId(
+                                existing.resource_id.clone(),
+                            ));
                         }
                     }
                     simulated.remove(&entry.resource_id);
                     if let RegisterResult::ConflictingId(existing) =
                         simulated.register(entry.resource_id, after.clone())
                     {
-                        return Err(ResourceExecutionError::ConflictingResourceId(existing.resource_id));
+                        return Err(ResourceExecutionError::ConflictingResourceId(
+                            existing.resource_id,
+                        ));
                     }
                 }
             }
@@ -239,7 +245,9 @@ fn apply_framework_state(
                     let _ = registry.remove(&entry.resource_id);
                     match registry.register(entry.resource_id, after.clone()) {
                         RegisterResult::Added(_) | RegisterResult::Existing(_) => {}
-                        RegisterResult::ConflictingId(_) => unreachable!("registry changes prevalidated"),
+                        RegisterResult::ConflictingId(_) => {
+                            unreachable!("registry changes prevalidated")
+                        }
                     }
                 }
                 replace_uses(framework_uses, before, after);
@@ -320,6 +328,7 @@ where
             journal.set_execution_route(StoredExecutionRoute::Application);
             let after_ids = allocate_after_resource_ids(plan, registry, &mut new_id);
             journal.set_after_resource_ids(&after_ids);
+            validate_registry_changes(registry, plan, &journal)?;
             journal
                 .save(context)
                 .map_err(ResourceExecutionError::JournalWrite)?;
