@@ -9,6 +9,7 @@ pub struct ResourceRegistry {
 pub enum RegisterResult {
     Added(ResourceEntry),
     Existing(ResourceEntry),
+    ConflictingId(ResourceEntry),
 }
 
 impl ResourceRegistry {
@@ -34,8 +35,12 @@ impl ResourceRegistry {
         if let Some(existing) = self.find_by_reference(&reference) {
             return RegisterResult::Existing(existing.clone());
         }
+        let resource_id = resource_id.into();
+        if let Some(existing) = self.find_by_id(&resource_id) {
+            return RegisterResult::ConflictingId(existing.clone());
+        }
         let entry = ResourceEntry {
-            resource_id: resource_id.into(),
+            resource_id,
             reference,
         };
         self.entries.push(entry.clone());
