@@ -636,16 +636,16 @@ fn reg_app_008_project_panel_registration_persists_through_save_and_open() {
 fn reg_life_005_restore_rejects_duplicate_ids_without_dropping_entries() {
     let settings = FrameworkSettings {
         resources: vec![
-        StoredResourceEntry {
-            resource_id: "same".into(),
-            scope: StoredResourceScope::Project,
-            path: "first.txt".into(),
-        },
-        StoredResourceEntry {
-            resource_id: "same".into(),
-            scope: StoredResourceScope::Project,
-            path: "second.txt".into(),
-        },
+            StoredResourceEntry {
+                resource_id: "same".into(),
+                scope: StoredResourceScope::Project,
+                path: "first.txt".into(),
+            },
+            StoredResourceEntry {
+                resource_id: "same".into(),
+                scope: StoredResourceScope::Project,
+                path: "second.txt".into(),
+            },
         ],
         ..Default::default()
     };
@@ -659,16 +659,16 @@ fn reg_life_005_restore_rejects_duplicate_ids_without_dropping_entries() {
 fn reg_life_006_restore_rejects_duplicate_normalized_references() {
     let settings = FrameworkSettings {
         resources: vec![
-        StoredResourceEntry {
-            resource_id: "first".into(),
-            scope: StoredResourceScope::Project,
-            path: "folder/item.txt".into(),
-        },
-        StoredResourceEntry {
-            resource_id: "second".into(),
-            scope: StoredResourceScope::Project,
-            path: "folder/./item.txt".into(),
-        },
+            StoredResourceEntry {
+                resource_id: "first".into(),
+                scope: StoredResourceScope::Project,
+                path: "folder/item.txt".into(),
+            },
+            StoredResourceEntry {
+                resource_id: "second".into(),
+                scope: StoredResourceScope::Project,
+                path: "folder/./item.txt".into(),
+            },
         ],
         ..Default::default()
     };
