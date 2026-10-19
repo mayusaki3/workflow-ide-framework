@@ -1,8 +1,8 @@
 use crate::{
     locate_replace::FrameworkResourceUse,
-    resource_delete::{DeleteConfirmation, DeleteDecision, authorize_delete},
     project::ProjectContext,
     project_resource::{ApplicationJournalData, ResourceReference},
+    resource_delete::{DeleteConfirmation, DeleteDecision, authorize_delete},
     resource_journal::{ResourceOperationJournal, StoredExecutionRoute},
     resource_operation::{
         ApplicationResourceOperationAdapter, PreparedResourceOperation, ResourceOperationKind,
@@ -375,8 +375,7 @@ where
     }
     let target = plan.items[0].before.as_ref();
     let registered = registry.find_by_id(&confirmation.resource_id);
-    if target != Some(&confirmation.reference)
-        || registered.map(|entry| &entry.reference) != target
+    if target != Some(&confirmation.reference) || registered.map(|entry| &entry.reference) != target
     {
         return Err(ConfirmedDeleteError::TargetMismatch);
     }
