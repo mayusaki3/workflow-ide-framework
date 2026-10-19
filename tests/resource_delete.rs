@@ -58,12 +58,12 @@ fn reg_del_004_zero_references_still_requires_confirmation() {
 fn reg_del_004_cancelled_execution_does_not_touch_file_registry_or_journal() {
     use std::fs;
     use workflow_ide_framework::{
+        project::ProjectContext,
         resource_executor::{ConfirmedDeleteError, execute_confirmed_delete},
         resource_journal::journal_path,
         resource_operation::{ResourceOperationItem, ResourceOperationKind, ResourceOperationPlan},
         resource_registry::ResourceRegistry,
         resource_state::ResourceRoots,
-        project::ProjectContext,
     };
     let base = std::env::temp_dir().join(format!("wfide-delete-guard-{}", std::process::id()));
     let _ = fs::remove_dir_all(&base);
@@ -82,15 +82,28 @@ fn reg_del_004_cancelled_execution_does_not_touch_file_registry_or_journal() {
     let plan = ResourceOperationPlan {
         operation_id: "cancelled-delete".into(),
         kind: ResourceOperationKind::Delete,
-        items: vec![ResourceOperationItem { before: Some(reference.clone()), after: None }],
+        items: vec![ResourceOperationItem {
+            before: Some(reference.clone()),
+            after: None,
+        }],
     };
     let confirmation = inspect_delete(Some(&mut Inspector(Ok(Some(3)))), "stable", &reference);
     let result = execute_confirmed_delete(
-        &context, &roots, &mut registry, &mut uses, &plan,
-        &confirmation, DeleteDecision::Cancel, None, || "unused".into(),
+        &context,
+        &roots,
+        &mut registry,
+        &mut uses,
+        &plan,
+        &confirmation,
+        DeleteDecision::Cancel,
+        None,
+        || "unused".into(),
     );
     assert!(matches!(result, Err(ConfirmedDeleteError::Cancelled)));
-    assert_eq!(fs::read(roots.project.join("models.txt")).unwrap(), b"content");
+    assert_eq!(
+        fs::read(roots.project.join("models.txt")).unwrap(),
+        b"content"
+    );
     assert_eq!(registry.find_by_id("stable").unwrap().reference, reference);
     assert!(!journal_path(&context).exists());
     let _ = fs::remove_dir_all(base);
