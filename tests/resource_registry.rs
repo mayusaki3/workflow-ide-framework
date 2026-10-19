@@ -74,3 +74,22 @@ fn invalid_stored_reference_is_not_silently_dropped() {
     };
     assert!(settings.to_registry().is_err());
 }
+
+#[test]
+fn reg_core_004_rejects_duplicate_resource_id_for_different_reference() {
+    let mut registry = ResourceRegistry::default();
+    assert!(matches!(
+        registry.register("stable-id", project("first.png")),
+        RegisterResult::Added(_)
+    ));
+    assert!(matches!(
+        registry.register("stable-id", project("second.png")),
+        RegisterResult::ConflictingId(ref entry) if entry.reference == project("first.png")
+    ));
+    assert_eq!(registry.entries().len(), 1);
+    assert_eq!(
+        registry.find_by_id("stable-id").unwrap().reference,
+        project("first.png")
+    );
+    assert!(registry.find_by_reference(&project("second.png")).is_none());
+}
