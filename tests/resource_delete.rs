@@ -154,7 +154,10 @@ fn reg_del_confirmed_execution_rejects_stale_target_before_journal() {
         || "unused".into(),
     );
     assert!(matches!(result, Err(ConfirmedDeleteError::TargetMismatch)));
-    assert_eq!(fs::read(roots.project.join("target.txt")).unwrap(), b"preserve");
+    assert_eq!(
+        fs::read(roots.project.join("target.txt")).unwrap(),
+        b"preserve"
+    );
     assert!(registry.find_by_id("stable").is_some());
     assert!(!journal_path(&context).exists());
     let _ = fs::remove_dir_all(base);
