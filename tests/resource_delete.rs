@@ -108,3 +108,54 @@ fn reg_del_004_cancelled_execution_does_not_touch_file_registry_or_journal() {
     assert!(!journal_path(&context).exists());
     let _ = fs::remove_dir_all(base);
 }
+
+#[test]
+fn reg_del_confirmed_execution_rejects_stale_target_before_journal() {
+    use std::fs;
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        resource_executor::{ConfirmedDeleteError, execute_confirmed_delete},
+        resource_journal::journal_path,
+        resource_operation::{ResourceOperationItem, ResourceOperationKind, ResourceOperationPlan},
+        resource_registry::ResourceRegistry,
+        resource_state::ResourceRoots,
+    };
+    let base = std::env::temp_dir().join(format!("wfide-delete-stale-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&base);
+    let project = base.join("project");
+    let roots = ResourceRoots {
+        application: base.join("app"),
+        project: project.join("resources"),
+    };
+    fs::create_dir_all(&roots.project).unwrap();
+    fs::write(roots.project.join("target.txt"), b"preserve").unwrap();
+    let context = ProjectContext::new(project);
+    let reference = ResourceReference::new(ResourceScope::Project, "target.txt").unwrap();
+    let mut registry = ResourceRegistry::default();
+    registry.register("stable", reference.clone());
+    let plan = ResourceOperationPlan {
+        operation_id: "stale-delete".into(),
+        kind: ResourceOperationKind::Delete,
+        items: vec![ResourceOperationItem {
+            before: Some(reference.clone()),
+            after: None,
+        }],
+    };
+    let confirmation = inspect_delete(Some(&mut Inspector(Ok(Some(0)))), "wrong-id", &reference);
+    let result = execute_confirmed_delete(
+        &context,
+        &roots,
+        &mut registry,
+        &mut [],
+        &plan,
+        &confirmation,
+        DeleteDecision::Confirm,
+        None,
+        || "unused".into(),
+    );
+    assert!(matches!(result, Err(ConfirmedDeleteError::TargetMismatch)));
+    assert_eq!(fs::read(roots.project.join("target.txt")).unwrap(), b"preserve");
+    assert!(registry.find_by_id("stable").is_some());
+    assert!(!journal_path(&context).exists());
+    let _ = fs::remove_dir_all(base);
+}
