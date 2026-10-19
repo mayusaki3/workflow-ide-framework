@@ -393,3 +393,57 @@ where
     )
     .map_err(ConfirmedDeleteError::Execution)
 }
+
+fn validate_confirmed_delete(
+    registry: &ResourceRegistry,
+    plan: &ResourceOperationPlan,
+    confirmation: &DeleteConfirmation,
+    decision: DeleteDecision,
+) -> Result<(), ConfirmedDeleteError> {
+    if plan.kind != ResourceOperationKind::Delete || plan.items.len() != 1 {
+        return Err(ConfirmedDeleteError::NotDeleteOperation);
+    }
+    let target = plan.items[0].before.as_ref();
+    let registered = registry.find_by_id(&confirmation.resource_id);
+    if target != Some(&confirmation.reference) || registered.map(|entry| &entry.reference) != target
+    {
+        return Err(ConfirmedDeleteError::TargetMismatch);
+    }
+    if !authorize_delete(confirmation, decision) {
+        return Err(ConfirmedDeleteError::Cancelled);
+    }
+    Ok(())
+}
+
+/// Guard both framework-accepted and application-handled deletion before journaling
+/// or invoking the application executor.
+#[allow(clippy::too_many_arguments)]
+pub fn execute_confirmed_prepared_delete<A, F>(
+    application: &mut A,
+    context: &ProjectContext,
+    roots: &ResourceRoots,
+    registry: &mut ResourceRegistry,
+    framework_uses: &mut [FrameworkResourceUse],
+    plan: &ResourceOperationPlan,
+    prepared: PreparedResourceOperation,
+    confirmation: &DeleteConfirmation,
+    decision: DeleteDecision,
+    new_id: F,
+) -> Result<(), ConfirmedDeleteError>
+where
+    A: ApplicationResourceOperationAdapter,
+    F: FnMut() -> String,
+{
+    validate_confirmed_delete(registry, plan, confirmation, decision)?;
+    execute_prepared_operation(
+        application,
+        context,
+        roots,
+        registry,
+        framework_uses,
+        plan,
+        prepared,
+        new_id,
+    )
+    .map_err(ConfirmedDeleteError::Execution)
+}
