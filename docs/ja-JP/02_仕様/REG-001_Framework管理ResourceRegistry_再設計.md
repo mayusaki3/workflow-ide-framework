@@ -42,3 +42,47 @@
 2. 参照確認フックの具体的な戻り値（件数、参照元一覧、未知、拒否）。
 3. Locale別ファイルの既定Locale設定元と、対象がExternal scopeの場合の扱い。
 4. Registryに存在するが実体がMissingの項目をユーザーが明示的に整理する復旧UIの位置付け。
+
+## 8. 保存整合性の設計検討（2026-10-19）
+
+### 8.1 現行実装の確認
+- `ProjectController::save()` はメモリ上のRegistryを `FrameworkSettings.resources` に反映し、`save_project()` に渡す。
+- `save_project()` はアプリの `save_project_data()`、Framework設定、Projectメタデータの順でそれぞれ書き込む。複数ファイルを一括コミットする機構はない。
+- 成功時のみ `ProjectSession::complete_save()` がDirtyをクリアする。失敗時はメモリ上のRegistryとDirtyを維持するが、書き込み済みファイルは自動的に戻らない。
+- `save_project_as()` はアプリデータ保存、resourcesディレクトリのコピー、Framework/Project保存の順。途中失敗時のコピー先のクリーンアップは保証されない。
+- `save_id` はFramework設定とProjectメタデータに記録され、Open時に不一致を検出できる。アプリデータの `save_id` 一致はFramework側では検証しない。
+
+### 8.2 目標と不変条件
+1. アプリの論理データが参照するRegistry Resource IDとRegistry本体は、**同じコミット世代**として復元される。
+2. Save失敗時、メモリ上のRegistryとアプリの未保存変更は保持し、Dirtyをクリアしない。
+3. Save Asで論理IDとRegistry Resource IDを変更せず、失敗時に元プロジェクトを変更しない。
+4. Open時に不完全な保存世代を検出したら、正常な最新確定世代へ復旧するか、利用者に明示して操作を止める。**不整合な世代を黙って採用しない**。
+5. `ApplicationProjectAdapter` はアプリデータの保存形式を所有し、Frameworkはその意味を解釈しない。
+
+### 8.3 提案する最小API（未実装）
+- 既存の `save_project_data()` / `save_project_data_as()` を即時書き込み型として残す間は、原子的保存を保証しない。
+- 新たにアプリが **ステージング先** にデータを書き出すコールバックを追加する。Frameworkはアプリ・Registry・Projectメタデータを同じ保存世代の候補として準備する。
+- Frameworkはコミット記録を管理し、完了済み世代だけをOpenで採用する。複数ファイルの置換中断に備え、前世代を復元できるようにする。
+- アプリデータが複数ファイルの場合も扱えるよう、コールバックの対象は単一ファイルではなくディレクトリとする。
+- 新APIに移行するアプリはステージング領域外へ書き込まない。従来API利用アプリの保証水準は別途明示する。
+
+### 8.4 実装前テスト候補
+| ID | 条件 | 期待結果 |
+|---|---|---|
+| SAVE-CONS-001 | Registryとアプリデータの同時変更後にSave | 両者の同じ保存世代がOpenで復元される |
+| SAVE-CONS-002 | アプリのステージング失敗 | 既存保存世代不変、Dirty維持 |
+| SAVE-CONS-003 | Framework設定の準備失敗 | 既存保存世代不変、Dirty維持 |
+| SAVE-CONS-004 | コミット途中で中断 | Openで前世代へ復旧、または明示的な復旧待ち |
+| SAVE-CONS-005 | Save As成功 | 元プロジェクト不変、Resource ID維持 |
+| SAVE-CONS-006 | Save As失敗 | 元プロジェクト不変、コピー先を未確定として扱う |
+| SAVE-CONS-007 | 保存せずClose/Open | 未保存Registryとアプリデータを破棄 |
+| SAVE-CONS-008 | アプリの参照IDがRegistryに存在しない | 不整合を通知し、黙って正常扱いしない |
+
+### 8.5 作業順序と既存テストへの影響
+1. **先に保存整合性の仕様と失敗注入テストを確定する**。既存の `project_save` / `project_persistence` / `project_open` / `project_lifecycle` / `resource_executor` の現行期待値を記録する。
+2. 新しいステージング保存経路を**別APIとして実装**し、既存保存APIは直ちに変更しない。既存テストへの破壊的変更を避ける。
+3. 新経路の成功・失敗・再オープンテストを通した後、`ProjectController` とUIの保存入口を切り替える。
+4. REG-DELの直接削除経路制限と確認UIを、新しい保存契約の下で完成させる。
+5. Project Panelの追加ノード自動展開を実装する。
+
+注：本章は設計検討であり、ステージング・世代復旧・アプリ参照整合性検査は**現時点で未実装**。
