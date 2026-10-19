@@ -251,6 +251,8 @@ struct ControllerPropertyLink {
     property_panel_id: String,
 }
 
+type RegistryAccessHandler = Box<dyn FnMut(&mut project_controller::RegistryAccess<'_>)>;
+
 pub struct Application {
     unsaved_notification: unsaved_notification::UnsavedNotification,
     config: ApplicationConfig,
@@ -274,7 +276,7 @@ pub struct Application {
     status: status::StatusHandle,
     application_events: application_event::ApplicationEventDispatcher,
     project_events: project_event::ProjectEventDispatcher,
-    registry_access_handler: Option<Box<dyn FnMut(&mut project_controller::RegistryAccess<'_>)>>,
+    registry_access_handler: Option<RegistryAccessHandler>,
 }
 
 impl Application {
@@ -886,7 +888,7 @@ struct FrameworkHost {
     status: status::StatusHandle,
     application_events: application_event::ApplicationEventDispatcher,
     project_events: project_event::ProjectEventDispatcher,
-    registry_access_handler: Option<Box<dyn FnMut(&mut project_controller::RegistryAccess<'_>)>>,
+    registry_access_handler: Option<RegistryAccessHandler>,
     project_ui: ProjectUiState,
     active_log_dialog: Option<logging::CapturedMessages>,
     recent_projects: recent_projects::RecentProjects,
@@ -2889,10 +2891,9 @@ impl eframe::App for FrameworkHost {
         if let (Some(handler), Some(controller)) = (
             self.registry_access_handler.as_mut(),
             self.project_controller.as_mut(),
-        ) {
-            if let Ok(mut registry) = controller.registry_access() {
-                handler(&mut registry);
-            }
+        ) && let Ok(mut registry) = controller.registry_access()
+        {
+            handler(&mut registry);
         }
         self.sync_unsaved_notifications();
         if self.project_directory_watcher.is_some() {
