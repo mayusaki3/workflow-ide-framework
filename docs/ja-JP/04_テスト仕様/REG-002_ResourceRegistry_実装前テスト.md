@@ -12,6 +12,9 @@
 | REG-LIFE-002 | Save As | ID維持、移行先に正しく保存 |
 | REG-LIFE-003 | 別Projectへ切替 | 前ProjectのRegistryが混入しない |
 | REG-LIFE-004 | Registry変更後Save失敗 | dirtyが維持される |
+| REG-LIFE-005 | 保存データに同一Resource IDが複数存在 | 復元をエラーにし、黙って統合しない |
+| REG-LIFE-006 | 保存データに正規化後同一参照が異なるIDで存在 | 復元をエラーにし、黙って統合しない |
+| REG-LIFE-007 | 別Projectを開く際のRegistry復元が失敗 | 開く前のProject状態を保持する |
 | REG-DEL-001 | 未参照ファイルをユーザーが削除 | 実体とRegistryを整合して更新 |
 | REG-DEL-002 | 参照数3のファイルを削除要求 | 参照警告と続行確認を表示 |
 | REG-DEL-003 | 参照数不明で削除要求 | 未参照扱いにせず不明と表示 |
