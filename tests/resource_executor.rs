@@ -570,7 +570,7 @@ fn move_to_registered_destination_is_rejected_before_file_move() {
 #[test]
 fn prepared_delete_cancel_blocks_both_routes_before_journal_or_application() {
     use workflow_ide_framework::{
-        resource_delete::{DeleteDecision, DeleteReferences, DeleteConfirmation},
+        resource_delete::{DeleteConfirmation, DeleteDecision, DeleteReferences},
         resource_executor::{ConfirmedDeleteError, execute_confirmed_prepared_delete},
     };
     for handled in [false, true] {
