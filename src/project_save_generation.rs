@@ -1,7 +1,11 @@
 //! Save-generation commit pointer. This module is independent of the legacy save path.
 //! A generation is visible only after its complete directory is promoted and
 //! its commit pointer is atomically replaced.
-use crate::{project::ProjectContext, project_io::atomic_write};
+use crate::{
+    framework_settings::{FrameworkSettings, FRAMEWORK_SETTINGS_FORMAT_VERSION},
+    project::{ProjectContext, ProjectFile, PROJECT_FORMAT_VERSION},
+    project_io::atomic_write,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fs, io,
@@ -21,6 +25,7 @@ pub enum GenerationError {
     MissingCandidate,
     IncompleteCandidate,
     InvalidCommit(String),
+    InvalidCandidate(String),
     MissingCommittedGeneration,
     Io(io::Error),
 }
@@ -138,4 +143,35 @@ pub fn read_committed_generation(
     }
     require_complete(&path)?;
     Ok(Some(marker))
+}
+
+/// Validate the contents of a save candidate before it becomes visible.
+/// The application payload remains application-owned and needs its own adapter validation.
+pub fn validate_generation_contents(
+    path: &Path,
+    expected_application_id: &str,
+    expected_save_id: &str,
+) -> Result<(), GenerationError> {
+    require_complete(path)?;
+    let project_text = fs::read_to_string(path.join("project.toml"))?;
+    let project = ProjectFile::from_toml(&project_text, expected_application_id)
+        .map_err(|e| GenerationError::InvalidCandidate(format!("project.toml: {e:?}")))?;
+    if project.project.format_version != PROJECT_FORMAT_VERSION
+        || project.project.save_id != expected_save_id
+    {
+        return Err(GenerationError::InvalidCandidate(
+            "project format version or save_id mismatch".into(),
+        ));
+    }
+    let framework_text = fs::read_to_string(path.join("framework_settings.toml"))?;
+    let framework = FrameworkSettings::from_toml(&framework_text)
+        .map_err(|e| GenerationError::InvalidCandidate(format!("framework_settings.toml: {e:?}")))?;
+    if framework.format_version != FRAMEWORK_SETTINGS_FORMAT_VERSION
+        || framework.save_id.as_deref() != Some(expected_save_id)
+    {
+        return Err(GenerationError::InvalidCandidate(
+            "framework format version or save_id mismatch".into(),
+        ));
+    }
+    Ok(())
 }
