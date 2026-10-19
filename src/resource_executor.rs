@@ -172,7 +172,10 @@ fn validate_registry_changes(
             ResourceOperationKind::Import | ResourceOperationKind::Replace => {
                 let after = item.after.as_ref().expect("validated");
                 if simulated.find_by_reference(after).is_none() {
-                    let id = stored.after_resource_id.as_ref().expect("target ID journaled");
+                    let id = stored
+                        .after_resource_id
+                        .as_ref()
+                        .expect("target ID journaled");
                     match simulated.register(id.clone(), after.clone()) {
                         RegisterResult::ConflictingId(entry) => {
                             return Err(ResourceExecutionError::ConflictingResourceId(
@@ -187,12 +190,12 @@ fn validate_registry_changes(
                 let before = item.before.as_ref().expect("validated");
                 let after = item.after.as_ref().expect("validated");
                 if let Some(entry) = simulated.find_by_reference(before).cloned() {
-                    if let Some(existing) = simulated.find_by_reference(after) {
-                        if existing.resource_id != entry.resource_id {
-                            return Err(ResourceExecutionError::ConflictingResourceId(
-                                existing.resource_id.clone(),
-                            ));
-                        }
+                    if let Some(existing) = simulated.find_by_reference(after)
+                        && existing.resource_id != entry.resource_id
+                    {
+                        return Err(ResourceExecutionError::ConflictingResourceId(
+                            existing.resource_id.clone(),
+                        ));
                     }
                     simulated.remove(&entry.resource_id);
                     if let RegisterResult::ConflictingId(existing) =
