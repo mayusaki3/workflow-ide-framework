@@ -692,7 +692,9 @@ fn reg_life_007_failed_registry_accept_open_preserves_active_project() {
     let mut app = App;
     let mut controller = ProjectController::new("org.test.registry", "Registry");
     new_project(&mut controller, &mut app, active_root.clone());
-    let active_id = controller.register_resource(reference("active.txt")).unwrap();
+    let active_id = controller
+        .register_resource(reference("active.txt"))
+        .unwrap();
     let previous_project = controller.project_file.clone();
     let previous_settings = controller.framework_settings.clone();
     let previous_registry = controller.resource_registry().unwrap().clone();
@@ -727,9 +729,17 @@ fn reg_life_007_failed_registry_accept_open_preserves_active_project() {
     assert_eq!(controller.framework_settings, previous_settings);
     assert_eq!(controller.resource_registry().unwrap(), &previous_registry);
     assert_eq!(controller.has_unsaved_changes(), previous_dirty);
-    assert_eq!(controller.session.as_ref().unwrap().context(), previous_root.as_ref());
     assert_eq!(
-        controller.resource_registry().unwrap().find_by_id(&active_id).unwrap().reference,
+        controller.session.as_ref().unwrap().context(),
+        previous_root.as_ref()
+    );
+    assert_eq!(
+        controller
+            .resource_registry()
+            .unwrap()
+            .find_by_id(&active_id)
+            .unwrap()
+            .reference,
         reference("active.txt")
     );
 
