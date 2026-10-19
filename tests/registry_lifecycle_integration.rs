@@ -581,3 +581,50 @@ fn reg_app_009_default_provider_registry_action_falls_back_to_legacy_handler() {
     );
     let _ = fs::remove_dir_all(root.root());
 }
+
+#[test]
+fn reg_app_008_project_panel_registration_persists_through_save_and_open() {
+    let root = context("panel-register-persist");
+    let mut app = App;
+    let mut controller = ProjectController::new("org.test.registry", "Registry");
+    new_project(&mut controller, &mut app, root.clone());
+    let mut provider = RegistryActionProvider {
+        resource_id: None,
+        legacy_called: false,
+    };
+    {
+        let mut registry = controller.registry_access().unwrap();
+        assert_eq!(
+            provider.handle_project_panel_action_with_registry(
+                &root,
+                AppPanelAction::ContextAction {
+                    node_ids: vec!["robot.node".into()],
+                    action_id: "register".into(),
+                },
+                &mut registry,
+            ),
+            AppPanelActionResult::Handled
+        );
+    }
+    let id = provider.resource_id.clone().unwrap();
+    assert_eq!(
+        controller.save(&mut app, "reg-app-008", "2026-10-19T00:00:00Z"),
+        ProjectCommandResult::Completed
+    );
+    assert!(!controller.has_unsaved_changes());
+    assert_eq!(controller.close(false), ProjectCommandResult::Completed);
+    assert_eq!(
+        controller.open(root.clone(), &mut app),
+        ProjectCommandResult::Completed
+    );
+    assert_eq!(
+        controller
+            .registry_access()
+            .unwrap()
+            .find_by_reference(&reference("models/robot.urdf"))
+            .unwrap()
+            .resource_id,
+        id
+    );
+    let _ = fs::remove_dir_all(root.root());
+}
