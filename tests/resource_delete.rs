@@ -53,3 +53,45 @@ fn reg_del_004_zero_references_still_requires_confirmation() {
     assert_eq!(request.references, DeleteReferences::Known(0));
     assert!(!authorize_delete(&request, DeleteDecision::Cancel));
 }
+
+#[test]
+fn reg_del_004_cancelled_execution_does_not_touch_file_registry_or_journal() {
+    use std::fs;
+    use workflow_ide_framework::{
+        resource_executor::{ConfirmedDeleteError, execute_confirmed_delete},
+        resource_journal::journal_path,
+        resource_operation::{ResourceOperationItem, ResourceOperationKind, ResourceOperationPlan},
+        resource_registry::ResourceRegistry,
+        resource_state::ResourceRoots,
+        project::ProjectContext,
+    };
+    let base = std::env::temp_dir().join(format!("wfide-delete-guard-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&base);
+    let project = base.join("project");
+    let roots = ResourceRoots {
+        application: base.join("app"),
+        project: project.join("resources"),
+    };
+    fs::create_dir_all(&roots.project).unwrap();
+    fs::write(roots.project.join("models.txt"), b"content").unwrap();
+    let context = ProjectContext::new(project);
+    let reference = ResourceReference::new(ResourceScope::Project, "models.txt").unwrap();
+    let mut registry = ResourceRegistry::default();
+    registry.register("stable", reference.clone());
+    let mut uses = vec![];
+    let plan = ResourceOperationPlan {
+        operation_id: "cancelled-delete".into(),
+        kind: ResourceOperationKind::Delete,
+        items: vec![ResourceOperationItem { before: Some(reference.clone()), after: None }],
+    };
+    let confirmation = inspect_delete(Some(&mut Inspector(Ok(Some(3)))), "stable", &reference);
+    let result = execute_confirmed_delete(
+        &context, &roots, &mut registry, &mut uses, &plan,
+        &confirmation, DeleteDecision::Cancel, None, || "unused".into(),
+    );
+    assert!(matches!(result, Err(ConfirmedDeleteError::Cancelled)));
+    assert_eq!(fs::read(roots.project.join("models.txt")).unwrap(), b"content");
+    assert_eq!(registry.find_by_id("stable").unwrap().reference, reference);
+    assert!(!journal_path(&context).exists());
+    let _ = fs::remove_dir_all(base);
+}
