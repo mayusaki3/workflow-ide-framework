@@ -23,13 +23,18 @@ pub struct LocateReplacePlan {
     pub new_registry_entry_added: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LocateReplaceError {
+    ConflictingResourceId(String),
+}
+
 pub fn locate_replace<F>(
     registry: &mut ResourceRegistry,
     framework_uses: &mut [FrameworkResourceUse],
     old: &ResourceReference,
     new: ResourceReference,
     new_id: F,
-) -> LocateReplacePlan
+) -> Result<LocateReplacePlan, LocateReplaceError>
 where
     F: FnOnce() -> String,
 {
@@ -40,10 +45,7 @@ where
                 RegisterResult::Added(entry) => (entry, true),
                 RegisterResult::Existing(entry) => (entry, false),
                 RegisterResult::ConflictingId(entry) => {
-                    panic!(
-                        "resource ID collision during locate/replace: {}",
-                        entry.resource_id
-                    )
+                    return Err(LocateReplaceError::ConflictingResourceId(entry.resource_id));
                 }
             },
         };
@@ -56,7 +58,7 @@ where
         }
     }
 
-    LocateReplacePlan {
+    Ok(LocateReplacePlan {
         change: ResourceChange {
             before: old.clone(),
             after: new,
@@ -64,7 +66,7 @@ where
         affected_owner_ids,
         new_registry_entry,
         new_registry_entry_added,
-    }
+    })
 }
 
 pub trait ApplicationResourceChangeAdapter {
