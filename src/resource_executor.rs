@@ -18,6 +18,7 @@ use std::{
 #[derive(Debug)]
 pub enum ResourceExecutionError {
     Validation(String),
+    ConflictingResourceId(String),
     JournalWrite(io::Error),
     Filesystem(io::Error),
     JournalRemove(io::Error),
@@ -46,6 +47,7 @@ where
     journal.set_execution_route(StoredExecutionRoute::Framework);
     let after_ids = allocate_after_resource_ids(plan, registry, &mut new_id);
     journal.set_after_resource_ids(&after_ids);
+    validate_registry_changes(registry, plan, &journal)?;
     journal
         .save(context)
         .map_err(ResourceExecutionError::JournalWrite)?;
@@ -159,6 +161,56 @@ fn allocate_after_resource_ids<F: FnMut() -> String>(
         .collect()
 }
 
+fn validate_registry_changes(
+    registry: &ResourceRegistry,
+    plan: &ResourceOperationPlan,
+    journal: &ResourceOperationJournal,
+) -> Result<(), ResourceExecutionError> {
+    let mut simulated = registry.clone();
+    for (item, stored) in plan.items.iter().zip(&journal.items) {
+        match plan.kind {
+            ResourceOperationKind::Import | ResourceOperationKind::Replace => {
+                let after = item.after.as_ref().expect("validated");
+                if simulated.find_by_reference(after).is_none() {
+                    let id = stored.after_resource_id.as_ref().expect("target ID journaled");
+                    match simulated.register(id.clone(), after.clone()) {
+                        RegisterResult::ConflictingId(entry) => {
+                            return Err(ResourceExecutionError::ConflictingResourceId(entry.resource_id));
+                        }
+                        RegisterResult::Added(_) | RegisterResult::Existing(_) => {}
+                    }
+                }
+            }
+            ResourceOperationKind::Rename | ResourceOperationKind::Move => {
+                let before = item.before.as_ref().expect("validated");
+                let after = item.after.as_ref().expect("validated");
+                if let Some(entry) = simulated.find_by_reference(before).cloned() {
+                    if let Some(existing) = simulated.find_by_reference(after) {
+                        if existing.resource_id != entry.resource_id {
+                            return Err(ResourceExecutionError::ConflictingResourceId(existing.resource_id.clone()));
+                        }
+                    }
+                    simulated.remove(&entry.resource_id);
+                    if let RegisterResult::ConflictingId(existing) =
+                        simulated.register(entry.resource_id, after.clone())
+                    {
+                        return Err(ResourceExecutionError::ConflictingResourceId(existing.resource_id));
+                    }
+                }
+            }
+            ResourceOperationKind::Delete => {
+                let before = item.before.as_ref().expect("validated");
+                if let Some(entry) = simulated.find_by_reference(before) {
+                    let id = entry.resource_id.clone();
+                    simulated.remove(&id);
+                }
+            }
+            ResourceOperationKind::Export => {}
+        }
+    }
+    Ok(())
+}
+
 fn apply_framework_state(
     registry: &mut ResourceRegistry,
     framework_uses: &mut [FrameworkResourceUse],
@@ -187,12 +239,7 @@ fn apply_framework_state(
                     let _ = registry.remove(&entry.resource_id);
                     match registry.register(entry.resource_id, after.clone()) {
                         RegisterResult::Added(_) | RegisterResult::Existing(_) => {}
-                        RegisterResult::ConflictingId(entry) => {
-                            panic!(
-                                "resource ID collision during rename/move: {}",
-                                entry.resource_id
-                            )
-                        }
+                        RegisterResult::ConflictingId(_) => unreachable!("registry changes prevalidated"),
                     }
                 }
                 replace_uses(framework_uses, before, after);
