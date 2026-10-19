@@ -680,3 +680,59 @@ fn reg_life_006_restore_rejects_duplicate_normalized_references() {
         })
     );
 }
+
+#[test]
+fn reg_life_007_failed_registry_accept_open_preserves_active_project() {
+    use workflow_ide_framework::project_open::{
+        FrameworkSettingsOpen, PendingResourceOperationOpen, ProjectOpenResult,
+    };
+
+    let active_root = context("failed-open-active");
+    let attempted_root = context("failed-open-target");
+    let mut app = App;
+    let mut controller = ProjectController::new("org.test.registry", "Registry");
+    new_project(&mut controller, &mut app, active_root.clone());
+    let active_id = controller.register_resource(reference("active.txt")).unwrap();
+    let previous_project = controller.project_file.clone();
+    let previous_settings = controller.framework_settings.clone();
+    let previous_registry = controller.resource_registry().unwrap().clone();
+    let previous_dirty = controller.has_unsaved_changes();
+    let previous_root = controller.session.as_ref().unwrap().context().cloned();
+
+    let invalid_settings = FrameworkSettings {
+        resources: vec![
+            StoredResourceEntry {
+                resource_id: "duplicate".into(),
+                scope: StoredResourceScope::Project,
+                path: "first.txt".into(),
+            },
+            StoredResourceEntry {
+                resource_id: "duplicate".into(),
+                scope: StoredResourceScope::Project,
+                path: "second.txt".into(),
+            },
+        ],
+        ..Default::default()
+    };
+    let attempted = ProjectOpenResult {
+        project_file: previous_project.clone().unwrap(),
+        framework_settings: FrameworkSettingsOpen::Loaded(invalid_settings),
+        pending_resource_operation: PendingResourceOperationOpen::None,
+        application_compatibility: ProjectDataCompatibility::Compatible,
+        application_consistency: ProjectDataConsistency::Consistent,
+    };
+    let result = controller.accept_open(attempted_root.clone(), attempted);
+    assert!(matches!(result, ProjectCommandResult::Failed(_)));
+    assert_eq!(controller.project_file, previous_project);
+    assert_eq!(controller.framework_settings, previous_settings);
+    assert_eq!(controller.resource_registry().unwrap(), &previous_registry);
+    assert_eq!(controller.has_unsaved_changes(), previous_dirty);
+    assert_eq!(controller.session.as_ref().unwrap().context(), previous_root.as_ref());
+    assert_eq!(
+        controller.resource_registry().unwrap().find_by_id(&active_id).unwrap().reference,
+        reference("active.txt")
+    );
+
+    let _ = fs::remove_dir_all(active_root.root());
+    let _ = fs::remove_dir_all(attempted_root.root());
+}
