@@ -1,7 +1,7 @@
 use workflow_ide_framework::{
     locate_replace::{
-        ApplicationResourceChangeAdapter, FrameworkResourceUse, LocateReplaceDecision, LocateReplaceError,
-        locate_replace, prepare_locate_replace,
+        ApplicationResourceChangeAdapter, FrameworkResourceUse, LocateReplaceDecision,
+        LocateReplaceError, locate_replace, prepare_locate_replace,
     },
     project_resource::ResourceOperationDecision,
     project_resource::{ResourceReference, ResourceScope},
@@ -37,7 +37,8 @@ fn replaces_all_identical_framework_references() {
     ];
     let plan = locate_replace(&mut registry, &mut uses, &old, new.clone(), || {
         "new-id".into()
-    }).unwrap();
+    })
+    .unwrap();
     assert_eq!(plan.affected_owner_ids, vec!["button", "image"]);
     assert_eq!(uses[0].reference, new);
     assert_eq!(uses[1].reference, new);
@@ -53,7 +54,8 @@ fn old_registry_entry_is_preserved_and_new_one_is_added() {
     let mut uses = vec![];
     let plan = locate_replace(&mut registry, &mut uses, &old, new.clone(), || {
         "new-id".into()
-    }).unwrap();
+    })
+    .unwrap();
     assert!(plan.new_registry_entry_added);
     assert_eq!(
         registry.find_by_reference(&old).unwrap().resource_id,
@@ -79,7 +81,8 @@ fn existing_new_registry_entry_is_reused() {
     }];
     let plan = locate_replace(&mut registry, &mut uses, &old, new, || {
         panic!("must not allocate id")
-    }).unwrap();
+    })
+    .unwrap();
     assert!(!plan.new_registry_entry_added);
     assert_eq!(plan.new_registry_entry.resource_id, "existing-new");
     assert_eq!(registry.entries().len(), 2);
@@ -100,7 +103,8 @@ fn normalized_old_reference_matches_framework_uses() {
         &old,
         p("textures/new.png"),
         || "new".into(),
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(plan.affected_owner_ids, vec!["x"]);
 }
 
@@ -144,12 +148,12 @@ fn conflicting_id_does_not_change_registry_or_framework_uses() {
         reference: old.clone(),
     }];
     let original_uses = uses.clone();
-    let result = locate_replace(&mut registry, &mut uses, &old, new, || {
-        "existing-id".into()
-    });
+    let result = locate_replace(&mut registry, &mut uses, &old, new, || "existing-id".into());
     assert_eq!(
         result,
-        Err(LocateReplaceError::ConflictingResourceId("existing-id".into()))
+        Err(LocateReplaceError::ConflictingResourceId(
+            "existing-id".into()
+        ))
     );
     assert_eq!(registry, before);
     assert_eq!(uses, original_uses);
