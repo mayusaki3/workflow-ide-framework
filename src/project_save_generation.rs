@@ -3,7 +3,10 @@
 //! its commit pointer is atomically replaced.
 use crate::{project::ProjectContext, project_io::atomic_write};
 use serde::{Deserialize, Serialize};
-use std::{fs, io, path::{Path, PathBuf}};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommittedGeneration {
@@ -23,11 +26,18 @@ pub enum GenerationError {
 }
 
 impl From<io::Error> for GenerationError {
-    fn from(error: io::Error) -> Self { Self::Io(error) }
+    fn from(error: io::Error) -> Self {
+        Self::Io(error)
+    }
 }
 
 fn validate_id(id: &str) -> Result<(), GenerationError> {
-    if id.is_empty() || id.len() > 128 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') {
+    if id.is_empty()
+        || id.len() > 128
+        || !id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    {
         return Err(GenerationError::InvalidId);
     }
     Ok(())
@@ -77,8 +87,12 @@ fn require_complete(path: &Path) -> Result<(), GenerationError> {
 pub fn promote_generation(context: &ProjectContext, id: &str) -> Result<(), GenerationError> {
     let source = staging_path(context, id)?;
     let target = generation_path(context, id)?;
-    if target.exists() { return Err(GenerationError::AlreadyExists); }
-    if !source.is_dir() { return Err(GenerationError::MissingCandidate); }
+    if target.exists() {
+        return Err(GenerationError::AlreadyExists);
+    }
+    if !source.is_dir() {
+        return Err(GenerationError::MissingCandidate);
+    }
     require_complete(&source)?;
     fs::rename(source, target)?;
     Ok(())
@@ -87,29 +101,41 @@ pub fn promote_generation(context: &ProjectContext, id: &str) -> Result<(), Gene
 /// Commit a previously promoted generation. Never points to an incomplete candidate.
 pub fn commit_generation(context: &ProjectContext, id: &str) -> Result<(), GenerationError> {
     let path = generation_path(context, id)?;
-    if !path.is_dir() { return Err(GenerationError::MissingCandidate); }
+    if !path.is_dir() {
+        return Err(GenerationError::MissingCandidate);
+    }
     require_complete(&path)?;
-    let marker = CommittedGeneration { format_version: 1, generation_id: id.to_owned() };
-    let text = toml::to_string(&marker).map_err(|e| GenerationError::InvalidCommit(e.to_string()))?;
+    let marker = CommittedGeneration {
+        format_version: 1,
+        generation_id: id.to_owned(),
+    };
+    let text =
+        toml::to_string(&marker).map_err(|e| GenerationError::InvalidCommit(e.to_string()))?;
     atomic_write(&committed_path(context), text.as_bytes())?;
     Ok(())
 }
 
 /// None means legacy format; an invalid pointer is always an error, not legacy fallback.
-pub fn read_committed_generation(context: &ProjectContext) -> Result<Option<CommittedGeneration>, GenerationError> {
+pub fn read_committed_generation(
+    context: &ProjectContext,
+) -> Result<Option<CommittedGeneration>, GenerationError> {
     let text = match fs::read_to_string(committed_path(context)) {
         Ok(text) => text,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(e.into()),
     };
-    let marker: CommittedGeneration = toml::from_str(&text)
-        .map_err(|e| GenerationError::InvalidCommit(e.to_string()))?;
+    let marker: CommittedGeneration =
+        toml::from_str(&text).map_err(|e| GenerationError::InvalidCommit(e.to_string()))?;
     if marker.format_version != 1 {
-        return Err(GenerationError::InvalidCommit("unsupported format version".into()));
+        return Err(GenerationError::InvalidCommit(
+            "unsupported format version".into(),
+        ));
     }
     validate_id(&marker.generation_id)?;
     let path = generation_path(context, &marker.generation_id)?;
-    if !path.is_dir() { return Err(GenerationError::MissingCommittedGeneration); }
+    if !path.is_dir() {
+        return Err(GenerationError::MissingCommittedGeneration);
+    }
     require_complete(&path)?;
     Ok(Some(marker))
 }
