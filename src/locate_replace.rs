@@ -40,7 +40,10 @@ where
                 RegisterResult::Added(entry) => (entry, true),
                 RegisterResult::Existing(entry) => (entry, false),
                 RegisterResult::ConflictingId(entry) => {
-                    panic!("resource ID collision during locate/replace: {}", entry.resource_id)
+                    panic!(
+                        "resource ID collision during locate/replace: {}",
+                        entry.resource_id
+                    )
                 }
             },
         };
