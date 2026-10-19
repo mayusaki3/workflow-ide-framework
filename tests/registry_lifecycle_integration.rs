@@ -1,6 +1,8 @@
 use std::fs;
 use workflow_ide_framework::{
-    framework_settings::{FrameworkSettings, FrameworkSettingsError, StoredResourceEntry, StoredResourceScope},
+    framework_settings::{
+        FrameworkSettings, FrameworkSettingsError, StoredResourceEntry, StoredResourceScope,
+    },
     project::ProjectContext,
     project_adapter::ApplicationProjectAdapter,
     project_controller::{ProjectCommandResult, ProjectController},
@@ -632,8 +634,8 @@ fn reg_app_008_project_panel_registration_persists_through_save_and_open() {
 
 #[test]
 fn reg_life_005_restore_rejects_duplicate_ids_without_dropping_entries() {
-    let mut settings = FrameworkSettings::default();
-    settings.resources = vec![
+    let settings = FrameworkSettings {
+        resources: vec![
         StoredResourceEntry {
             resource_id: "same".into(),
             scope: StoredResourceScope::Project,
@@ -644,7 +646,9 @@ fn reg_life_005_restore_rejects_duplicate_ids_without_dropping_entries() {
             scope: StoredResourceScope::Project,
             path: "second.txt".into(),
         },
-    ];
+        ],
+        ..Default::default()
+    };
     assert_eq!(
         settings.to_registry(),
         Err(FrameworkSettingsError::DuplicateResourceId("same".into()))
@@ -653,8 +657,8 @@ fn reg_life_005_restore_rejects_duplicate_ids_without_dropping_entries() {
 
 #[test]
 fn reg_life_006_restore_rejects_duplicate_normalized_references() {
-    let mut settings = FrameworkSettings::default();
-    settings.resources = vec![
+    let settings = FrameworkSettings {
+        resources: vec![
         StoredResourceEntry {
             resource_id: "first".into(),
             scope: StoredResourceScope::Project,
@@ -665,7 +669,9 @@ fn reg_life_006_restore_rejects_duplicate_normalized_references() {
             scope: StoredResourceScope::Project,
             path: "folder/./item.txt".into(),
         },
-    ];
+        ],
+        ..Default::default()
+    };
     assert_eq!(
         settings.to_registry(),
         Err(FrameworkSettingsError::DuplicateResourceReference {
@@ -674,4 +680,3 @@ fn reg_life_006_restore_rejects_duplicate_normalized_references() {
         })
     );
 }
-
