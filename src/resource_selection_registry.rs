@@ -37,7 +37,8 @@ where
             RegisterResult::ConflictingId(entry) => {
                 return FileSelectionRegistration::Error(
                     crate::file_resource_selector::FileSelectionError::Io(format!(
-                        "resource ID collision: {}", entry.resource_id
+                        "resource ID collision: {}",
+                        entry.resource_id
                     )),
                 );
             }
