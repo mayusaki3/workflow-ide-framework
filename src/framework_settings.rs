@@ -154,6 +154,11 @@ pub enum FrameworkSettingsError {
         supported: u32,
     },
     InvalidFormatVersion(u32),
+    DuplicateResourceId(String),
+    DuplicateResourceReference {
+        first_id: String,
+        duplicate_id: String,
+    },
     InvalidResourceReference {
         resource_id: String,
         error: ResourceReferenceError,
@@ -181,16 +186,28 @@ impl FrameworkSettings {
     }
 
     pub fn to_registry(&self) -> Result<ResourceRegistry, FrameworkSettingsError> {
-        let mut entries = Vec::with_capacity(self.resources.len());
+        let mut registry = ResourceRegistry::default();
         for stored in &self.resources {
-            entries.push(stored.to_resource().map_err(|error| {
+            let entry = stored.to_resource().map_err(|error| {
                 FrameworkSettingsError::InvalidResourceReference {
                     resource_id: stored.resource_id.clone(),
                     error,
                 }
-            })?);
+            })?;
+            if registry.find_by_id(&entry.resource_id).is_some() {
+                return Err(FrameworkSettingsError::DuplicateResourceId(
+                    entry.resource_id,
+                ));
+            }
+            if let Some(existing) = registry.find_by_reference(&entry.reference) {
+                return Err(FrameworkSettingsError::DuplicateResourceReference {
+                    first_id: existing.resource_id.clone(),
+                    duplicate_id: entry.resource_id,
+                });
+            }
+            registry.register(entry.resource_id, entry.reference);
         }
-        Ok(ResourceRegistry::new(entries))
+        Ok(registry)
     }
 
     pub fn from_toml(input: &str) -> Result<Self, FrameworkSettingsError> {
