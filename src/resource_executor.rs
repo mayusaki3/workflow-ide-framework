@@ -188,7 +188,10 @@ fn apply_framework_state(
                     match registry.register(entry.resource_id, after.clone()) {
                         RegisterResult::Added(_) | RegisterResult::Existing(_) => {}
                         RegisterResult::ConflictingId(entry) => {
-                            panic!("resource ID collision during rename/move: {}", entry.resource_id)
+                            panic!(
+                                "resource ID collision during rename/move: {}",
+                                entry.resource_id
+                            )
                         }
                     }
                 }
