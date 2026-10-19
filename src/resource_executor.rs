@@ -1,5 +1,6 @@
 use crate::{
     locate_replace::FrameworkResourceUse,
+    resource_delete::{DeleteConfirmation, DeleteDecision, authorize_delete},
     project::ProjectContext,
     project_resource::{ApplicationJournalData, ResourceReference},
     resource_journal::{ResourceOperationJournal, StoredExecutionRoute},
@@ -342,4 +343,54 @@ where
             ResourceOperationJournal::remove(context).map_err(ResourceExecutionError::JournalRemove)
         }
     }
+}
+
+#[derive(Debug)]
+pub enum ConfirmedDeleteError {
+    NotDeleteOperation,
+    TargetMismatch,
+    Cancelled,
+    Execution(ResourceExecutionError),
+}
+
+/// UI-facing guarded entry point. Cancellation and stale targets cause no mutation.
+/// Callers must obtain the decision from the user, not infer it from reference counts.
+#[allow(clippy::too_many_arguments)]
+pub fn execute_confirmed_delete<F>(
+    context: &ProjectContext,
+    roots: &ResourceRoots,
+    registry: &mut ResourceRegistry,
+    framework_uses: &mut [FrameworkResourceUse],
+    plan: &ResourceOperationPlan,
+    confirmation: &DeleteConfirmation,
+    decision: DeleteDecision,
+    application_journal_data: Option<ApplicationJournalData>,
+    new_id: F,
+) -> Result<(), ConfirmedDeleteError>
+where
+    F: FnMut() -> String,
+{
+    if plan.kind != ResourceOperationKind::Delete || plan.items.len() != 1 {
+        return Err(ConfirmedDeleteError::NotDeleteOperation);
+    }
+    let target = plan.items[0].before.as_ref();
+    let registered = registry.find_by_id(&confirmation.resource_id);
+    if target != Some(&confirmation.reference)
+        || registered.map(|entry| &entry.reference) != target
+    {
+        return Err(ConfirmedDeleteError::TargetMismatch);
+    }
+    if !authorize_delete(confirmation, decision) {
+        return Err(ConfirmedDeleteError::Cancelled);
+    }
+    execute_operation(
+        context,
+        roots,
+        registry,
+        framework_uses,
+        plan,
+        application_journal_data,
+        new_id,
+    )
+    .map_err(ConfirmedDeleteError::Execution)
 }
