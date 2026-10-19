@@ -34,6 +34,13 @@ where
                 entries.push(entry);
             }
             RegisterResult::Existing(entry) => entries.push(entry),
+            RegisterResult::ConflictingId(entry) => {
+                return FileSelectionRegistration::Error(
+                    crate::file_resource_selector::FileSelectionError::Io(format!(
+                        "resource ID collision: {}", entry.resource_id
+                    )),
+                );
+            }
         }
     }
     FileSelectionRegistration::Registered(RegistrationBatch {
