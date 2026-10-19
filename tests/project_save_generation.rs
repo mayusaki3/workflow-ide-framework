@@ -3,7 +3,7 @@ use workflow_ide_framework::{
     project::ProjectContext,
     project_save_generation::{
         GenerationError, begin_generation, commit_generation, committed_path, generation_path,
-        promote_generation, read_committed_generation, staging_path,
+        promote_generation, read_committed_generation, staging_path, validate_generation_contents,
     },
 };
 
@@ -131,6 +131,54 @@ fn save_cons_010_rejects_invalid_and_duplicate_generation_ids() {
     assert!(matches!(
         begin_generation(&context, "unique"),
         Err(GenerationError::AlreadyExists)
+    ));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn save_cons_rejects_invalid_project_and_mismatched_save_ids() {
+    let (root, context) = setup("content-validation");
+    let stage = begin_generation(&context, "candidate").unwrap();
+    complete(&stage);
+    assert!(matches!(
+        validate_generation_contents(&stage, "org.example.test", "generation-42"),
+        Err(GenerationError::InvalidCandidate(_))
+    ));
+    let project = workflow_ide_framework::project::ProjectFile {
+        project: workflow_ide_framework::project::ProjectMetadata {
+            format_version: 1,
+            name: "Test".into(),
+            description: None,
+            language: "en-US".into(),
+            save_id: "generation-42".into(),
+            saved_at: "now".into(),
+        },
+        application: workflow_ide_framework::project::ApplicationMetadata {
+            id: "org.example.test".into(),
+            name: "Test".into(),
+            description: None,
+            language: "en-US".into(),
+            data_version: None,
+        },
+    };
+    fs::write(stage.join("project.toml"), project.to_toml().unwrap()).unwrap();
+    assert!(matches!(
+        validate_generation_contents(&stage, "org.example.test", "generation-42"),
+        Err(GenerationError::InvalidCandidate(_))
+    ));
+    let settings = workflow_ide_framework::framework_settings::FrameworkSettings {
+        save_id: Some("generation-42".into()),
+        ..Default::default()
+    };
+    fs::write(stage.join("framework_settings.toml"), settings.to_toml().unwrap()).unwrap();
+    validate_generation_contents(&stage, "org.example.test", "generation-42").unwrap();
+    assert!(matches!(
+        validate_generation_contents(&stage, "org.example.other", "generation-42"),
+        Err(GenerationError::InvalidCandidate(_))
+    ));
+    assert!(matches!(
+        validate_generation_contents(&stage, "org.example.test", "generation-43"),
+        Err(GenerationError::InvalidCandidate(_))
     ));
     fs::remove_dir_all(root).unwrap();
 }
