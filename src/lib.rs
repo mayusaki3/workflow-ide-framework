@@ -274,6 +274,7 @@ pub struct Application {
     status: status::StatusHandle,
     application_events: application_event::ApplicationEventDispatcher,
     project_events: project_event::ProjectEventDispatcher,
+    registry_access_handler: Option<Box<dyn FnMut(&mut project_controller::RegistryAccess<'_>)>>,
 }
 
 impl Application {
@@ -305,6 +306,7 @@ impl Application {
             status: status::StatusHandle::new(),
             application_events: application_event::ApplicationEventDispatcher::default(),
             project_events: project_event::ProjectEventDispatcher::default(),
+            registry_access_handler: None,
         }
     }
 
@@ -515,6 +517,16 @@ impl Application {
         self
     }
 
+    /// Run application-owned Registry operations during Framework UI updates while a
+    /// project is active. The access handle cannot outlive the callback.
+    pub fn on_registry_access<F>(mut self, handler: F) -> Self
+    where
+        F: FnMut(&mut project_controller::RegistryAccess<'_>) + 'static,
+    {
+        self.registry_access_handler = Some(Box::new(handler));
+        self
+    }
+
     pub fn panel(mut self, panel: PanelDefinition) -> Self {
         self.config.panels.push(panel);
         self
@@ -590,6 +602,7 @@ impl Application {
         let status = self.status;
         let mut application_events = self.application_events;
         let project_events = self.project_events;
+        let registry_access_handler = self.registry_access_handler;
         application_events.emit(application_event::ApplicationEvent::Starting);
         if config.probe_panel
             && !config
@@ -807,6 +820,7 @@ impl Application {
                     status,
                     application_events,
                     project_events,
+                    registry_access_handler,
                     project_ui: ProjectUiState::default(),
                     active_log_dialog: None,
                     recent_projects,
@@ -872,6 +886,7 @@ struct FrameworkHost {
     status: status::StatusHandle,
     application_events: application_event::ApplicationEventDispatcher,
     project_events: project_event::ProjectEventDispatcher,
+    registry_access_handler: Option<Box<dyn FnMut(&mut project_controller::RegistryAccess<'_>)>>,
     project_ui: ProjectUiState,
     active_log_dialog: Option<logging::CapturedMessages>,
     recent_projects: recent_projects::RecentProjects,
@@ -2871,6 +2886,14 @@ impl Drop for FrameworkHost {
 impl eframe::App for FrameworkHost {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         logging::set_dialog_repaint_context(Some(ui.ctx().clone()));
+        if let (Some(handler), Some(controller)) = (
+            self.registry_access_handler.as_mut(),
+            self.project_controller.as_mut(),
+        ) {
+            if let Ok(mut registry) = controller.registry_access() {
+                handler(&mut registry);
+            }
+        }
         self.sync_unsaved_notifications();
         if self.project_directory_watcher.is_some() {
             ui.ctx()
