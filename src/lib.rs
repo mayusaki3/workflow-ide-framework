@@ -251,6 +251,122 @@ struct ControllerPropertyLink {
     property_panel_id: String,
 }
 
+
+#[cfg(test)]
+mod registry_callback_tests {
+    use super::*;
+    use crate::{
+        project::ProjectContext,
+        project_adapter::ApplicationProjectAdapter,
+        project_controller::ProjectCommandResult,
+        project_resource::{
+            NewProjectStoragePolicy, ProjectDataCompatibility, ProjectDataConsistency,
+            ResourceReference, ResourceScope,
+        },
+        project_save::ApplicationSaveResult,
+    };
+
+    struct Adapter;
+    impl ApplicationProjectAdapter for Adapter {
+        type Error = &'static str;
+
+        fn initialize_project(&mut self, _: &ProjectContext) -> Result<(), Self::Error> {
+            Ok(())
+        }
+        fn inspect_project_data(
+            &mut self,
+            _: &ProjectContext,
+            _: Option<&str>,
+        ) -> Result<ProjectDataCompatibility, Self::Error> {
+            Ok(ProjectDataCompatibility::Compatible)
+        }
+        fn check_project_consistency(
+            &mut self,
+            _: &ProjectContext,
+        ) -> Result<ProjectDataConsistency, Self::Error> {
+            Ok(ProjectDataConsistency::Consistent)
+        }
+        fn save_project_data(
+            &mut self,
+            _: &ProjectContext,
+            _: &str,
+        ) -> Result<ApplicationSaveResult, Self::Error> {
+            Ok(ApplicationSaveResult {
+                data_version: Some("1".into()),
+            })
+        }
+        fn save_project_data_as(
+            &mut self,
+            _: Option<&ProjectContext>,
+            _: &ProjectContext,
+            _: &str,
+        ) -> Result<ApplicationSaveResult, Self::Error> {
+            Ok(ApplicationSaveResult {
+                data_version: Some("1".into()),
+            })
+        }
+    }
+
+    #[test]
+    fn reg_app_010_callback_only_runs_for_active_project_and_preserves_ids() {
+        let calls = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+        let recorded = calls.clone();
+        let application = Application::new("org.test.registry.callback", "Registry")
+            .on_registry_access(move |registry| {
+                let reference =
+                    ResourceReference::new(ResourceScope::Project, "models/robot.urdf").unwrap();
+                let id = registry.register(reference.clone()).unwrap();
+                assert_eq!(registry.find_by_id(&id).unwrap().reference, reference);
+                recorded.borrow_mut().push(id);
+            });
+        let mut handler = application.registry_access_handler;
+        let mut controller =
+            project_controller::ProjectController::new("org.test.registry.callback", "Registry");
+        assert!(!dispatch_registry_access(handler.as_mut(), Some(&mut controller)));
+        assert!(!dispatch_registry_access(handler.as_mut(), None));
+        assert!(calls.borrow().is_empty());
+
+        let unique = std::sync::atomic::AtomicU64::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "wfide-reg-callback-{}-{}",
+            std::process::id(),
+            unique.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&path).unwrap();
+        let context = ProjectContext::new(path.clone());
+        let mut adapter = Adapter;
+        assert_eq!(
+            controller.new_project(
+                "Registry",
+                "ja-JP",
+                None,
+                NewProjectStoragePolicy::Required,
+                Some(context.clone()),
+                &mut adapter,
+            ),
+            ProjectCommandResult::Completed
+        );
+        assert!(dispatch_registry_access(handler.as_mut(), Some(&mut controller)));
+        let id = calls.borrow()[0].clone();
+        assert!(controller.has_unsaved_changes());
+        assert!(dispatch_registry_access(handler.as_mut(), Some(&mut controller)));
+        assert_eq!(calls.borrow()[1], id);
+        assert_eq!(
+            controller.save(&mut adapter, "reg-app-010", "2026-10-19T00:00:00Z"),
+            ProjectCommandResult::Completed
+        );
+        assert_eq!(controller.close(false), ProjectCommandResult::Completed);
+        assert!(!dispatch_registry_access(handler.as_mut(), Some(&mut controller)));
+        assert_eq!(
+            controller.open(context, &mut adapter),
+            ProjectCommandResult::Completed
+        );
+        assert!(dispatch_registry_access(handler.as_mut(), Some(&mut controller)));
+        assert_eq!(calls.borrow()[2], id);
+        let _ = std::fs::remove_dir_all(path);
+    }
+}
+
 type RegistryAccessHandler = Box<dyn FnMut(&mut project_controller::RegistryAccess<'_>)>;
 
 fn dispatch_registry_access(
