@@ -1,8 +1,8 @@
 use workflow_ide_framework::{
     project_resource::{ResourceReference, ResourceScope},
     resource_delete::{
-        ApplicationDeleteReferenceInspector, DeleteDecision, DeleteReferences,
-        authorize_delete, inspect_delete,
+        ApplicationDeleteReferenceInspector, DeleteDecision, DeleteReferences, authorize_delete,
+        inspect_delete,
     },
 };
 
@@ -12,7 +12,7 @@ impl ApplicationDeleteReferenceInspector for Inspector {
     type Error = &'static str;
 
     fn count_resource_references(&mut self, _: &str) -> Result<Option<usize>, Self::Error> {
-        self.0.clone()
+        self.0
     }
 }
 
