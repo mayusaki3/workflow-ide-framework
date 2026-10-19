@@ -625,3 +625,65 @@ fn prepared_delete_cancel_blocks_both_routes_before_journal_or_application() {
         let _ = fs::remove_dir_all(base);
     }
 }
+
+#[test]
+fn confirmed_prepared_delete_executes_accepted_and_handled_routes() {
+    use workflow_ide_framework::{
+        resource_delete::{DeleteConfirmation, DeleteDecision, DeleteReferences},
+        resource_executor::execute_confirmed_prepared_delete,
+    };
+    for handled in [false, true] {
+        let label = if handled { "handled" } else { "accepted" };
+        let (base, context, roots) = setup(&format!("confirmed-prepared-{label}"));
+        fs::write(roots.project.join("item.txt"), b"original").unwrap();
+        let reference = p("item.txt");
+        let mut registry = ResourceRegistry::default();
+        registry.register("stable", reference.clone());
+        let mut uses = vec![FrameworkResourceUse {
+            owner_id: "editor".into(),
+            reference: reference.clone(),
+        }];
+        let plan = ResourceOperationPlan {
+            operation_id: format!("confirmed-delete-{label}"),
+            kind: ResourceOperationKind::Delete,
+            items: vec![ResourceOperationItem {
+                before: Some(reference.clone()),
+                after: None,
+            }],
+        };
+        let confirmation = DeleteConfirmation {
+            resource_id: "stable".into(),
+            reference: reference.clone(),
+            references: DeleteReferences::Known(1),
+        };
+        let prepared = if handled {
+            PreparedResourceOperation::Handled { journal_data: None }
+        } else {
+            PreparedResourceOperation::Accepted { journal_data: None }
+        };
+        let mut app = ConvertingApp {
+            executed: false,
+            saw_journal: false,
+            fail: false,
+        };
+        execute_confirmed_prepared_delete(
+            &mut app,
+            &context,
+            &roots,
+            &mut registry,
+            &mut uses,
+            &plan,
+            prepared,
+            &confirmation,
+            DeleteDecision::Confirm,
+            || "unused".into(),
+        )
+        .unwrap();
+        assert_eq!(app.executed, handled);
+        assert!(registry.find_by_id("stable").is_none());
+        assert_eq!(uses[0].reference, reference);
+        assert_eq!(roots.project.join("item.txt").exists(), handled);
+        assert!(!journal_path(&context).exists());
+        let _ = fs::remove_dir_all(base);
+    }
+}
