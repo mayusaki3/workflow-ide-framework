@@ -9,7 +9,10 @@ pub enum DeleteReferences {
 
 pub trait ApplicationDeleteReferenceInspector {
     type Error;
-    fn count_resource_references(&mut self, resource_id: &str) -> Result<Option<usize>, Self::Error>;
+    fn count_resource_references(
+        &mut self,
+        resource_id: &str,
+    ) -> Result<Option<usize>, Self::Error>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,7 +34,8 @@ pub fn inspect_delete<I: ApplicationDeleteReferenceInspector>(
     resource_id: &str,
     reference: &ResourceReference,
 ) -> DeleteConfirmation {
-    let references = match inspector.and_then(|app| app.count_resource_references(resource_id).ok()) {
+    let references = match inspector.and_then(|app| app.count_resource_references(resource_id).ok())
+    {
         Some(Some(count)) => DeleteReferences::Known(count),
         _ => DeleteReferences::Unknown,
     };
