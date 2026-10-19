@@ -26,6 +26,7 @@ pub mod project_panel_api;
 pub mod project_resource;
 pub mod project_save;
 pub mod project_save_as;
+pub mod project_save_generation;
 pub mod property_panel;
 pub mod recent_projects;
 pub mod resource_delete;
