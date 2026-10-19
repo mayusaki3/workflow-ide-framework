@@ -253,6 +253,19 @@ struct ControllerPropertyLink {
 
 type RegistryAccessHandler = Box<dyn FnMut(&mut project_controller::RegistryAccess<'_>)>;
 
+fn dispatch_registry_access(
+    handler: Option<&mut RegistryAccessHandler>,
+    controller: Option<&mut project_controller::ProjectController>,
+) -> bool {
+    if let (Some(handler), Some(controller)) = (handler, controller)
+        && let Ok(mut registry) = controller.registry_access()
+    {
+        handler(&mut registry);
+        return true;
+    }
+    false
+}
+
 pub struct Application {
     unsaved_notification: unsaved_notification::UnsavedNotification,
     config: ApplicationConfig,
@@ -2888,13 +2901,10 @@ impl Drop for FrameworkHost {
 impl eframe::App for FrameworkHost {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         logging::set_dialog_repaint_context(Some(ui.ctx().clone()));
-        if let (Some(handler), Some(controller)) = (
+        dispatch_registry_access(
             self.registry_access_handler.as_mut(),
             self.project_controller.as_mut(),
-        ) && let Ok(mut registry) = controller.registry_access()
-        {
-            handler(&mut registry);
-        }
+        );
         self.sync_unsaved_notifications();
         if self.project_directory_watcher.is_some() {
             ui.ctx()
