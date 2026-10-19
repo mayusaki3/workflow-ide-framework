@@ -558,7 +558,10 @@ fn move_to_registered_destination_is_rejected_before_file_move() {
     ));
     assert_eq!(registry, original);
     assert_eq!(uses[0].reference, p("old.txt"));
-    assert_eq!(fs::read(roots.project.join("old.txt")).unwrap(), b"original");
+    assert_eq!(
+        fs::read(roots.project.join("old.txt")).unwrap(),
+        b"original"
+    );
     assert!(!roots.project.join("target.txt").exists());
     assert!(!journal_path(&context).exists());
     let _ = fs::remove_dir_all(base);
