@@ -28,6 +28,7 @@ pub mod project_save;
 pub mod project_save_as;
 pub mod property_panel;
 pub mod recent_projects;
+pub mod resource_delete;
 pub mod resource_journal;
 pub mod resource_operation;
 pub mod resource_registry;
