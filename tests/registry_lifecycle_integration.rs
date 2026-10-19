@@ -495,9 +495,11 @@ impl ApplicationProjectPanelProvider for RegistryActionProvider {
             AppPanelAction::ContextAction { action_id, .. } if action_id == "rename" => {
                 let id = self.resource_id.as_deref().unwrap();
                 assert!(registry.find_by_id(id).is_some());
-                assert!(registry
-                    .update_reference(id, reference("models/renamed.urdf"))
-                    .unwrap());
+                assert!(
+                    registry
+                        .update_reference(id, reference("models/renamed.urdf"))
+                        .unwrap()
+                );
                 AppPanelActionResult::Handled
             }
             _ => AppPanelActionResult::NotHandled,
@@ -528,10 +530,13 @@ fn reg_app_009_project_panel_provider_registers_and_updates_framework_registry()
             ),
             AppPanelActionResult::Handled
         );
-        let id = provider.resource_id.as_ref().unwrap();
+        let id = provider.resource_id.clone().unwrap();
         assert_eq!(
-            registry.find_by_reference(&reference("models/robot.urdf")).unwrap().resource_id,
-            *id
+            registry
+                .find_by_reference(&reference("models/robot.urdf"))
+                .unwrap()
+                .resource_id,
+            id
         );
         assert_eq!(
             provider.handle_project_panel_action_with_registry(
@@ -545,7 +550,7 @@ fn reg_app_009_project_panel_provider_registers_and_updates_framework_registry()
             AppPanelActionResult::Handled
         );
         assert_eq!(
-            registry.find_by_id(id).unwrap().reference,
+            registry.find_by_id(&id).unwrap().reference,
             reference("models/renamed.urdf")
         );
     }
