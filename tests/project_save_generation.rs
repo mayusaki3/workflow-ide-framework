@@ -3,8 +3,8 @@ use workflow_ide_framework::{
     project::ProjectContext,
     project_save_generation::{
         GenerationError, begin_generation, commit_generation, committed_path, generation_path,
-        promote_generation, read_committed_generation, staging_path, validate_and_commit_generation,
-        validate_generation_contents,
+        promote_generation, read_committed_generation, staging_path,
+        validate_and_commit_generation, validate_generation_contents,
     },
 };
 
@@ -237,7 +237,9 @@ fn save_cons_validated_publish_preserves_pointer_on_failure() {
     ));
     assert!(matches!(
         validate_and_commit_generation(&context, "new", "org.example.test", "save-new", |_| {
-            Err(GenerationError::InvalidCandidate("application rejected".into()))
+            Err(GenerationError::InvalidCandidate(
+                "application rejected".into(),
+            ))
         }),
         Err(GenerationError::InvalidCandidate(_))
     ));
