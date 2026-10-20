@@ -89,7 +89,7 @@ fn require_complete(path: &Path) -> Result<(), GenerationError> {
 }
 
 /// Promote a complete candidate without changing the currently committed ID.
-pub fn promote_generation(context: &ProjectContext, id: &str) -> Result<(), GenerationError> {
+fn promote_generation(context: &ProjectContext, id: &str) -> Result<(), GenerationError> {
     let source = staging_path(context, id)?;
     let target = generation_path(context, id)?;
     if target.exists() {
@@ -104,7 +104,7 @@ pub fn promote_generation(context: &ProjectContext, id: &str) -> Result<(), Gene
 }
 
 /// Commit a previously promoted generation. Never points to an incomplete candidate.
-pub fn commit_generation(context: &ProjectContext, id: &str) -> Result<(), GenerationError> {
+fn commit_generation(context: &ProjectContext, id: &str) -> Result<(), GenerationError> {
     let path = generation_path(context, id)?;
     if !path.is_dir() {
         return Err(GenerationError::MissingCandidate);
