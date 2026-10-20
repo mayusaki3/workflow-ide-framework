@@ -201,3 +201,25 @@ where
     promote_generation(context, generation_id)?;
     commit_generation(context, generation_id)
 }
+
+/// Resolve the committed generation only after verifying its stored contents.
+/// A corrupt committed generation is an error; it must never trigger legacy fallback.
+pub fn read_validated_committed_generation<F>(
+    context: &ProjectContext,
+    expected_application_id: &str,
+    validate_application: F,
+) -> Result<Option<CommittedGeneration>, GenerationError>
+where
+    F: FnOnce(&Path) -> Result<(), GenerationError>,
+{
+    let Some(marker) = read_committed_generation(context)? else {
+        return Ok(None);
+    };
+    let path = generation_path(context, &marker.generation_id)?;
+    let project_text = fs::read_to_string(path.join("project.toml"))?;
+    let project = ProjectFile::from_toml(&project_text, expected_application_id)
+        .map_err(|e| GenerationError::InvalidCandidate(format!("project.toml: {e:?}")))?;
+    validate_generation_contents(&path, expected_application_id, &project.project.save_id)?;
+    validate_application(&path.join("application"))?;
+    Ok(Some(marker))
+}
