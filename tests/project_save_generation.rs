@@ -3,7 +3,7 @@ use workflow_ide_framework::{
     project::ProjectContext,
     project_save_generation::{
         GenerationError, begin_generation, commit_generation, committed_path, generation_path,
-        promote_generation, read_committed_generation, staging_path,
+        promote_generation, read_committed_generation, read_validated_committed_generation, staging_path,
         validate_and_commit_generation, validate_generation_contents,
     },
 };
@@ -261,5 +261,45 @@ fn save_cons_validated_publish_preserves_pointer_on_failure() {
             .generation_id,
         "new"
     );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn save_cons_read_rejects_corrupt_committed_contents_without_fallback() {
+    let (root, context) = setup("validated-read");
+    assert!(read_validated_committed_generation(&context, "org.example.test", |_| Ok(()))
+        .unwrap()
+        .is_none());
+    let stage = begin_generation(&context, "good").unwrap();
+    complete_valid(&stage, "save-good");
+    validate_and_commit_generation(&context, "good", "org.example.test", "save-good", |_| Ok(()))
+        .unwrap();
+    assert_eq!(
+        read_validated_committed_generation(&context, "org.example.test", |app| {
+            assert!(app.join("catalog.json").is_file());
+            Ok(())
+        })
+        .unwrap()
+        .unwrap()
+        .generation_id,
+        "good"
+    );
+    assert!(matches!(
+        read_validated_committed_generation(&context, "wrong.application", |_| Ok(())),
+        Err(GenerationError::InvalidCandidate(_))
+    ));
+    assert!(matches!(
+        read_validated_committed_generation(&context, "org.example.test", |_| {
+            Err(GenerationError::InvalidCandidate("invalid app data".into()))
+        }),
+        Err(GenerationError::InvalidCandidate(_))
+    ));
+    let committed = generation_path(&context, "good").unwrap();
+    fs::write(committed.join("framework_settings.toml"), "format_version = 1\nsave_id = 'wrong'\n")
+        .unwrap();
+    assert!(matches!(
+        read_validated_committed_generation(&context, "org.example.test", |_| Ok(())),
+        Err(GenerationError::InvalidCandidate(_))
+    ));
     fs::remove_dir_all(root).unwrap();
 }
