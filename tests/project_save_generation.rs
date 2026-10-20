@@ -170,7 +170,11 @@ fn save_cons_rejects_invalid_project_and_mismatched_save_ids() {
         save_id: Some("generation-42".into()),
         ..Default::default()
     };
-    fs::write(stage.join("framework_settings.toml"), settings.to_toml().unwrap()).unwrap();
+    fs::write(
+        stage.join("framework_settings.toml"),
+        settings.to_toml().unwrap(),
+    )
+    .unwrap();
     validate_generation_contents(&stage, "org.example.test", "generation-42").unwrap();
     assert!(matches!(
         validate_generation_contents(&stage, "org.example.other", "generation-42"),

@@ -2,8 +2,8 @@
 //! A generation is visible only after its complete directory is promoted and
 //! its commit pointer is atomically replaced.
 use crate::{
-    framework_settings::{FrameworkSettings, FRAMEWORK_SETTINGS_FORMAT_VERSION},
-    project::{ProjectContext, ProjectFile, PROJECT_FORMAT_VERSION},
+    framework_settings::{FRAMEWORK_SETTINGS_FORMAT_VERSION, FrameworkSettings},
+    project::{PROJECT_FORMAT_VERSION, ProjectContext, ProjectFile},
     project_io::atomic_write,
 };
 use serde::{Deserialize, Serialize};
@@ -164,8 +164,9 @@ pub fn validate_generation_contents(
         ));
     }
     let framework_text = fs::read_to_string(path.join("framework_settings.toml"))?;
-    let framework = FrameworkSettings::from_toml(&framework_text)
-        .map_err(|e| GenerationError::InvalidCandidate(format!("framework_settings.toml: {e:?}")))?;
+    let framework = FrameworkSettings::from_toml(&framework_text).map_err(|e| {
+        GenerationError::InvalidCandidate(format!("framework_settings.toml: {e:?}"))
+    })?;
     if framework.format_version != FRAMEWORK_SETTINGS_FORMAT_VERSION
         || framework.save_id.as_deref() != Some(expected_save_id)
     {
