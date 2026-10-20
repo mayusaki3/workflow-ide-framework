@@ -176,3 +176,28 @@ pub fn validate_generation_contents(
     }
     Ok(())
 }
+
+/// Validate and publish a staged generation as one controlled operation.
+///
+/// The application callback must validate the staged application directory
+/// without modifying the committed generation or legacy project files.
+/// On validation failure, the committed pointer is left unchanged.
+pub fn validate_and_commit_generation<F>(
+    context: &ProjectContext,
+    generation_id: &str,
+    expected_application_id: &str,
+    expected_save_id: &str,
+    validate_application: F,
+) -> Result<(), GenerationError>
+where
+    F: FnOnce(&Path) -> Result<(), GenerationError>,
+{
+    let stage = staging_path(context, generation_id)?;
+    if !stage.is_dir() {
+        return Err(GenerationError::MissingCandidate);
+    }
+    validate_generation_contents(&stage, expected_application_id, expected_save_id)?;
+    validate_application(&stage.join("application"))?;
+    promote_generation(context, generation_id)?;
+    commit_generation(context, generation_id)
+}
