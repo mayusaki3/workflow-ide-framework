@@ -3,7 +3,7 @@ use workflow_ide_framework::{
     project::ProjectContext,
     project_save_generation::{
         GenerationError, begin_generation, committed_path, generation_path,
-        read_committed_generation, read_validated_committed_generation, staging_path,
+        read_committed_generation, read_validated_committed_generation, resolve_validated_committed_paths, staging_path,
         validate_and_commit_generation, validate_generation_contents,
     },
 };
@@ -333,6 +333,50 @@ fn save_cons_read_rejects_corrupt_committed_contents_without_fallback() {
     assert!(matches!(
         read_validated_committed_generation(&context, "org.example.test", |_| Ok(())),
         Err(GenerationError::InvalidCandidate(_))
+    ));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn save_cons_resolved_paths_are_generation_scoped_not_legacy_layout() {
+    let (root, context) = setup("resolved-paths");
+    assert!(
+        resolve_validated_committed_paths(&context, "org.example.test", |_| Ok(()))
+            .unwrap()
+            .is_none()
+    );
+    let stage = begin_generation(&context, "snapshot").unwrap();
+    complete_valid(&stage, "save-snapshot");
+    validate_and_commit_generation(
+        &context,
+        "snapshot",
+        "org.example.test",
+        "save-snapshot",
+        |_| Ok(()),
+    )
+    .unwrap();
+    let resolved =
+        resolve_validated_committed_paths(&context, "org.example.test", |application| {
+            assert!(application.join("catalog.json").is_file());
+            Ok(())
+        })
+        .unwrap()
+        .unwrap();
+    let generation = generation_path(&context, "snapshot").unwrap();
+    assert_eq!(resolved.generation_id, "snapshot");
+    assert_eq!(resolved.project_file, generation.join("project.toml"));
+    assert_eq!(
+        resolved.framework_settings,
+        generation.join("framework_settings.toml")
+    );
+    assert_eq!(resolved.application_directory, generation.join("application"));
+    assert_ne!(resolved.project_file, context.project_file_path());
+    assert_ne!(resolved.framework_settings, context.framework_settings_path());
+    assert_ne!(resolved.application_directory, context.application_directory());
+    fs::write(committed_path(&context), "invalid = [").unwrap();
+    assert!(matches!(
+        resolve_validated_committed_paths(&context, "org.example.test", |_| Ok(())),
+        Err(GenerationError::InvalidCommit(_))
     ));
     fs::remove_dir_all(root).unwrap();
 }
