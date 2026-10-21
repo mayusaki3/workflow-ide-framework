@@ -32,6 +32,19 @@ pub trait ApplicationProjectAdapter {
         context: &ProjectContext,
     ) -> Result<ProjectDataConsistency, Self::Error>;
 
+    /// Inspect a committed generation using its isolated application directory.
+    /// The project_root remains the stable project location for shared resources.
+    /// None means the adapter has not opted in to generation-aware opening.
+    /// Implementations must not modify persisted data during inspection.
+    fn inspect_project_data_generation(
+        &mut self,
+        _project_root: &ProjectContext,
+        _generation: &ProjectContext,
+        _stored_data_version: Option<&str>,
+    ) -> Result<Option<(ProjectDataCompatibility, ProjectDataConsistency)>, Self::Error> {
+        Ok(None)
+    }
+
     fn save_project_data(
         &mut self,
         context: &ProjectContext,
