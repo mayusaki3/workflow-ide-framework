@@ -3,8 +3,8 @@ use crate::{
     project::{ProjectContext, ProjectFile, ProjectFileError},
     project_lifecycle::{ProjectSession, ProjectStorageState},
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
-    resource_journal::ResourceOperationJournal,
     project_save_generation::{GenerationError, read_committed_generation},
+    resource_journal::ResourceOperationJournal,
 };
 use std::{fs, io};
 
