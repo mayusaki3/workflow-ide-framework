@@ -492,3 +492,173 @@ fn committed_generation_never_opens_stale_legacy_files() {
     assert!(app.seen_version.is_none());
     fs::remove_dir_all(r).unwrap();
 }
+
+
+struct GenerationInspector {
+    enabled: bool,
+    called: bool,
+}
+
+impl workflow_ide_framework::project_adapter::ApplicationProjectAdapter for GenerationInspector {
+    type Error = &'static str;
+
+    fn initialize_project(&mut self, _: &ProjectContext) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn inspect_project_data(
+        &mut self,
+        _: &ProjectContext,
+        _: Option<&str>,
+    ) -> Result<ProjectDataCompatibility, Self::Error> {
+        panic!("legacy inspection must never run for a committed generation")
+    }
+
+    fn check_project_consistency(
+        &mut self,
+        _: &ProjectContext,
+    ) -> Result<ProjectDataConsistency, Self::Error> {
+        panic!("legacy consistency must never run for a committed generation")
+    }
+
+    fn inspect_project_data_generation(
+        &mut self,
+        project_root: &ProjectContext,
+        generation: &ProjectContext,
+        version: Option<&str>,
+    ) -> Result<Option<(ProjectDataCompatibility, ProjectDataConsistency)>, Self::Error> {
+        self.called = true;
+        if !self.enabled {
+            return Ok(None);
+        }
+        assert_ne!(project_root.root(), generation.root());
+        assert_eq!(version, Some("generation-v1"));
+        assert_eq!(
+            fs::read_to_string(generation.application_directory().join("catalog.json")).unwrap(),
+            "generation-data"
+        );
+        assert_eq!(
+            fs::read_to_string(project_root.application_directory().join("catalog.json")).unwrap(),
+            "stale-legacy"
+        );
+        Ok(Some((
+            ProjectDataCompatibility::Compatible,
+            ProjectDataConsistency::Consistent,
+        )))
+    }
+
+    fn save_project_data(
+        &mut self,
+        _: &ProjectContext,
+        _: &str,
+    ) -> Result<workflow_ide_framework::project_save::ApplicationSaveResult, Self::Error> {
+        panic!("save must not run during inspection")
+    }
+
+    fn save_project_data_as(
+        &mut self,
+        _: Option<&ProjectContext>,
+        _: &ProjectContext,
+        _: &str,
+    ) -> Result<workflow_ide_framework::project_save::ApplicationSaveResult, Self::Error> {
+        panic!("save-as must not run during inspection")
+    }
+}
+
+fn committed_fixture(name: &str) -> (PathBuf, ProjectContext) {
+    use workflow_ide_framework::project_save_generation::{
+        begin_generation, validate_and_commit_generation,
+    };
+    let r = root(name);
+    let context = ProjectContext::new(&r);
+    fs::create_dir_all(context.application_directory()).unwrap();
+    fs::write(context.application_directory().join("catalog.json"), "stale-legacy").unwrap();
+    let stage = begin_generation(&context, "snapshot").unwrap();
+    fs::create_dir_all(stage.join("application")).unwrap();
+    fs::write(stage.join("application/catalog.json"), "generation-data").unwrap();
+    let project = ProjectFile {
+        project: ProjectMetadata {
+            format_version: PROJECT_FORMAT_VERSION,
+            name: "Generation Project".into(),
+            description: None,
+            language: "en-US".into(),
+            save_id: "generation-save".into(),
+            saved_at: "now".into(),
+        },
+        application: ApplicationMetadata {
+            id: "org.example.open".into(),
+            name: "Open App".into(),
+            description: None,
+            language: "en-US".into(),
+            data_version: Some("generation-v1".into()),
+        },
+    };
+    fs::write(stage.join("project.toml"), project.to_toml().unwrap()).unwrap();
+    let settings = FrameworkSettings {
+        save_id: Some("generation-save".into()),
+        ..Default::default()
+    };
+    fs::write(stage.join("framework_settings.toml"), settings.to_toml().unwrap()).unwrap();
+    validate_and_commit_generation(
+        &context,
+        "snapshot",
+        "org.example.open",
+        "generation-save",
+        |_| Ok(()),
+    ).unwrap();
+    (r, context)
+}
+
+#[test]
+fn committed_inspection_uses_only_generation_snapshot() {
+    use workflow_ide_framework::project_open::inspect_committed_generation;
+    let (r, context) = committed_fixture("inspect-generation");
+    let mut app = GenerationInspector { enabled: true, called: false };
+    let result = inspect_committed_generation(&context, "org.example.open", &mut app)
+        .unwrap().unwrap();
+    assert!(app.called);
+    assert_eq!(result.project_file.project.name, "Generation Project");
+    assert_eq!(result.project_file.project.save_id, "generation-save");
+    assert!(matches!(result.framework_settings, FrameworkSettingsOpen::Loaded(ref s) if s.save_id.as_deref() == Some("generation-save")));
+    fs::remove_dir_all(r).unwrap();
+}
+
+#[test]
+fn committed_inspection_rejects_adapter_without_generation_support() {
+    use workflow_ide_framework::project_open::{inspect_committed_generation, ProjectOpenError};
+    let (r, context) = committed_fixture("inspect-unsupported");
+    let mut app = GenerationInspector { enabled: false, called: false };
+    assert!(matches!(
+        inspect_committed_generation(&context, "org.example.open", &mut app),
+        Err(ProjectOpenError::GenerationOpenNotSupported)
+    ));
+    assert!(app.called);
+    fs::remove_dir_all(r).unwrap();
+}
+
+#[test]
+fn committed_inspection_rejects_corrupt_snapshot_before_adapter() {
+    use workflow_ide_framework::project_open::{inspect_committed_generation, ProjectOpenError};
+    use workflow_ide_framework::project_save_generation::generation_path;
+    let (r, context) = committed_fixture("inspect-corrupt");
+    let snapshot = generation_path(&context, "snapshot").unwrap();
+    fs::write(snapshot.join("framework_settings.toml"), "format_version = 1\nsave_id = 'other'\n").unwrap();
+    let mut app = GenerationInspector { enabled: true, called: false };
+    assert!(matches!(
+        inspect_committed_generation(&context, "org.example.open", &mut app),
+        Err(ProjectOpenError::Generation(_))
+    ));
+    assert!(!app.called);
+    fs::remove_dir_all(r).unwrap();
+}
+
+#[test]
+fn committed_inspection_returns_none_for_legacy_project() {
+    use workflow_ide_framework::project_open::inspect_committed_generation;
+    let r = root("inspect-legacy");
+    let context = ProjectContext::new(&r);
+    let mut app = GenerationInspector { enabled: true, called: false };
+    assert!(inspect_committed_generation(&context, "org.example.open", &mut app).unwrap().is_none());
+    assert!(!app.called);
+    fs::remove_dir_all(r).unwrap();
+}
