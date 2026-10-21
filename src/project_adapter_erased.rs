@@ -19,6 +19,12 @@ pub trait ErasedApplicationProjectAdapter {
         &mut self,
         context: &ProjectContext,
     ) -> Result<ProjectDataConsistency, String>;
+    fn inspect_project_data_generation(
+        &mut self,
+        project_root: &ProjectContext,
+        generation: &ProjectContext,
+        stored_data_version: Option<&str>,
+    ) -> Result<Option<(ProjectDataCompatibility, ProjectDataConsistency)>, String>;
     fn save_project_data(
         &mut self,
         context: &ProjectContext,
@@ -62,6 +68,21 @@ impl<A: ApplicationProjectAdapter> ErasedApplicationProjectAdapter for A {
     ) -> Result<ProjectDataConsistency, String> {
         ApplicationProjectAdapter::check_project_consistency(self, context)
             .map_err(|e| e.to_string())
+    }
+
+    fn inspect_project_data_generation(
+        &mut self,
+        project_root: &ProjectContext,
+        generation: &ProjectContext,
+        stored_data_version: Option<&str>,
+    ) -> Result<Option<(ProjectDataCompatibility, ProjectDataConsistency)>, String> {
+        ApplicationProjectAdapter::inspect_project_data_generation(
+            self,
+            project_root,
+            generation,
+            stored_data_version,
+        )
+        .map_err(|e| e.to_string())
     }
 
     fn save_project_data(
