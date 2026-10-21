@@ -3,8 +3,9 @@ use workflow_ide_framework::{
     project::ProjectContext,
     project_save_generation::{
         GenerationError, begin_generation, committed_path, generation_path,
-        read_committed_generation, read_validated_committed_generation, resolve_validated_committed_paths, staging_path,
-        validate_and_commit_generation, validate_generation_contents,
+        read_committed_generation, read_validated_committed_generation,
+        resolve_validated_committed_paths, staging_path, validate_and_commit_generation,
+        validate_generation_contents,
     },
 };
 
@@ -355,13 +356,12 @@ fn save_cons_resolved_paths_are_generation_scoped_not_legacy_layout() {
         |_| Ok(()),
     )
     .unwrap();
-    let resolved =
-        resolve_validated_committed_paths(&context, "org.example.test", |application| {
-            assert!(application.join("catalog.json").is_file());
-            Ok(())
-        })
-        .unwrap()
-        .unwrap();
+    let resolved = resolve_validated_committed_paths(&context, "org.example.test", |application| {
+        assert!(application.join("catalog.json").is_file());
+        Ok(())
+    })
+    .unwrap()
+    .unwrap();
     let generation = generation_path(&context, "snapshot").unwrap();
     assert_eq!(resolved.generation_id, "snapshot");
     assert_eq!(resolved.project_file, generation.join("project.toml"));
@@ -369,10 +369,19 @@ fn save_cons_resolved_paths_are_generation_scoped_not_legacy_layout() {
         resolved.framework_settings,
         generation.join("framework_settings.toml")
     );
-    assert_eq!(resolved.application_directory, generation.join("application"));
+    assert_eq!(
+        resolved.application_directory,
+        generation.join("application")
+    );
     assert_ne!(resolved.project_file, context.project_file_path());
-    assert_ne!(resolved.framework_settings, context.framework_settings_path());
-    assert_ne!(resolved.application_directory, context.application_directory());
+    assert_ne!(
+        resolved.framework_settings,
+        context.framework_settings_path()
+    );
+    assert_ne!(
+        resolved.application_directory,
+        context.application_directory()
+    );
     fs::write(committed_path(&context), "invalid = [").unwrap();
     assert!(matches!(
         resolve_validated_committed_paths(&context, "org.example.test", |_| Ok(())),

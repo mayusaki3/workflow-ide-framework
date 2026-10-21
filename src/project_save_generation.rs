@@ -251,7 +251,8 @@ where
         context,
         expected_application_id,
         validate_application,
-    )? else {
+    )?
+    else {
         return Ok(None);
     };
     let root = generation_path(context, &marker.generation_id)?;
