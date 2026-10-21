@@ -445,3 +445,33 @@ fn invalid_resource_journal_is_reported_without_failing_project_parse() {
     assert!(open_can_continue(&result));
     let _ = fs::remove_dir_all(r);
 }
+
+#[test]
+fn committed_generation_never_opens_stale_legacy_files() {
+    use workflow_ide_framework::project_open::ProjectOpenError;
+    use workflow_ide_framework::project_save_generation::committed_path;
+    let r = root("generation-block");
+    let context = ProjectContext::new(&r);
+    write_project(&context, None);
+    let mut app = Inspector {
+        seen_version: None,
+        compatibility: ProjectDataCompatibility::Compatible,
+        consistency: ProjectDataConsistency::Consistent,
+    };
+    let pointer = committed_path(&context);
+    fs::create_dir_all(pointer.parent().unwrap()).unwrap();
+    fs::write(&pointer, "format_version = 1\ngeneration_id = 'snapshot'\n").unwrap();
+    assert!(matches!(
+        open_project(&context, "org.example.open", &mut app),
+        Err(ProjectOpenError::Generation(_))
+    ));
+    fs::create_dir_all(context.framework_directory().join("save-generations/snapshot/application")).unwrap();
+    fs::write(context.framework_directory().join("save-generations/snapshot/project.toml"), "test").unwrap();
+    fs::write(context.framework_directory().join("save-generations/snapshot/framework_settings.toml"), "test").unwrap();
+    assert!(matches!(
+        open_project(&context, "org.example.open", &mut app),
+        Err(ProjectOpenError::GenerationOpenNotSupported)
+    ));
+    assert!(app.seen_version.is_none());
+    fs::remove_dir_all(r).unwrap();
+}
