@@ -3,8 +3,8 @@ use workflow_ide_framework::{
     project::ProjectContext,
     project_save_generation::{
         GenerationError, begin_generation, committed_path, generation_path,
-        read_committed_generation, read_validated_committed_generation,
-        staging_path, validate_and_commit_generation, validate_generation_contents,
+        read_committed_generation, read_validated_committed_generation, staging_path,
+        validate_and_commit_generation, validate_generation_contents,
     },
 };
 
@@ -30,7 +30,14 @@ fn save_cons_001_commits_only_complete_generation() {
     let staging = begin_generation(&context, "generation-1").unwrap();
     complete_valid(&staging, "save-1");
     assert!(read_committed_generation(&context).unwrap().is_none());
-    validate_and_commit_generation(&context, "generation-1", "org.example.test", "save-1", |_| Ok(())).unwrap();
+    validate_and_commit_generation(
+        &context,
+        "generation-1",
+        "org.example.test",
+        "save-1",
+        |_| Ok(()),
+    )
+    .unwrap();
     assert_eq!(
         read_committed_generation(&context)
             .unwrap()
@@ -51,7 +58,8 @@ fn save_cons_001_commits_only_complete_generation() {
 fn save_cons_004_uncommitted_candidate_does_not_replace_previous_generation() {
     let (root, context) = setup("interrupt");
     complete_valid(&begin_generation(&context, "old").unwrap(), "save-old");
-    validate_and_commit_generation(&context, "old", "org.example.test", "save-old", |_| Ok(())).unwrap();
+    validate_and_commit_generation(&context, "old", "org.example.test", "save-old", |_| Ok(()))
+        .unwrap();
     complete_valid(&begin_generation(&context, "new").unwrap(), "save-new");
     assert_eq!(
         read_committed_generation(&context)
@@ -60,7 +68,11 @@ fn save_cons_004_uncommitted_candidate_does_not_replace_previous_generation() {
             .generation_id,
         "old"
     );
-    fs::rename(staging_path(&context, "new").unwrap(), generation_path(&context, "new").unwrap()).unwrap();
+    fs::rename(
+        staging_path(&context, "new").unwrap(),
+        generation_path(&context, "new").unwrap(),
+    )
+    .unwrap();
     assert_eq!(
         read_committed_generation(&context)
             .unwrap()
@@ -70,7 +82,10 @@ fn save_cons_004_uncommitted_candidate_does_not_replace_previous_generation() {
     );
     assert!(generation_path(&context, "new").unwrap().is_dir());
     assert_eq!(
-        read_committed_generation(&context).unwrap().unwrap().generation_id,
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
         "old"
     );
     assert!(generation_path(&context, "old").unwrap().is_dir());
@@ -82,11 +97,23 @@ fn save_cons_003_incomplete_candidate_cannot_be_promoted_or_committed() {
     let (root, context) = setup("incomplete");
     begin_generation(&context, "partial").unwrap();
     assert!(matches!(
-        validate_and_commit_generation(&context, "partial", "org.example.test", "save-partial", |_| Ok(())),
+        validate_and_commit_generation(
+            &context,
+            "partial",
+            "org.example.test",
+            "save-partial",
+            |_| Ok(())
+        ),
         Err(GenerationError::IncompleteCandidate)
     ));
     assert!(matches!(
-        validate_and_commit_generation(&context, "missing", "org.example.test", "save-missing", |_| Ok(())),
+        validate_and_commit_generation(
+            &context,
+            "missing",
+            "org.example.test",
+            "save-missing",
+            |_| Ok(())
+        ),
         Err(GenerationError::MissingCandidate)
     ));
     assert!(read_committed_generation(&context).unwrap().is_none());
