@@ -223,3 +223,42 @@ where
     validate_application(&path.join("application"))?;
     Ok(Some(marker))
 }
+
+/// The physical paths of the validated committed snapshot.
+///
+/// These paths are intentionally explicit: a generation stores framework
+/// settings at its root, unlike the legacy ProjectContext layout.
+/// Callers must not treat a generation directory as a legacy project root.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommittedGenerationPaths {
+    pub generation_id: String,
+    pub project_file: PathBuf,
+    pub framework_settings: PathBuf,
+    pub application_directory: PathBuf,
+}
+
+/// Resolve a validated committed snapshot, or None only for a legacy project.
+/// An invalid commit pointer or invalid generation is never a legacy fallback.
+pub fn resolve_validated_committed_paths<F>(
+    context: &ProjectContext,
+    expected_application_id: &str,
+    validate_application: F,
+) -> Result<Option<CommittedGenerationPaths>, GenerationError>
+where
+    F: FnOnce(&Path) -> Result<(), GenerationError>,
+{
+    let Some(marker) = read_validated_committed_generation(
+        context,
+        expected_application_id,
+        validate_application,
+    )? else {
+        return Ok(None);
+    };
+    let root = generation_path(context, &marker.generation_id)?;
+    Ok(Some(CommittedGenerationPaths {
+        generation_id: marker.generation_id,
+        project_file: root.join("project.toml"),
+        framework_settings: root.join("framework_settings.toml"),
+        application_directory: root.join("application"),
+    }))
+}
