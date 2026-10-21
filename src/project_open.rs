@@ -3,7 +3,9 @@ use crate::{
     project::{ProjectContext, ProjectFile, ProjectFileError},
     project_lifecycle::{ProjectSession, ProjectStorageState},
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
-    project_save_generation::{GenerationError, read_committed_generation, resolve_validated_committed_paths},
+    project_save_generation::{
+        GenerationError, read_committed_generation, resolve_validated_committed_paths,
+    },
     resource_journal::ResourceOperationJournal,
 };
 use std::{fs, io};
@@ -135,22 +137,27 @@ pub fn inspect_committed_generation(
     expected_application_id: &str,
     application: &mut dyn crate::project_adapter_erased::ErasedApplicationProjectAdapter,
 ) -> Result<Option<ProjectOpenResult>, ProjectOpenError> {
-    let Some(paths) = resolve_validated_committed_paths(
-        context,
-        expected_application_id,
-        |_| Ok(()),
-    ).map_err(ProjectOpenError::Generation)? else {
+    let Some(paths) =
+        resolve_validated_committed_paths(context, expected_application_id, |_| Ok(()))
+            .map_err(ProjectOpenError::Generation)?
+    else {
         return Ok(None);
     };
-    let project_text = fs::read_to_string(&paths.project_file)
-        .map_err(ProjectOpenError::ReadProject)?;
+    let project_text =
+        fs::read_to_string(&paths.project_file).map_err(ProjectOpenError::ReadProject)?;
     let project_file = ProjectFile::from_toml(&project_text, expected_application_id)
         .map_err(ProjectOpenError::ProjectFile)?;
-    let framework_text = fs::read_to_string(&paths.framework_settings)
-        .map_err(ProjectOpenError::ReadFramework)?;
-    let settings = FrameworkSettings::from_toml(&framework_text)
-        .map_err(|e| ProjectOpenError::Generation(GenerationError::InvalidCandidate(format!("framework_settings.toml: {e:?}"))))?;
-    let generation_root = paths.project_file.parent().expect("generation project has parent");
+    let framework_text =
+        fs::read_to_string(&paths.framework_settings).map_err(ProjectOpenError::ReadFramework)?;
+    let settings = FrameworkSettings::from_toml(&framework_text).map_err(|e| {
+        ProjectOpenError::Generation(GenerationError::InvalidCandidate(format!(
+            "framework_settings.toml: {e:?}"
+        )))
+    })?;
+    let generation_root = paths
+        .project_file
+        .parent()
+        .expect("generation project has parent");
     let generation = ProjectContext::new(generation_root);
     let Some((application_compatibility, application_consistency)) = application
         .inspect_project_data_generation(
