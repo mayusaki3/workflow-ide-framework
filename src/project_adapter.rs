@@ -38,6 +38,19 @@ pub trait ApplicationProjectAdapter {
         save_id: &str,
     ) -> Result<ApplicationSaveResult, Self::Error>;
 
+    /// Opt in to isolated generation staging. The destination is a staging
+    /// ProjectContext; write only beneath destination.application_directory().
+    /// None means this adapter supports only the legacy save path.
+    /// Implementations must not mutate the active project or committed data.
+    fn save_project_data_staged(
+        &mut self,
+        _source: &ProjectContext,
+        _destination: &ProjectContext,
+        _save_id: &str,
+    ) -> Result<Option<ApplicationSaveResult>, Self::Error> {
+        Ok(None)
+    }
+
     fn save_project_data_as(
         &mut self,
         source: Option<&ProjectContext>,
