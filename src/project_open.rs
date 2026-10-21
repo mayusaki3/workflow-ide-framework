@@ -4,6 +4,7 @@ use crate::{
     project_lifecycle::{ProjectSession, ProjectStorageState},
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
     resource_journal::ResourceOperationJournal,
+    project_save_generation::{GenerationError, read_committed_generation},
 };
 use std::{fs, io};
 
@@ -57,6 +58,8 @@ pub enum ProjectOpenError {
     ProjectFile(ProjectFileError),
     ReadFramework(io::Error),
     Application(String),
+    Generation(GenerationError),
+    GenerationOpenNotSupported,
 }
 
 pub fn open_project<A: ApplicationProjectInspector + ?Sized>(
@@ -64,6 +67,15 @@ pub fn open_project<A: ApplicationProjectInspector + ?Sized>(
     expected_application_id: &str,
     application: &mut A,
 ) -> Result<ProjectOpenResult, ProjectOpenError> {
+    // Do not silently read stale legacy files when a committed generation exists.
+    // Application inspection is still legacy-context-based; generation-aware
+    // inspection must be integrated before this branch can safely open it.
+    if read_committed_generation(context)
+        .map_err(ProjectOpenError::Generation)?
+        .is_some()
+    {
+        return Err(ProjectOpenError::GenerationOpenNotSupported);
+    }
     let project_text =
         fs::read_to_string(context.project_file_path()).map_err(ProjectOpenError::ReadProject)?;
     let project_file = ProjectFile::from_toml(&project_text, expected_application_id)
