@@ -3,7 +3,7 @@ use crate::{
     project::{ProjectContext, ProjectFile, ProjectFileError},
     project_lifecycle::{ProjectSession, ProjectStorageState},
     project_resource::{ProjectDataCompatibility, ProjectDataConsistency},
-    project_save_generation::{GenerationError, read_committed_generation},
+    project_save_generation::{GenerationError, read_committed_generation, resolve_validated_committed_paths},
     resource_journal::ResourceOperationJournal,
 };
 use std::{fs, io};
@@ -125,6 +125,57 @@ pub fn open_project<A: ApplicationProjectInspector + ?Sized>(
         application_compatibility,
         application_consistency,
     })
+}
+
+/// Read a committed snapshot without consulting legacy metadata or application data.
+/// Returns None only when no commit pointer exists. The caller must not accept
+/// this result into a writable session until generation-aware Save is supported.
+pub fn inspect_committed_generation(
+    context: &ProjectContext,
+    expected_application_id: &str,
+    application: &mut dyn crate::project_adapter_erased::ErasedApplicationProjectAdapter,
+) -> Result<Option<ProjectOpenResult>, ProjectOpenError> {
+    let Some(paths) = resolve_validated_committed_paths(
+        context,
+        expected_application_id,
+        |_| Ok(()),
+    ).map_err(ProjectOpenError::Generation)? else {
+        return Ok(None);
+    };
+    let project_text = fs::read_to_string(&paths.project_file)
+        .map_err(ProjectOpenError::ReadProject)?;
+    let project_file = ProjectFile::from_toml(&project_text, expected_application_id)
+        .map_err(ProjectOpenError::ProjectFile)?;
+    let framework_text = fs::read_to_string(&paths.framework_settings)
+        .map_err(ProjectOpenError::ReadFramework)?;
+    let settings = FrameworkSettings::from_toml(&framework_text)
+        .map_err(|e| ProjectOpenError::Generation(GenerationError::InvalidCandidate(format!("framework_settings.toml: {e:?}"))))?;
+    let generation_root = paths.project_file.parent().expect("generation project has parent");
+    let generation = ProjectContext::new(generation_root);
+    let Some((application_compatibility, application_consistency)) = application
+        .inspect_project_data_generation(
+            context,
+            &generation,
+            project_file.application.data_version.as_deref(),
+        )
+        .map_err(ProjectOpenError::Application)?
+    else {
+        return Err(ProjectOpenError::GenerationOpenNotSupported);
+    };
+    let pending_resource_operation = match ResourceOperationJournal::load(context) {
+        Ok(Some(journal)) => PendingResourceOperationOpen::Pending(journal),
+        Ok(None) => PendingResourceOperationOpen::None,
+        Err(error) => PendingResourceOperationOpen::Invalid {
+            reason: error.to_string(),
+        },
+    };
+    Ok(Some(ProjectOpenResult {
+        project_file,
+        framework_settings: FrameworkSettingsOpen::Loaded(settings),
+        pending_resource_operation,
+        application_compatibility,
+        application_consistency,
+    }))
 }
 
 pub fn open_requires_user_decision(result: &ProjectOpenResult) -> bool {
