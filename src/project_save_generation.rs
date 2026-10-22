@@ -290,6 +290,24 @@ pub fn save_project_generation(
         save_id,
         saved_at,
     } = identity;
+    // Resolve the active snapshot before creating a new stage. An invalid
+    // committed generation must never silently fall back to legacy files.
+    let source_generation = resolve_validated_committed_paths(
+        context,
+        &project_file.application.id,
+        |_| Ok(()),
+    )
+    .map_err(GenerationSaveError::Generation)?;
+    let source_context = source_generation
+        .as_ref()
+        .map(|paths| {
+            ProjectContext::new(
+                paths.application_directory
+                    .parent()
+                    .expect("generation application directory has a parent"),
+            )
+        })
+        .unwrap_or_else(|| context.clone());
     let stage =
         begin_generation(context, generation_id).map_err(GenerationSaveError::Generation)?;
     // Only the staging directory created by this invocation is eligible for
@@ -297,7 +315,7 @@ pub fn save_project_generation(
     let staged_result = (|| -> Result<ProjectFile, GenerationSaveError> {
         let stage_context = ProjectContext::new(&stage);
         let app = application
-            .save_project_data_staged(context, &stage_context, save_id)
+            .save_project_data_staged(&source_context, &stage_context, save_id)
             .map_err(GenerationSaveError::Application)?
             .ok_or(GenerationSaveError::StagedSaveNotSupported)?;
 
