@@ -36,6 +36,12 @@ pub trait ErasedApplicationProjectAdapter {
         destination: &ProjectContext,
         save_id: &str,
     ) -> Result<Option<ApplicationSaveResult>, String>;
+    fn validate_project_data_staged(
+        &mut self,
+        project_root: &ProjectContext,
+        destination: &ProjectContext,
+        stored_data_version: Option<&str>,
+    ) -> Result<Option<()>, String>;
     fn save_project_data_as(
         &mut self,
         source: Option<&ProjectContext>,
@@ -102,6 +108,17 @@ impl<A: ApplicationProjectAdapter> ErasedApplicationProjectAdapter for A {
     ) -> Result<Option<ApplicationSaveResult>, String> {
         ApplicationProjectAdapter::save_project_data_staged(self, source, destination, save_id)
             .map_err(|e| e.to_string())
+    }
+
+    fn validate_project_data_staged(
+        &mut self,
+        project_root: &ProjectContext,
+        destination: &ProjectContext,
+        stored_data_version: Option<&str>,
+    ) -> Result<Option<()>, String> {
+        ApplicationProjectAdapter::validate_project_data_staged(
+            self, project_root, destination, stored_data_version,
+        ).map_err(|e| e.to_string())
     }
 
     fn save_project_data_as(
