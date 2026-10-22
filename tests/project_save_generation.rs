@@ -475,7 +475,11 @@ impl workflow_ide_framework::project_adapter::ApplicationProjectAdapter for Stag
             "failure" => Err("staged application failure".into()),
             "success" | "resave" | "validation-error" | "validation-unsupported" => {
                 if self.mode == "resave" {
-                    assert_eq!(fs::read_to_string(source.application_directory().join("catalog.json")).unwrap(), "save-old");
+                    assert_eq!(
+                        fs::read_to_string(source.application_directory().join("catalog.json"))
+                            .unwrap(),
+                        "save-old"
+                    );
                 }
                 fs::create_dir_all(destination.application_directory()).unwrap();
                 fs::write(
@@ -764,21 +768,59 @@ fn save_cons_resave_reads_previous_committed_application() {
     use workflow_ide_framework::project_save_generation::save_project_generation;
     let (root, context, mut session, mut project) = save_fixture("resave-source");
     let settings = workflow_ide_framework::framework_settings::FrameworkSettings::default();
-    let mut first = StagedSaver { mode: "success", calls: 0 };
+    let mut first = StagedSaver {
+        mode: "success",
+        calls: 0,
+    };
     save_project_generation(
-        &mut session, &context, &mut project, &settings, &mut first,
+        &mut session,
+        &context,
+        &mut project,
+        &settings,
+        &mut first,
         save_identity("old", "save-old"),
-    ).unwrap();
+    )
+    .unwrap();
     session.mark_application_dirty();
-    let mut second = StagedSaver { mode: "resave", calls: 0 };
+    let mut second = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
     save_project_generation(
-        &mut session, &context, &mut project, &settings, &mut second,
+        &mut session,
+        &context,
+        &mut project,
+        &settings,
+        &mut second,
         save_identity("new", "save-new"),
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(second.calls, 1);
-    assert_eq!(read_committed_generation(&context).unwrap().unwrap().generation_id, "new");
-    assert_eq!(fs::read_to_string(generation_path(&context, "old").unwrap().join("application/catalog.json")).unwrap(), "save-old");
-    assert_eq!(fs::read_to_string(generation_path(&context, "new").unwrap().join("application/catalog.json")).unwrap(), "save-new");
+    assert_eq!(
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "new"
+    );
+    assert_eq!(
+        fs::read_to_string(
+            generation_path(&context, "old")
+                .unwrap()
+                .join("application/catalog.json")
+        )
+        .unwrap(),
+        "save-old"
+    );
+    assert_eq!(
+        fs::read_to_string(
+            generation_path(&context, "new")
+                .unwrap()
+                .join("application/catalog.json")
+        )
+        .unwrap(),
+        "save-new"
+    );
     assert!(!session.dirty.is_dirty());
     fs::remove_dir_all(root).unwrap();
 }
@@ -786,28 +828,57 @@ fn save_cons_resave_reads_previous_committed_application() {
 #[test]
 fn save_cons_corrupt_committed_source_blocks_resave_without_staging() {
     use workflow_ide_framework::project_save_generation::{
-        save_project_generation, staging_path, GenerationSaveError,
+        GenerationSaveError, save_project_generation, staging_path,
     };
     let (root, context, mut session, mut project) = save_fixture("resave-corrupt");
     let settings = workflow_ide_framework::framework_settings::FrameworkSettings::default();
-    let mut first = StagedSaver { mode: "success", calls: 0 };
+    let mut first = StagedSaver {
+        mode: "success",
+        calls: 0,
+    };
     save_project_generation(
-        &mut session, &context, &mut project, &settings, &mut first,
+        &mut session,
+        &context,
+        &mut project,
+        &settings,
+        &mut first,
         save_identity("old", "save-old"),
-    ).unwrap();
+    )
+    .unwrap();
     session.mark_application_dirty();
     let previous = project.clone();
-    fs::write(generation_path(&context, "old").unwrap().join("framework_settings.toml"), "invalid = [").unwrap();
-    let mut second = StagedSaver { mode: "resave", calls: 0 };
+    fs::write(
+        generation_path(&context, "old")
+            .unwrap()
+            .join("framework_settings.toml"),
+        "invalid = [",
+    )
+    .unwrap();
+    let mut second = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
     assert!(matches!(
         save_project_generation(
-            &mut session, &context, &mut project, &settings, &mut second,
+            &mut session,
+            &context,
+            &mut project,
+            &settings,
+            &mut second,
             save_identity("new", "save-new"),
         ),
-        Err(GenerationSaveError::Generation(GenerationError::InvalidCandidate(_)))
+        Err(GenerationSaveError::Generation(
+            GenerationError::InvalidCandidate(_)
+        ))
     ));
     assert_eq!(second.calls, 0);
-    assert_eq!(read_committed_generation(&context).unwrap().unwrap().generation_id, "old");
+    assert_eq!(
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "old"
+    );
     assert_eq!(session.current_save_id.as_deref(), Some("save-old"));
     assert!(session.dirty.application);
     assert_eq!(project, previous);

@@ -292,17 +292,15 @@ pub fn save_project_generation(
     } = identity;
     // Resolve the active snapshot before creating a new stage. An invalid
     // committed generation must never silently fall back to legacy files.
-    let source_generation = resolve_validated_committed_paths(
-        context,
-        &project_file.application.id,
-        |_| Ok(()),
-    )
-    .map_err(GenerationSaveError::Generation)?;
+    let source_generation =
+        resolve_validated_committed_paths(context, &project_file.application.id, |_| Ok(()))
+            .map_err(GenerationSaveError::Generation)?;
     let source_context = source_generation
         .as_ref()
         .map(|paths| {
             ProjectContext::new(
-                paths.application_directory
+                paths
+                    .application_directory
                     .parent()
                     .expect("generation application directory has a parent"),
             )
