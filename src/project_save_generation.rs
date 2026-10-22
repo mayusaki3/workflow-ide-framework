@@ -320,20 +320,18 @@ pub fn save_project_generation(
         generation_id,
         &project_candidate.application.id,
         save_id,
-        |_| {
-            match application.validate_project_data_staged(
-                context,
-                &stage_context,
-                project_candidate.application.data_version.as_deref(),
-            ) {
-                Ok(Some(())) => Ok(()),
-                Ok(None) => Err(GenerationError::InvalidCandidate(
-                    "application staged validation is not supported".into(),
-                )),
-                Err(error) => Err(GenerationError::InvalidCandidate(format!(
-                    "application staged validation failed: {error}"
-                ))),
-            }
+        |_| match application.validate_project_data_staged(
+            context,
+            &stage_context,
+            project_candidate.application.data_version.as_deref(),
+        ) {
+            Ok(Some(())) => Ok(()),
+            Ok(None) => Err(GenerationError::InvalidCandidate(
+                "application staged validation is not supported".into(),
+            )),
+            Err(error) => Err(GenerationError::InvalidCandidate(format!(
+                "application staged validation failed: {error}"
+            ))),
         },
     )
     .map_err(GenerationSaveError::Generation)?;

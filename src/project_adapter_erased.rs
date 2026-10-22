@@ -117,8 +117,12 @@ impl<A: ApplicationProjectAdapter> ErasedApplicationProjectAdapter for A {
         stored_data_version: Option<&str>,
     ) -> Result<Option<()>, String> {
         ApplicationProjectAdapter::validate_project_data_staged(
-            self, project_root, destination, stored_data_version,
-        ).map_err(|e| e.to_string())
+            self,
+            project_root,
+            destination,
+            stored_data_version,
+        )
+        .map_err(|e| e.to_string())
     }
 
     fn save_project_data_as(

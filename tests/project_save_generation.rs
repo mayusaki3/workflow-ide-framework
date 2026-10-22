@@ -436,9 +436,9 @@ impl workflow_ide_framework::project_adapter::ApplicationProjectAdapter for Stag
                 if stored_data_version != Some("staged-v1") {
                     return Err("unexpected data version".into());
                 }
-                let data = fs::read_to_string(
-                    destination.application_directory().join("catalog.json"),
-                ).map_err(|e| e.to_string())?;
+                let data =
+                    fs::read_to_string(destination.application_directory().join("catalog.json"))
+                        .map_err(|e| e.to_string())?;
                 if data.is_empty() {
                     return Err("empty staged payload".into());
                 }
