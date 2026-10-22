@@ -425,6 +425,30 @@ impl workflow_ide_framework::project_adapter::ApplicationProjectAdapter for Stag
         panic!("legacy save must never be used")
     }
 
+    fn validate_project_data_staged(
+        &mut self,
+        _: &ProjectContext,
+        destination: &ProjectContext,
+        stored_data_version: Option<&str>,
+    ) -> Result<Option<()>, String> {
+        match self.mode {
+            "success" | "failure" => {
+                if stored_data_version != Some("staged-v1") {
+                    return Err("unexpected data version".into());
+                }
+                let data = fs::read_to_string(
+                    destination.application_directory().join("catalog.json"),
+                ).map_err(|e| e.to_string())?;
+                if data.is_empty() {
+                    return Err("empty staged payload".into());
+                }
+                Ok(Some(()))
+            }
+            "unsupported" => Ok(None),
+            _ => unreachable!(),
+        }
+    }
+
     fn save_project_data_as(
         &mut self,
         _: Option<&ProjectContext>,
