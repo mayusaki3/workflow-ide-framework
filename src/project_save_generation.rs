@@ -263,3 +263,74 @@ where
         application_directory: root.join("application"),
     }))
 }
+
+
+/// Stage and publish one complete save without modifying the legacy layout.
+///
+/// This is an explicit opt-in API, not yet connected to ProjectController::save.
+/// The application must support staged saving; an unsupported adapter is rejected
+/// rather than falling back to the non-transactional legacy save path.
+/// In-memory session and metadata are updated only after the commit pointer
+/// has been published successfully.
+pub fn save_project_generation(
+    session: &mut crate::project_lifecycle::ProjectSession,
+    context: &ProjectContext,
+    project_file: &mut ProjectFile,
+    framework_settings: &FrameworkSettings,
+    application: &mut dyn crate::project_adapter_erased::ErasedApplicationProjectAdapter,
+    generation_id: &str,
+    save_id: &str,
+    saved_at: &str,
+) -> Result<(), GenerationSaveError> {
+    let stage = begin_generation(context, generation_id).map_err(GenerationSaveError::Generation)?;
+    let stage_context = ProjectContext::new(&stage);
+    let app = application
+        .save_project_data_staged(context, &stage_context, save_id)
+        .map_err(GenerationSaveError::Application)?
+        .ok_or(GenerationSaveError::StagedSaveNotSupported)?;
+
+    let mut settings_candidate = framework_settings.clone();
+    settings_candidate.save_id = Some(save_id.to_owned());
+    let settings_text = settings_candidate
+        .to_toml()
+        .map_err(|e| GenerationSaveError::Serialization(format!("framework settings: {e:?}")))?;
+    fs::write(stage.join("framework_settings.toml"), settings_text)
+        .map_err(GenerationSaveError::Io)?;
+
+    let mut project_candidate = project_file.clone();
+    project_candidate.project.save_id = save_id.to_owned();
+    project_candidate.project.saved_at = saved_at.to_owned();
+    project_candidate.application.data_version = app.data_version;
+    let project_text = project_candidate
+        .to_toml()
+        .map_err(|e| GenerationSaveError::Serialization(format!("project: {e:?}")))?;
+    fs::write(stage.join("project.toml"), project_text)
+        .map_err(GenerationSaveError::Io)?;
+
+    validate_and_commit_generation(
+        context,
+        generation_id,
+        &project_candidate.application.id,
+        save_id,
+        |_| Ok(()),
+    )
+    .map_err(GenerationSaveError::Generation)?;
+
+    let pending = session
+        .begin_save(save_id)
+        .application_saved()
+        .framework_saved()
+        .project_file_saved();
+    session.complete_save(pending).expect("all save stages completed");
+    *project_file = project_candidate;
+    Ok(())
+}
+
+#[derive(Debug)]
+pub enum GenerationSaveError {
+    Generation(GenerationError),
+    Application(String),
+    StagedSaveNotSupported,
+    Serialization(String),
+    Io(io::Error),
+}
