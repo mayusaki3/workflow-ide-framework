@@ -272,16 +272,21 @@ where
 /// rather than falling back to the non-transactional legacy save path.
 /// In-memory session and metadata are updated only after the commit pointer
 /// has been published successfully.
+pub struct GenerationSaveIdentity<'a> {
+    pub generation_id: &'a str,
+    pub save_id: &'a str,
+    pub saved_at: &'a str,
+}
+
 pub fn save_project_generation(
     session: &mut crate::project_lifecycle::ProjectSession,
     context: &ProjectContext,
     project_file: &mut ProjectFile,
     framework_settings: &FrameworkSettings,
     application: &mut dyn crate::project_adapter_erased::ErasedApplicationProjectAdapter,
-    generation_id: &str,
-    save_id: &str,
-    saved_at: &str,
+    identity: GenerationSaveIdentity<'_>,
 ) -> Result<(), GenerationSaveError> {
+    let GenerationSaveIdentity { generation_id, save_id, saved_at } = identity;
     let stage = begin_generation(context, generation_id).map_err(GenerationSaveError::Generation)?;
     let stage_context = ProjectContext::new(&stage);
     let app = application
