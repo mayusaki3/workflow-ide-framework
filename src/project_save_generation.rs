@@ -295,6 +295,37 @@ pub fn save_project_generation(
     let source_generation =
         resolve_validated_committed_paths(context, &project_file.application.id, |_| Ok(()))
             .map_err(GenerationSaveError::Generation)?;
+    if let Some(paths) = source_generation.as_ref() {
+        use crate::project_resource::{ProjectDataCompatibility, ProjectDataConsistency};
+        let stored = fs::read_to_string(&paths.project_file)
+            .map_err(GenerationSaveError::Io)?;
+        let committed_project = ProjectFile::from_toml(&stored, &project_file.application.id)
+            .map_err(|e| GenerationSaveError::Generation(
+                GenerationError::InvalidCandidate(format!("committed project: {e:?}"))
+            ))?;
+        let generation_root = paths.application_directory.parent().expect("generation has parent");
+        let generation_context = ProjectContext::new(generation_root);
+        let inspection = application
+            .inspect_project_data_generation(
+                context,
+                &generation_context,
+                committed_project.application.data_version.as_deref(),
+            )
+            .map_err(GenerationSaveError::Application)?;
+        match inspection {
+            Some((ProjectDataCompatibility::Compatible, ProjectDataConsistency::Consistent)) => {}
+            Some(_) => return Err(GenerationSaveError::Generation(
+                GenerationError::InvalidCandidate(
+                    "committed application data is not compatible and consistent".into()
+                )
+            )),
+            None => return Err(GenerationSaveError::Generation(
+                GenerationError::InvalidCandidate(
+                    "committed application generation inspection is not supported".into()
+                )
+            )),
+        }
+    }
     let source_context = source_generation
         .as_ref()
         .map(|paths| {
