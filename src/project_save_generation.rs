@@ -264,7 +264,6 @@ where
     }))
 }
 
-
 /// Stage and publish one complete save without modifying the legacy layout.
 ///
 /// This is an explicit opt-in API, not yet connected to ProjectController::save.
@@ -286,8 +285,13 @@ pub fn save_project_generation(
     application: &mut dyn crate::project_adapter_erased::ErasedApplicationProjectAdapter,
     identity: GenerationSaveIdentity<'_>,
 ) -> Result<(), GenerationSaveError> {
-    let GenerationSaveIdentity { generation_id, save_id, saved_at } = identity;
-    let stage = begin_generation(context, generation_id).map_err(GenerationSaveError::Generation)?;
+    let GenerationSaveIdentity {
+        generation_id,
+        save_id,
+        saved_at,
+    } = identity;
+    let stage =
+        begin_generation(context, generation_id).map_err(GenerationSaveError::Generation)?;
     let stage_context = ProjectContext::new(&stage);
     let app = application
         .save_project_data_staged(context, &stage_context, save_id)
@@ -309,8 +313,7 @@ pub fn save_project_generation(
     let project_text = project_candidate
         .to_toml()
         .map_err(|e| GenerationSaveError::Serialization(format!("project: {e:?}")))?;
-    fs::write(stage.join("project.toml"), project_text)
-        .map_err(GenerationSaveError::Io)?;
+    fs::write(stage.join("project.toml"), project_text).map_err(GenerationSaveError::Io)?;
 
     validate_and_commit_generation(
         context,
@@ -326,7 +329,9 @@ pub fn save_project_generation(
         .application_saved()
         .framework_saved()
         .project_file_saved();
-    session.complete_save(pending).expect("all save stages completed");
+    session
+        .complete_save(pending)
+        .expect("all save stages completed");
     *project_file = project_candidate;
     Ok(())
 }
