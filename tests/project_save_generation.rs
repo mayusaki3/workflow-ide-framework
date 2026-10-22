@@ -432,7 +432,7 @@ impl workflow_ide_framework::project_adapter::ApplicationProjectAdapter for Stag
         stored_data_version: Option<&str>,
     ) -> Result<Option<()>, String> {
         match self.mode {
-            "success" | "failure" => {
+            "success" | "failure" | "validation-error" | "validation-unsupported" => {
                 if stored_data_version != Some("staged-v1") {
                     return Err("unexpected data version".into());
                 }
@@ -442,7 +442,11 @@ impl workflow_ide_framework::project_adapter::ApplicationProjectAdapter for Stag
                 if data.is_empty() {
                     return Err("empty staged payload".into());
                 }
-                Ok(Some(()))
+                match self.mode {
+                    "validation-error" => Err("rejected staged payload".into()),
+                    "validation-unsupported" => Ok(None),
+                    _ => Ok(Some(())),
+                }
             }
             "unsupported" => Ok(None),
             _ => unreachable!(),
@@ -469,7 +473,7 @@ impl workflow_ide_framework::project_adapter::ApplicationProjectAdapter for Stag
         match self.mode {
             "unsupported" => Ok(None),
             "failure" => Err("staged application failure".into()),
-            "success" => {
+            "success" | "validation-error" | "validation-unsupported" => {
                 fs::create_dir_all(destination.application_directory()).unwrap();
                 fs::write(
                     destination.application_directory().join("catalog.json"),
@@ -658,5 +662,64 @@ fn save_cons_staged_save_unsupported_adapter_never_falls_back_to_legacy() {
     assert!(session.current_save_id.is_none());
     assert_eq!(project, original);
     assert!(!context.project_file_path().exists());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn save_cons_validation_failure_keeps_previous_generation_and_cleans_stage() {
+    use workflow_ide_framework::project_save_generation::{
+        save_project_generation, staging_path, GenerationSaveError,
+    };
+    let (root, context, mut session, mut project) = save_fixture("validation-error");
+    let settings = workflow_ide_framework::framework_settings::FrameworkSettings::default();
+    let mut success = StagedSaver { mode: "success", calls: 0 };
+    save_project_generation(
+        &mut session, &context, &mut project, &settings, &mut success,
+        save_identity("old", "save-old"),
+    ).unwrap();
+    session.mark_application_dirty();
+    let previous = project.clone();
+    let mut rejected = StagedSaver { mode: "validation-error", calls: 0 };
+    assert!(matches!(
+        save_project_generation(
+            &mut session, &context, &mut project, &settings, &mut rejected,
+            save_identity("new", "save-new"),
+        ),
+        Err(GenerationSaveError::Generation(GenerationError::InvalidCandidate(_)))
+    ));
+    assert_eq!(rejected.calls, 1);
+    assert_eq!(read_committed_generation(&context).unwrap().unwrap().generation_id, "old");
+    assert_eq!(session.current_save_id.as_deref(), Some("save-old"));
+    assert!(session.dirty.application);
+    assert_eq!(project, previous);
+    assert!(!staging_path(&context, "new").unwrap().exists());
+    assert!(!generation_path(&context, "new").unwrap().exists());
+    assert!(generation_path(&context, "old").unwrap().is_dir());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn save_cons_unsupported_validation_never_commits_and_cleans_stage() {
+    use workflow_ide_framework::project_save_generation::{
+        save_project_generation, staging_path, GenerationSaveError,
+    };
+    let (root, context, mut session, mut project) = save_fixture("validation-unsupported");
+    let original = project.clone();
+    let settings = workflow_ide_framework::framework_settings::FrameworkSettings::default();
+    let mut app = StagedSaver { mode: "validation-unsupported", calls: 0 };
+    assert!(matches!(
+        save_project_generation(
+            &mut session, &context, &mut project, &settings, &mut app,
+            save_identity("candidate", "save-candidate"),
+        ),
+        Err(GenerationSaveError::Generation(GenerationError::InvalidCandidate(_)))
+    ));
+    assert_eq!(app.calls, 1);
+    assert!(read_committed_generation(&context).unwrap().is_none());
+    assert!(session.current_save_id.is_none());
+    assert!(session.dirty.is_dirty());
+    assert_eq!(project, original);
+    assert!(!staging_path(&context, "candidate").unwrap().exists());
+    assert!(!generation_path(&context, "candidate").unwrap().exists());
     fs::remove_dir_all(root).unwrap();
 }
