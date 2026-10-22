@@ -292,49 +292,66 @@ pub fn save_project_generation(
     } = identity;
     let stage =
         begin_generation(context, generation_id).map_err(GenerationSaveError::Generation)?;
-    let stage_context = ProjectContext::new(&stage);
-    let app = application
-        .save_project_data_staged(context, &stage_context, save_id)
-        .map_err(GenerationSaveError::Application)?
-        .ok_or(GenerationSaveError::StagedSaveNotSupported)?;
-
-    let mut settings_candidate = framework_settings.clone();
-    settings_candidate.save_id = Some(save_id.to_owned());
-    let settings_text = settings_candidate
-        .to_toml()
-        .map_err(|e| GenerationSaveError::Serialization(format!("framework settings: {e:?}")))?;
-    fs::write(stage.join("framework_settings.toml"), settings_text)
-        .map_err(GenerationSaveError::Io)?;
-
-    let mut project_candidate = project_file.clone();
-    project_candidate.project.save_id = save_id.to_owned();
-    project_candidate.project.saved_at = saved_at.to_owned();
-    project_candidate.application.data_version = app.data_version;
-    let project_text = project_candidate
-        .to_toml()
-        .map_err(|e| GenerationSaveError::Serialization(format!("project: {e:?}")))?;
-    fs::write(stage.join("project.toml"), project_text).map_err(GenerationSaveError::Io)?;
-
-    validate_and_commit_generation(
-        context,
-        generation_id,
-        &project_candidate.application.id,
-        save_id,
-        |_| match application.validate_project_data_staged(
+    // Only the staging directory created by this invocation is eligible for
+    // cleanup. Never remove an already promoted or committed generation.
+    let staged_result = (|| -> Result<ProjectFile, GenerationSaveError> {
+        let stage_context = ProjectContext::new(&stage);
+        let app = application
+            .save_project_data_staged(context, &stage_context, save_id)
+            .map_err(GenerationSaveError::Application)?
+            .ok_or(GenerationSaveError::StagedSaveNotSupported)?;
+    
+        let mut settings_candidate = framework_settings.clone();
+        settings_candidate.save_id = Some(save_id.to_owned());
+        let settings_text = settings_candidate
+            .to_toml()
+            .map_err(|e| GenerationSaveError::Serialization(format!("framework settings: {e:?}")))?;
+        fs::write(stage.join("framework_settings.toml"), settings_text)
+            .map_err(GenerationSaveError::Io)?;
+    
+        let mut project_candidate = project_file.clone();
+        project_candidate.project.save_id = save_id.to_owned();
+        project_candidate.project.saved_at = saved_at.to_owned();
+        project_candidate.application.data_version = app.data_version;
+        let project_text = project_candidate
+            .to_toml()
+            .map_err(|e| GenerationSaveError::Serialization(format!("project: {e:?}")))?;
+        fs::write(stage.join("project.toml"), project_text).map_err(GenerationSaveError::Io)?;
+    
+        validate_and_commit_generation(
             context,
-            &stage_context,
-            project_candidate.application.data_version.as_deref(),
-        ) {
-            Ok(Some(())) => Ok(()),
-            Ok(None) => Err(GenerationError::InvalidCandidate(
-                "application staged validation is not supported".into(),
-            )),
-            Err(error) => Err(GenerationError::InvalidCandidate(format!(
-                "application staged validation failed: {error}"
-            ))),
-        },
-    )
-    .map_err(GenerationSaveError::Generation)?;
+            generation_id,
+            &project_candidate.application.id,
+            save_id,
+            |_| match application.validate_project_data_staged(
+                context,
+                &stage_context,
+                project_candidate.application.data_version.as_deref(),
+            ) {
+                Ok(Some(())) => Ok(()),
+                Ok(None) => Err(GenerationError::InvalidCandidate(
+                    "application staged validation is not supported".into(),
+                )),
+                Err(error) => Err(GenerationError::InvalidCandidate(format!(
+                    "application staged validation failed: {error}"
+                ))),
+            },
+        )
+        .map_err(GenerationSaveError::Generation)?;
+    
+        Ok(project_candidate)
+    })();
+    let project_candidate = match staged_result {
+        Ok(candidate) => candidate,
+        Err(error) => {
+            if stage.is_dir() {
+                // Preserve the original failure. A failed cleanup can be
+                // retried explicitly using the uncommitted staging path.
+                let _ = fs::remove_dir_all(&stage);
+            }
+            return Err(error);
+        }
+    };
 
     let pending = session
         .begin_save(save_id)
