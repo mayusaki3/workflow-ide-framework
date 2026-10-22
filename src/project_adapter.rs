@@ -64,6 +64,19 @@ pub trait ApplicationProjectAdapter {
         Ok(None)
     }
 
+    /// Validate the staged application payload before publishing a generation.
+    /// Return Some(()) only after verifying the saved payload; None means
+    /// validation is unsupported and the generation must not be committed.
+    /// Validation must not mutate persisted data.
+    fn validate_project_data_staged(
+        &mut self,
+        _project_root: &ProjectContext,
+        _destination: &ProjectContext,
+        _stored_data_version: Option<&str>,
+    ) -> Result<Option<()>, Self::Error> {
+        Ok(None)
+    }
+
     fn save_project_data_as(
         &mut self,
         source: Option<&ProjectContext>,
