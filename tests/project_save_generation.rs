@@ -389,3 +389,169 @@ fn save_cons_resolved_paths_are_generation_scoped_not_legacy_layout() {
     ));
     fs::remove_dir_all(root).unwrap();
 }
+
+
+struct StagedSaver {
+    mode: &'static str,
+    calls: usize,
+}
+
+impl workflow_ide_framework::project_adapter::ApplicationProjectAdapter for StagedSaver {
+    type Error = String;
+
+    fn initialize_project(&mut self, _: &ProjectContext) -> Result<(), String> { Ok(()) }
+
+    fn inspect_project_data(
+        &mut self, _: &ProjectContext, _: Option<&str>,
+    ) -> Result<workflow_ide_framework::project_resource::ProjectDataCompatibility, String> {
+        panic!("legacy inspection must not be used by staged save")
+    }
+
+    fn check_project_consistency(
+        &mut self, _: &ProjectContext,
+    ) -> Result<workflow_ide_framework::project_resource::ProjectDataConsistency, String> {
+        panic!("legacy consistency must not be used by staged save")
+    }
+
+    fn save_project_data(
+        &mut self, _: &ProjectContext, _: &str,
+    ) -> Result<workflow_ide_framework::project_save::ApplicationSaveResult, String> {
+        panic!("legacy save must never be used")
+    }
+
+    fn save_project_data_as(
+        &mut self, _: Option<&ProjectContext>, _: &ProjectContext, _: &str,
+    ) -> Result<workflow_ide_framework::project_save::ApplicationSaveResult, String> {
+        panic!("legacy save-as must never be used")
+    }
+
+    fn save_project_data_staged(
+        &mut self, source: &ProjectContext, destination: &ProjectContext, save_id: &str,
+    ) -> Result<Option<workflow_ide_framework::project_save::ApplicationSaveResult>, String> {
+        self.calls += 1;
+        assert_ne!(source.root(), destination.root());
+        match self.mode {
+            "unsupported" => Ok(None),
+            "failure" => Err("staged application failure".into()),
+            "success" => {
+                fs::create_dir_all(destination.application_directory()).unwrap();
+                fs::write(destination.application_directory().join("catalog.json"), save_id).unwrap();
+                Ok(Some(workflow_ide_framework::project_save::ApplicationSaveResult {
+                    data_version: Some("staged-v1".into()),
+                }))
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+fn save_fixture(name: &str) -> (
+    std::path::PathBuf,
+    ProjectContext,
+    workflow_ide_framework::project_lifecycle::ProjectSession,
+    workflow_ide_framework::project::ProjectFile,
+) {
+    use workflow_ide_framework::project::{
+        ApplicationMetadata, ProjectFile, ProjectMetadata,
+    };
+    use workflow_ide_framework::project_resource::NewProjectStoragePolicy;
+    let (root, context) = setup(name);
+    let session = workflow_ide_framework::project_lifecycle::ProjectSession::new_project(
+        NewProjectStoragePolicy::Required,
+        Some(context.clone()),
+    ).unwrap();
+    let project = ProjectFile {
+        project: ProjectMetadata {
+            format_version: 1, name: "Generation".into(), description: None,
+            language: "en-US".into(), save_id: String::new(), saved_at: String::new(),
+        },
+        application: ApplicationMetadata {
+            id: "org.example.test".into(), name: "Test".into(), description: None,
+            language: "en-US".into(), data_version: None,
+        },
+    };
+    (root, context, session, project)
+}
+
+fn save_identity<'a>(generation_id: &'a str, save_id: &'a str)
+    -> workflow_ide_framework::project_save_generation::GenerationSaveIdentity<'a>
+{
+    workflow_ide_framework::project_save_generation::GenerationSaveIdentity {
+        generation_id, save_id, saved_at: "2026-10-22",
+    }
+}
+
+#[test]
+fn save_cons_staged_save_publishes_and_clears_dirty_only_after_success() {
+    use workflow_ide_framework::project_save_generation::save_project_generation;
+    let (root, context, mut session, mut project) = save_fixture("staged-success");
+    let settings = workflow_ide_framework::framework_settings::FrameworkSettings::default();
+    let mut app = StagedSaver { mode: "success", calls: 0 };
+    save_project_generation(
+        &mut session, &context, &mut project, &settings, &mut app,
+        save_identity("generation-1", "save-1"),
+    ).unwrap();
+    assert_eq!(app.calls, 1);
+    assert_eq!(read_committed_generation(&context).unwrap().unwrap().generation_id, "generation-1");
+    assert_eq!(session.current_save_id.as_deref(), Some("save-1"));
+    assert!(!session.dirty.is_dirty());
+    assert_eq!(project.project.save_id, "save-1");
+    assert_eq!(project.application.data_version.as_deref(), Some("staged-v1"));
+    let stage = generation_path(&context, "generation-1").unwrap();
+    assert_eq!(fs::read_to_string(stage.join("application/catalog.json")).unwrap(), "save-1");
+    assert!(!context.project_file_path().exists());
+    assert!(!context.framework_settings_path().exists());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn save_cons_staged_save_failure_preserves_previous_commit_and_dirty_state() {
+    use workflow_ide_framework::project_save_generation::{save_project_generation, GenerationSaveError};
+    let (root, context, mut session, mut project) = save_fixture("staged-failure");
+    let settings = workflow_ide_framework::framework_settings::FrameworkSettings::default();
+    let mut success = StagedSaver { mode: "success", calls: 0 };
+    save_project_generation(
+        &mut session, &context, &mut project, &settings, &mut success,
+        save_identity("old", "save-old"),
+    ).unwrap();
+    session.mark_application_dirty();
+    let original = project.clone();
+    let mut failure = StagedSaver { mode: "failure", calls: 0 };
+    assert!(matches!(
+        save_project_generation(
+            &mut session, &context, &mut project, &settings, &mut failure,
+            save_identity("new", "save-new"),
+        ),
+        Err(GenerationSaveError::Application(_))
+    ));
+    assert_eq!(failure.calls, 1);
+    assert_eq!(read_committed_generation(&context).unwrap().unwrap().generation_id, "old");
+    assert_eq!(session.current_save_id.as_deref(), Some("save-old"));
+    assert!(session.dirty.application);
+    assert_eq!(project, original);
+    assert!(!generation_path(&context, "new").unwrap().exists());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn save_cons_staged_save_unsupported_adapter_never_falls_back_to_legacy() {
+    use workflow_ide_framework::project_save_generation::{save_project_generation, GenerationSaveError};
+    let (root, context, mut session, mut project) = save_fixture("staged-unsupported");
+    let original = project.clone();
+    let settings = workflow_ide_framework::framework_settings::FrameworkSettings::default();
+    let mut app = StagedSaver { mode: "unsupported", calls: 0 };
+    assert!(matches!(
+        save_project_generation(
+            &mut session, &context, &mut project, &settings, &mut app,
+            save_identity("unsupported", "save-unsupported"),
+        ),
+        Err(GenerationSaveError::StagedSaveNotSupported)
+    ));
+    assert_eq!(app.calls, 1);
+    assert!(read_committed_generation(&context).unwrap().is_none());
+    assert!(session.dirty.is_dirty());
+    assert!(session.current_save_id.is_none());
+    assert_eq!(project, original);
+    assert!(!context.project_file_path().exists());
+    fs::remove_dir_all(root).unwrap();
+}
