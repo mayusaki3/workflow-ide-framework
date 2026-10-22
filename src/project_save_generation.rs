@@ -300,15 +300,15 @@ pub fn save_project_generation(
             .save_project_data_staged(context, &stage_context, save_id)
             .map_err(GenerationSaveError::Application)?
             .ok_or(GenerationSaveError::StagedSaveNotSupported)?;
-    
+
         let mut settings_candidate = framework_settings.clone();
         settings_candidate.save_id = Some(save_id.to_owned());
-        let settings_text = settings_candidate
-            .to_toml()
-            .map_err(|e| GenerationSaveError::Serialization(format!("framework settings: {e:?}")))?;
+        let settings_text = settings_candidate.to_toml().map_err(|e| {
+            GenerationSaveError::Serialization(format!("framework settings: {e:?}"))
+        })?;
         fs::write(stage.join("framework_settings.toml"), settings_text)
             .map_err(GenerationSaveError::Io)?;
-    
+
         let mut project_candidate = project_file.clone();
         project_candidate.project.save_id = save_id.to_owned();
         project_candidate.project.saved_at = saved_at.to_owned();
@@ -317,7 +317,7 @@ pub fn save_project_generation(
             .to_toml()
             .map_err(|e| GenerationSaveError::Serialization(format!("project: {e:?}")))?;
         fs::write(stage.join("project.toml"), project_text).map_err(GenerationSaveError::Io)?;
-    
+
         validate_and_commit_generation(
             context,
             generation_id,
@@ -338,7 +338,7 @@ pub fn save_project_generation(
             },
         )
         .map_err(GenerationSaveError::Generation)?;
-    
+
         Ok(project_candidate)
     })();
     let project_candidate = match staged_result {
