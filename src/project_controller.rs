@@ -6,7 +6,7 @@ use crate::{
     project_adapter_erased::ErasedApplicationProjectAdapter,
     project_lifecycle::ProjectSession,
     project_open::{
-        FrameworkSettingsOpen, ProjectOpenResult, open_project, open_requires_user_decision,
+        FrameworkSettingsOpen, ProjectOpenResult, inspect_committed_generation, open_project, open_requires_user_decision,
         open_session,
     },
     project_resource::NewProjectStoragePolicy,
@@ -90,10 +90,43 @@ impl ProjectController {
         context: ProjectContext,
         application: &mut dyn ErasedApplicationProjectAdapter,
     ) -> ProjectCommandResult {
-        let result = match open_project(&context, &self.application_id, application) {
+        let storage_format = match detect_project_storage_format(&context) {
+            Ok(format) => format,
+            Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
+        };
+        let result = match storage_format {
+            ProjectStorageFormat::Legacy => {
+                open_project(&context, &self.application_id, application)
+            }
+            ProjectStorageFormat::Generation => {
+                match inspect_committed_generation(&context, &self.application_id, application) {
+                    Ok(Some(result)) => Ok(result),
+                    Ok(None) => return ProjectCommandResult::Failed(
+                        "committed generation disappeared during Open".into(),
+                    ),
+                    Err(error) => Err(error),
+                }
+            }
+        };
+        let result = match result {
             Ok(result) => result,
             Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
         };
+        // Generation data cannot yet be saved through ProjectController. Until
+        // generation-aware Save is connected, only clean snapshots may be opened.
+        if storage_format == ProjectStorageFormat::Generation
+            && (!matches!(
+                result.application_compatibility,
+                crate::project_resource::ProjectDataCompatibility::Compatible
+            ) || !matches!(
+                result.application_consistency,
+                crate::project_resource::ProjectDataConsistency::Consistent
+            ))
+        {
+            return ProjectCommandResult::Failed(
+                "generation application must be compatible and consistent".into(),
+            );
+        }
         if open_requires_user_decision(&result) {
             return ProjectCommandResult::NeedsOpenDecision(result);
         }
