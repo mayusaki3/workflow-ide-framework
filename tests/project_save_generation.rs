@@ -991,3 +991,46 @@ fn save_cons_resave_rejects_unhealthy_or_unsupported_committed_application() {
         fs::remove_dir_all(root).unwrap();
     }
 }
+
+#[test]
+fn save_cons_storage_format_detection_is_pointer_based_and_fails_closed() {
+    use workflow_ide_framework::project_save_generation::{
+        ProjectStorageFormat, committed_path, detect_project_storage_format,
+    };
+    let (root, context, mut session, mut project) = save_fixture("format-detection");
+    assert!(matches!(
+        detect_project_storage_format(&context),
+        Ok(ProjectStorageFormat::Legacy)
+    ));
+
+    let settings = workflow_ide_framework::framework_settings::FrameworkSettings::default();
+    let mut application = StagedSaver {
+        mode: "success",
+        calls: 0,
+    };
+    save_project_generation(
+        &mut session,
+        &context,
+        &mut project,
+        &settings,
+        &mut application,
+        save_identity("format-old", "format-save"),
+    )
+    .unwrap();
+    assert!(matches!(
+        detect_project_storage_format(&context),
+        Ok(ProjectStorageFormat::Generation)
+    ));
+
+    let committed = committed_path(&context);
+    let original_pointer = fs::read_to_string(&committed).unwrap();
+    fs::write(&committed, "not valid toml = [").unwrap();
+    assert!(detect_project_storage_format(&context).is_err());
+
+    fs::write(&committed, &original_pointer).unwrap();
+    fs::remove_file(generation_path(&context, "format-old").unwrap().join("project.toml"))
+        .unwrap();
+    assert!(detect_project_storage_format(&context).is_err());
+
+    fs::remove_dir_all(root).unwrap();
+}
