@@ -996,6 +996,7 @@ fn save_cons_resave_rejects_unhealthy_or_unsupported_committed_application() {
 fn save_cons_storage_format_detection_is_pointer_based_and_fails_closed() {
     use workflow_ide_framework::project_save_generation::{
         ProjectStorageFormat, committed_path, detect_project_storage_format,
+        save_project_generation,
     };
     let (root, context, mut session, mut project) = save_fixture("format-detection");
     assert!(matches!(
