@@ -693,3 +693,86 @@ fn committed_inspection_returns_none_for_legacy_project() {
     assert!(!app.called);
     fs::remove_dir_all(r).unwrap();
 }
+
+#[test]
+fn controller_opens_clean_generation_and_never_uses_legacy_save() {
+    use workflow_ide_framework::project_controller::{ProjectCommandResult, ProjectController};
+    let (r, context) = committed_fixture("controller-clean-generation");
+    let mut app = GenerationInspector {
+        enabled: true,
+        called: false,
+    };
+    let mut controller = ProjectController::new("org.example.open", "Open App");
+    assert_eq!(
+        controller.open(context.clone(), &mut app),
+        ProjectCommandResult::Completed
+    );
+    assert!(app.called);
+    assert_eq!(
+        controller.project_file.as_ref().unwrap().project.save_id,
+        "generation-save"
+    );
+    assert_eq!(
+        controller.session.as_ref().unwrap().current_save_id.as_deref(),
+        Some("generation-save")
+    );
+    assert!(matches!(
+        controller.save(&mut app, "next-save", "later"),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert!(matches!(
+        controller.save_as(
+            ProjectContext::new(r.join("copy")),
+            "Copy",
+            &mut app,
+            "next-save",
+            "later",
+        ),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(
+        fs::read_to_string(context.application_directory().join("catalog.json")).unwrap(),
+        "stale-legacy"
+    );
+    fs::remove_dir_all(r).unwrap();
+}
+
+#[test]
+fn controller_generation_open_rejects_unsupported_and_preserves_current_session() {
+    use workflow_ide_framework::project_controller::{ProjectCommandResult, ProjectController};
+    let (r, context) = committed_fixture("controller-unsupported-generation");
+    let mut controller = ProjectController::new("org.example.open", "Open App");
+    let mut app = GenerationInspector {
+        enabled: false,
+        called: false,
+    };
+    assert!(matches!(
+        controller.open(context, &mut app),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert!(!controller.is_open());
+    assert!(app.called);
+    fs::remove_dir_all(r).unwrap();
+}
+
+#[test]
+fn accept_open_rejects_fabricated_generation_result() {
+    use workflow_ide_framework::project_controller::{ProjectCommandResult, ProjectController};
+    use workflow_ide_framework::project_open::inspect_committed_generation;
+    let (r, context) = committed_fixture("controller-forged-generation");
+    let mut app = GenerationInspector {
+        enabled: true,
+        called: false,
+    };
+    let mut result = inspect_committed_generation(&context, "org.example.open", &mut app)
+        .unwrap()
+        .unwrap();
+    result.project_file.project.save_id = "forged".into();
+    let mut controller = ProjectController::new("org.example.open", "Open App");
+    assert!(matches!(
+        controller.accept_open(context, result),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert!(!controller.is_open());
+    fs::remove_dir_all(r).unwrap();
+}
