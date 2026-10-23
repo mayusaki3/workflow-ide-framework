@@ -1029,8 +1029,12 @@ fn save_cons_storage_format_detection_is_pointer_based_and_fails_closed() {
     assert!(detect_project_storage_format(&context).is_err());
 
     fs::write(&committed, &original_pointer).unwrap();
-    fs::remove_file(generation_path(&context, "format-old").unwrap().join("project.toml"))
-        .unwrap();
+    fs::remove_file(
+        generation_path(&context, "format-old")
+            .unwrap()
+            .join("project.toml"),
+    )
+    .unwrap();
     assert!(detect_project_storage_format(&context).is_err());
 
     fs::remove_dir_all(root).unwrap();
