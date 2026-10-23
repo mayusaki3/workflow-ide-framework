@@ -6,8 +6,8 @@ use crate::{
     project_adapter_erased::ErasedApplicationProjectAdapter,
     project_lifecycle::ProjectSession,
     project_open::{
-        FrameworkSettingsOpen, ProjectOpenResult, inspect_committed_generation, open_project, open_requires_user_decision,
-        open_session,
+        FrameworkSettingsOpen, ProjectOpenResult, inspect_committed_generation, open_project,
+        open_requires_user_decision, open_session,
     },
     project_resource::NewProjectStoragePolicy,
     project_save::save_project,
@@ -101,9 +101,11 @@ impl ProjectController {
             ProjectStorageFormat::Generation => {
                 match inspect_committed_generation(&context, &self.application_id, application) {
                     Ok(Some(result)) => Ok(result),
-                    Ok(None) => return ProjectCommandResult::Failed(
-                        "committed generation disappeared during Open".into(),
-                    ),
+                    Ok(None) => {
+                        return ProjectCommandResult::Failed(
+                            "committed generation disappeared during Open".into(),
+                        );
+                    }
                     Err(error) => Err(error),
                 }
             }
