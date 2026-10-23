@@ -12,6 +12,7 @@ use crate::{
     project_resource::NewProjectStoragePolicy,
     project_save::save_project,
     project_save_as::save_project_as,
+    project_save_generation::{ProjectStorageFormat, detect_project_storage_format},
     resource_registry::ResourceRegistry,
     workspace::{WorkspaceError, WorkspaceRegistry},
     workspace_dock::{
@@ -283,6 +284,17 @@ impl ProjectController {
         let Some(context) = session.context().cloned() else {
             return ProjectCommandResult::NeedsSaveLocation;
         };
+        // Generation projects must never be written through the legacy save path.
+        // An invalid committed pointer also fails closed.
+        match detect_project_storage_format(&context) {
+            Ok(ProjectStorageFormat::Legacy) => {}
+            Ok(ProjectStorageFormat::Generation) => {
+                return ProjectCommandResult::Failed(
+                    "generation project requires generation-aware save".into(),
+                );
+            }
+            Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
+        }
         let Some(project_file) = self.project_file.as_mut() else {
             return ProjectCommandResult::Failed("project metadata is unavailable".into());
         };
@@ -321,6 +333,28 @@ impl ProjectController {
         let Some(session) = self.session.as_mut() else {
             return ProjectCommandResult::Failed("no project is open".into());
         };
+        // Save As still uses the legacy adapter and must not copy a committed
+        // generation or overwrite a destination with one.
+        if let Some(source) = session.context() {
+            match detect_project_storage_format(source) {
+                Ok(ProjectStorageFormat::Legacy) => {}
+                Ok(ProjectStorageFormat::Generation) => {
+                    return ProjectCommandResult::Failed(
+                        "generation project requires generation-aware Save As".into(),
+                    );
+                }
+                Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
+            }
+        }
+        match detect_project_storage_format(&destination) {
+            Ok(ProjectStorageFormat::Legacy) => {}
+            Ok(ProjectStorageFormat::Generation) => {
+                return ProjectCommandResult::Failed(
+                    "cannot overwrite generation project through legacy Save As".into(),
+                );
+            }
+            Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
+        }
         let Some(project_file) = self.project_file.as_mut() else {
             return ProjectCommandResult::Failed("project metadata is unavailable".into());
         };
