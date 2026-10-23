@@ -145,6 +145,29 @@ pub fn read_committed_generation(
     Ok(Some(marker))
 }
 
+/// Persisted project storage format, derived from the committed pointer rather
+/// than from adapter capabilities or legacy metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectStorageFormat {
+    Legacy,
+    Generation,
+}
+
+/// Detect the persisted storage format without mutating project contents.
+/// An invalid committed pointer or incomplete committed generation is an error,
+/// never a reason to fall back to the legacy format.
+///
+/// Application payload validation remains the responsibility of generation-aware
+/// Open and Save operations; this function only checks the commit structure.
+pub fn detect_project_storage_format(
+    context: &ProjectContext,
+) -> Result<ProjectStorageFormat, GenerationError> {
+    match read_committed_generation(context)? {
+        Some(_) => Ok(ProjectStorageFormat::Generation),
+        None => Ok(ProjectStorageFormat::Legacy),
+    }
+}
+
 /// Validate the contents of a save candidate before it becomes visible.
 /// The application payload remains application-owned and needs its own adapter validation.
 pub fn validate_generation_contents(
