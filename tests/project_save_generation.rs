@@ -458,13 +458,15 @@ impl workflow_ide_framework::project_adapter::ApplicationProjectAdapter for Stag
         _: &ProjectContext,
         generation: &ProjectContext,
         version: Option<&str>,
-    ) -> Result<Option<(
-        workflow_ide_framework::project_resource::ProjectDataCompatibility,
-        workflow_ide_framework::project_resource::ProjectDataConsistency,
-    )>, String> {
+    ) -> Result<
+        Option<(
+            workflow_ide_framework::project_resource::ProjectDataCompatibility,
+            workflow_ide_framework::project_resource::ProjectDataConsistency,
+        )>,
+        String,
+    > {
         use workflow_ide_framework::project_resource::{
-            ProjectDataCompatibility as Compatibility,
-            ProjectDataConsistency as Consistency,
+            ProjectDataCompatibility as Compatibility, ProjectDataConsistency as Consistency,
         };
         assert_eq!(version, Some("staged-v1"));
         let data = fs::read_to_string(generation.application_directory().join("catalog.json"))
@@ -476,13 +478,19 @@ impl workflow_ide_framework::project_adapter::ApplicationProjectAdapter for Stag
             "inspect-unsupported" => Ok(None),
             "inspect-error" => Err("committed inspection failed".into()),
             "inspect-incompatible" => Ok(Some((
-                Compatibility::Incompatible { reason: None, handled: false },
+                Compatibility::Incompatible {
+                    reason: None,
+                    handled: false,
+                },
                 Consistency::Consistent,
             ))),
             "inspect-inconsistent" => Ok(Some((
                 Compatibility::Compatible,
                 Consistency::Inconsistent {
-                    reason: None, can_open: false, can_recover: false, handled: false,
+                    reason: None,
+                    can_open: false,
+                    can_recover: false,
+                    handled: false,
                 },
             ))),
             _ => Ok(Some((Compatibility::Compatible, Consistency::Consistent))),
@@ -925,7 +933,7 @@ fn save_cons_corrupt_committed_source_blocks_resave_without_staging() {
 #[test]
 fn save_cons_resave_rejects_unhealthy_or_unsupported_committed_application() {
     use workflow_ide_framework::project_save_generation::{
-        save_project_generation, staging_path, GenerationSaveError,
+        GenerationSaveError, save_project_generation, staging_path,
     };
     for mode in [
         "inspect-unsupported",
@@ -935,24 +943,46 @@ fn save_cons_resave_rejects_unhealthy_or_unsupported_committed_application() {
     ] {
         let (root, context, mut session, mut project) = save_fixture(mode);
         let settings = workflow_ide_framework::framework_settings::FrameworkSettings::default();
-        let mut first = StagedSaver { mode: "success", calls: 0 };
+        let mut first = StagedSaver {
+            mode: "success",
+            calls: 0,
+        };
         save_project_generation(
-            &mut session, &context, &mut project, &settings, &mut first,
+            &mut session,
+            &context,
+            &mut project,
+            &settings,
+            &mut first,
             save_identity("old", "save-old"),
-        ).unwrap();
+        )
+        .unwrap();
         session.mark_application_dirty();
         let original = project.clone();
         let mut second = StagedSaver { mode, calls: 0 };
-        assert!(matches!(
-            save_project_generation(
-                &mut session, &context, &mut project, &settings, &mut second,
-                save_identity("new", "save-new"),
+        assert!(
+            matches!(
+                save_project_generation(
+                    &mut session,
+                    &context,
+                    &mut project,
+                    &settings,
+                    &mut second,
+                    save_identity("new", "save-new"),
+                ),
+                Err(GenerationSaveError::Generation(
+                    GenerationError::InvalidCandidate(_)
+                )) | Err(GenerationSaveError::Application(_))
             ),
-            Err(GenerationSaveError::Generation(GenerationError::InvalidCandidate(_)))
-                | Err(GenerationSaveError::Application(_))
-        ), "mode: {mode}");
+            "mode: {mode}"
+        );
         assert_eq!(second.calls, 0, "mode: {mode}");
-        assert_eq!(read_committed_generation(&context).unwrap().unwrap().generation_id, "old");
+        assert_eq!(
+            read_committed_generation(&context)
+                .unwrap()
+                .unwrap()
+                .generation_id,
+            "old"
+        );
         assert_eq!(session.current_save_id.as_deref(), Some("save-old"));
         assert!(session.dirty.application);
         assert_eq!(project, original);
