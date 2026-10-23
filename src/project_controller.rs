@@ -140,6 +140,59 @@ impl ProjectController {
         context: ProjectContext,
         result: ProjectOpenResult,
     ) -> ProjectCommandResult {
+        // accept_open is public: callers must not bypass generation validation
+        // by supplying a fabricated or stale ProjectOpenResult.
+        match detect_project_storage_format(&context) {
+            Ok(ProjectStorageFormat::Legacy) => {}
+            Ok(ProjectStorageFormat::Generation) => {
+                use crate::project_save_generation::resolve_validated_committed_paths;
+                let paths = match resolve_validated_committed_paths(
+                    &context,
+                    &self.application_id,
+                    |_| Ok(()),
+                ) {
+                    Ok(Some(paths)) => paths,
+                    Ok(None) => return ProjectCommandResult::Failed(
+                        "committed generation disappeared during acceptance".into(),
+                    ),
+                    Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
+                };
+                let committed = match std::fs::read_to_string(&paths.project_file)
+                    .ok()
+                    .and_then(|text| ProjectFile::from_toml(&text, &self.application_id).ok())
+                {
+                    Some(file) => file,
+                    None => return ProjectCommandResult::Failed(
+                        "cannot read committed generation metadata".into(),
+                    ),
+                };
+                let settings = match std::fs::read_to_string(&paths.framework_settings)
+                    .ok()
+                    .and_then(|text| FrameworkSettings::from_toml(&text).ok())
+                {
+                    Some(settings) => settings,
+                    None => return ProjectCommandResult::Failed(
+                        "cannot read committed generation settings".into(),
+                    ),
+                };
+                if result.project_file != committed
+                    || result.framework_settings != FrameworkSettingsOpen::Loaded(settings)
+                    || !matches!(
+                        result.application_compatibility,
+                        crate::project_resource::ProjectDataCompatibility::Compatible
+                    )
+                    || !matches!(
+                        result.application_consistency,
+                        crate::project_resource::ProjectDataConsistency::Consistent
+                    )
+                {
+                    return ProjectCommandResult::Failed(
+                        "generation Open result does not match a clean committed snapshot".into(),
+                    );
+                }
+            }
+            Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
+        }
         let session = match open_session(context, &result) {
             Ok(session) => session,
             Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
