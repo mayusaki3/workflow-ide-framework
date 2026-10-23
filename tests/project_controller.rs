@@ -556,3 +556,29 @@ fn legacy_controller_save_and_save_as_fail_closed_for_committed_pointer() {
     assert!(!destination.project_file_path().exists());
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn controller_open_rejects_corrupt_generation_pointer_without_legacy_fallback() {
+    use std::fs;
+    use workflow_ide_framework::project_save_generation::committed_path;
+
+    let root = std::env::temp_dir().join(format!(
+        "wfide-controller-open-generation-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    let context = ProjectContext::new(&root);
+    let pointer = committed_path(&context);
+    fs::create_dir_all(pointer.parent().unwrap()).unwrap();
+    fs::write(&pointer, "invalid = [").unwrap();
+
+    let mut controller = ProjectController::new("org.test", "Test");
+    let mut app = App;
+    assert!(matches!(
+        controller.open(context, &mut app),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert!(!controller.is_open());
+    fs::remove_dir_all(root).unwrap();
+}
