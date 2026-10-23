@@ -523,7 +523,11 @@ fn legacy_controller_save_and_save_as_fail_closed_for_committed_pointer() {
         ),
         ProjectCommandResult::Completed
     );
-    controller.session.as_mut().unwrap().mark_application_dirty();
+    controller
+        .session
+        .as_mut()
+        .unwrap()
+        .mark_application_dirty();
     let original = controller.project_file.clone();
     let original_dirty = controller.session.as_ref().unwrap().dirty;
 
