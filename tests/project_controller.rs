@@ -497,3 +497,58 @@ fn missing_saved_selected_workspace_falls_back_to_default() {
         .unwrap();
     assert_eq!(reopened.selected_id(), DEFAULT_WORKSPACE_ID);
 }
+
+#[test]
+fn legacy_controller_save_and_save_as_fail_closed_for_committed_pointer() {
+    use std::fs;
+    use workflow_ide_framework::project_save_generation::committed_path;
+
+    let root = std::env::temp_dir().join(format!(
+        "wfide-controller-generation-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    let context = ProjectContext::new(&root);
+    let mut controller = ProjectController::new("org.test", "Test");
+    let mut app = App;
+    assert_eq!(
+        controller.new_project(
+            "Generation Guard",
+            "en",
+            None,
+            NewProjectStoragePolicy::Required,
+            Some(context.clone()),
+            &mut app,
+        ),
+        ProjectCommandResult::Completed
+    );
+    controller.session.as_mut().unwrap().mark_application_dirty();
+    let original = controller.project_file.clone();
+    let original_dirty = controller.session.as_ref().unwrap().dirty;
+
+    let pointer = committed_path(&context);
+    fs::create_dir_all(pointer.parent().unwrap()).unwrap();
+    fs::write(&pointer, "invalid pointer = [").unwrap();
+
+    assert!(matches!(
+        controller.save(&mut app, "new-save", "2026-10-24"),
+        ProjectCommandResult::Failed(_)
+    ));
+    let destination = ProjectContext::new(root.join("copy"));
+    assert!(matches!(
+        controller.save_as(
+            destination.clone(),
+            "Copied",
+            &mut app,
+            "new-save",
+            "2026-10-24",
+        ),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(controller.project_file, original);
+    assert_eq!(controller.session.as_ref().unwrap().dirty, original_dirty);
+    assert!(!context.project_file_path().exists());
+    assert!(!destination.project_file_path().exists());
+    fs::remove_dir_all(root).unwrap();
+}
