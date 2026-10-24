@@ -1189,3 +1189,27 @@ fn controller_generation_save_unsupported_never_falls_back_to_legacy() {
     assert!(!context.project_file_path().exists());
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn controller_generation_save_as_commits_copy_and_switches_session() {
+    use workflow_ide_framework::project_controller::ProjectCommandResult;
+    let (root, source, mut controller) = controller_generation_fixture("save-as-copy");
+    let destination = ProjectContext::new(root.join("copy"));
+    controller.mark_unsaved();
+    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    assert_eq!(
+        controller.save_as(destination.clone(), "Copy", &mut app, "copy-save", "now"),
+        ProjectCommandResult::Completed
+    );
+    assert_eq!(app.calls, 1);
+    assert_eq!(controller.session.as_ref().unwrap().context(), Some(&destination));
+    assert_eq!(controller.project_name(), Some("Copy"));
+    assert!(!controller.has_unsaved_changes());
+    assert_eq!(read_committed_generation(&source).unwrap().unwrap().generation_id, "original");
+    let pointer = read_committed_generation(&destination).unwrap().unwrap();
+    assert_eq!(
+        fs::read_to_string(generation_path(&destination, &pointer.generation_id).unwrap().join("application/catalog.json")).unwrap(),
+        "copy-save"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
