@@ -14,7 +14,7 @@ use crate::{
     project_save_as::save_project_as,
     project_save_generation::{
         GenerationSaveIdentity, ProjectStorageFormat, detect_project_storage_format,
-        save_project_generation,
+        save_project_generation, save_project_generation_as,
     },
     resource_registry::ResourceRegistry,
     workspace::{WorkspaceError, WorkspaceRegistry},
@@ -542,9 +542,31 @@ impl ProjectController {
             match detect_project_storage_format(source) {
                 Ok(ProjectStorageFormat::Legacy) => {}
                 Ok(ProjectStorageFormat::Generation) => {
-                    return ProjectCommandResult::Failed(
-                        "generation project requires generation-aware Save As".into(),
+                    let Some(project_file) = self.project_file.as_mut() else {
+                        return ProjectCommandResult::Failed("project metadata is unavailable".into());
+                    };
+                    let mut settings = self.framework_settings.clone();
+                    settings.resources = self.resource_registry.entries().iter()
+                        .map(crate::framework_settings::StoredResourceEntry::from_resource).collect();
+                    let mut candidate = project_file.clone();
+                    candidate.project.name = project_name.into();
+                    static NEXT_SAVE_AS_GENERATION: std::sync::atomic::AtomicU64 =
+                        std::sync::atomic::AtomicU64::new(1);
+                    let sequence = NEXT_SAVE_AS_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let timestamp = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
+                    let generation_id = format!("gen-{timestamp:x}-{sequence:x}");
+                    let result = save_project_generation_as(
+                        session, source, &destination, &mut candidate, &settings, application,
+                        GenerationSaveIdentity { generation_id: &generation_id, save_id, saved_at },
                     );
+                    return match result {
+                        Ok(()) => {
+                            *project_file = candidate;
+                            self.framework_settings = settings;
+                            ProjectCommandResult::Completed
+                        }
+                        Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
+                    };
                 }
                 Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
             }
