@@ -538,7 +538,7 @@ impl ProjectController {
         };
         // Save As still uses the legacy adapter and must not copy a committed
         // generation or overwrite a destination with one.
-        if let Some(source) = session.context() {
+        if let Some(ref source) = session.context().cloned() {
             match detect_project_storage_format(source) {
                 Ok(ProjectStorageFormat::Legacy) => {}
                 Ok(ProjectStorageFormat::Generation) => {
