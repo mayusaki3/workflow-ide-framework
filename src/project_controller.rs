@@ -12,7 +12,10 @@ use crate::{
     project_resource::NewProjectStoragePolicy,
     project_save::save_project,
     project_save_as::save_project_as,
-    project_save_generation::{ProjectStorageFormat, detect_project_storage_format},
+    project_save_generation::{
+        GenerationSaveIdentity, ProjectStorageFormat, detect_project_storage_format,
+        save_project_generation,
+    },
     resource_registry::ResourceRegistry,
     workspace::{WorkspaceError, WorkspaceRegistry},
     workspace_dock::{
@@ -379,15 +382,10 @@ impl ProjectController {
         };
         // Generation projects must never be written through the legacy save path.
         // An invalid committed pointer also fails closed.
-        match detect_project_storage_format(&context) {
-            Ok(ProjectStorageFormat::Legacy) => {}
-            Ok(ProjectStorageFormat::Generation) => {
-                return ProjectCommandResult::Failed(
-                    "generation project requires generation-aware save".into(),
-                );
-            }
+        let storage_format = match detect_project_storage_format(&context) {
+            Ok(format) => format,
             Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
-        }
+        };
         let Some(project_file) = self.project_file.as_mut() else {
             return ProjectCommandResult::Failed("project metadata is unavailable".into());
         };
@@ -398,20 +396,51 @@ impl ProjectController {
             .iter()
             .map(crate::framework_settings::StoredResourceEntry::from_resource)
             .collect();
-        match save_project(
-            session,
-            &context,
-            project_file,
-            &settings,
-            application,
-            save_id,
-            saved_at,
-        ) {
+        let result = match storage_format {
+            ProjectStorageFormat::Legacy => save_project(
+                session,
+                &context,
+                project_file,
+                &settings,
+                application,
+                save_id,
+                saved_at,
+            )
+            .map_err(|error| format!("{error:?}")),
+            ProjectStorageFormat::Generation => {
+                // A unique generation ID must not be derived solely from the
+                // caller's save ID: retries and repeated saves are permitted.
+                static NEXT_GENERATION: std::sync::atomic::AtomicU64 =
+                    std::sync::atomic::AtomicU64::new(1);
+                let sequence = NEXT_GENERATION.fetch_add(
+                    1,
+                    std::sync::atomic::Ordering::Relaxed,
+                );
+                let timestamp = chrono::Utc::now()
+                    .timestamp_nanos_opt()
+                    .unwrap_or_default();
+                let generation_id = format!("gen-{timestamp:x}-{sequence:x}");
+                save_project_generation(
+                    session,
+                    &context,
+                    project_file,
+                    &settings,
+                    application,
+                    GenerationSaveIdentity {
+                        generation_id: &generation_id,
+                        save_id,
+                        saved_at,
+                    },
+                )
+                .map_err(|error| format!("{error:?}"))
+            }
+        };
+        match result {
             Ok(()) => {
                 self.framework_settings = settings;
                 ProjectCommandResult::Completed
             }
-            Err(error) => ProjectCommandResult::Failed(format!("{error:?}")),
+            Err(error) => ProjectCommandResult::Failed(error),
         }
     }
 
