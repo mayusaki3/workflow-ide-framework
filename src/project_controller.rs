@@ -156,7 +156,8 @@ impl ProjectController {
         match detect_project_storage_format(&context) {
             Ok(ProjectStorageFormat::Legacy) => {}
             Ok(ProjectStorageFormat::Generation) => {
-                if !matches!(pending_generation, Some((ref authorized_context, ref authorized_result)) if *authorized_context == context && *authorized_result == result) {
+                if !matches!(pending_generation, Some((ref authorized_context, ref authorized_result)) if *authorized_context == context && *authorized_result == result)
+                {
                     return ProjectCommandResult::Failed(
                         "generation Open requires a matching controller inspection".into(),
                     );
