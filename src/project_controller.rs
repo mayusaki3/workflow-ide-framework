@@ -43,6 +43,7 @@ pub struct ProjectController {
     pub framework_settings: FrameworkSettings,
     pub resource_registry: ResourceRegistry,
     registry_refresh: Option<crate::project_panel_api::ProjectPanelRefreshHandle>,
+    pending_generation_open: Option<(ProjectContext, ProjectOpenResult)>,
 }
 
 impl ProjectController {
@@ -55,6 +56,7 @@ impl ProjectController {
             framework_settings: FrameworkSettings::default(),
             resource_registry: ResourceRegistry::default(),
             registry_refresh: None,
+            pending_generation_open: None,
         }
     }
 
@@ -93,6 +95,7 @@ impl ProjectController {
         context: ProjectContext,
         application: &mut dyn ErasedApplicationProjectAdapter,
     ) -> ProjectCommandResult {
+        self.pending_generation_open = None;
         let storage_format = match detect_project_storage_format(&context) {
             Ok(format) => format,
             Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
@@ -132,6 +135,9 @@ impl ProjectController {
                 "generation application must be compatible and consistent".into(),
             );
         }
+        if storage_format == ProjectStorageFormat::Generation {
+            self.pending_generation_open = Some((context.clone(), result.clone()));
+        }
         if open_requires_user_decision(&result) {
             return ProjectCommandResult::NeedsOpenDecision(result);
         }
@@ -143,11 +149,18 @@ impl ProjectController {
         context: ProjectContext,
         result: ProjectOpenResult,
     ) -> ProjectCommandResult {
+        // Consume the one-shot authorization even if validation below fails.
+        let pending_generation = self.pending_generation_open.take();
         // accept_open is public: callers must not bypass generation validation
         // by supplying a fabricated or stale ProjectOpenResult.
         match detect_project_storage_format(&context) {
             Ok(ProjectStorageFormat::Legacy) => {}
             Ok(ProjectStorageFormat::Generation) => {
+                if !matches!(pending_generation, Some((ref authorized_context, ref authorized_result)) if *authorized_context == context && *authorized_result == result) {
+                    return ProjectCommandResult::Failed(
+                        "generation Open requires a matching controller inspection".into(),
+                    );
+                }
                 use crate::project_save_generation::resolve_validated_committed_paths;
                 let paths =
                     match resolve_validated_committed_paths(&context, &self.application_id, |_| {
@@ -514,6 +527,7 @@ impl ProjectController {
             return ProjectCommandResult::NeedsDirtyConfirmation;
         }
         self.session = None;
+        self.pending_generation_open = None;
         self.project_file = None;
         self.framework_settings = FrameworkSettings::default();
         self.resource_registry = ResourceRegistry::default();
