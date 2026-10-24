@@ -781,3 +781,20 @@ fn accept_open_rejects_fabricated_generation_result() {
     assert!(!controller.is_open());
     fs::remove_dir_all(r).unwrap();
 }
+
+#[test]
+fn controller_rejects_untrusted_but_authentic_generation_result() {
+    use workflow_ide_framework::project_controller::{ProjectCommandResult, ProjectController};
+    use workflow_ide_framework::project_open::inspect_committed_generation;
+    let (root, context) = committed_fixture("controller-untrusted-generation");
+    let mut app = GenerationInspector { enabled: true, called: false };
+    let result = inspect_committed_generation(&context, "org.example.open", &mut app)
+        .unwrap().unwrap();
+    let mut controller = ProjectController::new("org.example.open", "Open App");
+    assert!(matches!(
+        controller.accept_open(context, result),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert!(!controller.is_open());
+    fs::remove_dir_all(root).unwrap();
+}
