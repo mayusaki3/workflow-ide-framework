@@ -412,13 +412,8 @@ impl ProjectController {
                 // caller's save ID: retries and repeated saves are permitted.
                 static NEXT_GENERATION: std::sync::atomic::AtomicU64 =
                     std::sync::atomic::AtomicU64::new(1);
-                let sequence = NEXT_GENERATION.fetch_add(
-                    1,
-                    std::sync::atomic::Ordering::Relaxed,
-                );
-                let timestamp = chrono::Utc::now()
-                    .timestamp_nanos_opt()
-                    .unwrap_or_default();
+                let sequence = NEXT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let timestamp = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
                 let generation_id = format!("gen-{timestamp:x}-{sequence:x}");
                 save_project_generation(
                     session,
