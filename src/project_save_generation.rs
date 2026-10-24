@@ -325,7 +325,7 @@ pub fn save_project_generation_as(
     }
     let paths = resolve_validated_committed_paths(source, &project_file.application.id, |_| Ok(()))
         .map_err(GenerationSaveError::Generation)?
-        .ok_or_else(|| GenerationSaveError::Generation(GenerationError::MissingCommittedGeneration))?;
+        .ok_or(GenerationSaveError::Generation(GenerationError::MissingCommittedGeneration))?;
     let committed_text = fs::read_to_string(&paths.project_file).map_err(GenerationSaveError::Io)?;
     let committed_project = ProjectFile::from_toml(&committed_text, &project_file.application.id)
         .map_err(|error| GenerationSaveError::Generation(GenerationError::InvalidCandidate(format!("{error:?}"))))?;
@@ -449,7 +449,7 @@ fn save_project_generation_from(
     let staged_result = (|| -> Result<ProjectFile, GenerationSaveError> {
         let stage_context = ProjectContext::new(&stage);
         let app = application
-            .save_project_data_staged(&source_context, &stage_context, save_id)
+            .save_project_data_staged(source_context, &stage_context, save_id)
             .map_err(GenerationSaveError::Application)?
             .ok_or(GenerationSaveError::StagedSaveNotSupported)?;
 
