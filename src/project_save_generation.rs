@@ -300,6 +300,64 @@ pub struct GenerationSaveIdentity<'a> {
     pub saved_at: &'a str,
 }
 
+/// Save a committed generation to a different, initially empty project root.
+/// The original session and metadata are replaced only after destination commit.
+pub fn save_project_generation_as(
+    session: &mut crate::project_lifecycle::ProjectSession,
+    source: &ProjectContext,
+    destination: &ProjectContext,
+    project_file: &mut ProjectFile,
+    framework_settings: &FrameworkSettings,
+    application: &mut dyn crate::project_adapter_erased::ErasedApplicationProjectAdapter,
+    identity: GenerationSaveIdentity<'_>,
+) -> Result<(), GenerationSaveError> {
+    if source.root() == destination.root() {
+        return Err(GenerationSaveError::Generation(GenerationError::InvalidCandidate(
+            "Save As destination must differ from source".into(),
+        )));
+    }
+    if destination.root().exists()
+        && fs::read_dir(destination.root()).map_err(GenerationSaveError::Io)?.next().is_some()
+    {
+        return Err(GenerationSaveError::Generation(GenerationError::InvalidCandidate(
+            "Save As destination must be empty".into(),
+        )));
+    }
+    let paths = resolve_validated_committed_paths(source, &project_file.application.id, |_| Ok(()))
+        .map_err(GenerationSaveError::Generation)?
+        .ok_or_else(|| GenerationSaveError::Generation(GenerationError::MissingCommittedGeneration))?;
+    let committed_text = fs::read_to_string(&paths.project_file).map_err(GenerationSaveError::Io)?;
+    let committed_project = ProjectFile::from_toml(&committed_text, &project_file.application.id)
+        .map_err(|error| GenerationSaveError::Generation(GenerationError::InvalidCandidate(format!("{error:?}"))))?;
+    let source_generation = ProjectContext::new(
+        paths.application_directory.parent().expect("generation has parent"),
+    );
+    use crate::project_resource::{ProjectDataCompatibility, ProjectDataConsistency};
+    match application.inspect_project_data_generation(
+        source,
+        &source_generation,
+        committed_project.application.data_version.as_deref(),
+    ).map_err(GenerationSaveError::Application)? {
+        Some((ProjectDataCompatibility::Compatible, ProjectDataConsistency::Consistent)) => {}
+        _ => return Err(GenerationSaveError::Generation(GenerationError::InvalidCandidate(
+            "source generation application is not compatible and consistent".into(),
+        ))),
+    }
+    let mut candidate_session = crate::project_lifecycle::ProjectSession {
+        dirty: session.dirty,
+        current_save_id: session.current_save_id.clone(),
+        storage: crate::project_lifecycle::ProjectStorageState::Stored(destination.clone()),
+    };
+    let mut candidate_project = project_file.clone();
+    save_project_generation_from(
+        &mut candidate_session, destination, &source_generation,
+        &mut candidate_project, framework_settings, application, identity,
+    )?;
+    *session = candidate_session;
+    *project_file = candidate_project;
+    Ok(())
+}
+
 pub fn save_project_generation(
     session: &mut crate::project_lifecycle::ProjectSession,
     context: &ProjectContext,
@@ -368,6 +426,22 @@ pub fn save_project_generation(
             )
         })
         .unwrap_or_else(|| context.clone());
+    save_project_generation_from(
+        session, context, &source_context, project_file, framework_settings, application,
+        GenerationSaveIdentity { generation_id, save_id, saved_at },
+    )
+}
+
+fn save_project_generation_from(
+    session: &mut crate::project_lifecycle::ProjectSession,
+    context: &ProjectContext,
+    source_context: &ProjectContext,
+    project_file: &mut ProjectFile,
+    framework_settings: &FrameworkSettings,
+    application: &mut dyn crate::project_adapter_erased::ErasedApplicationProjectAdapter,
+    identity: GenerationSaveIdentity<'_>,
+) -> Result<(), GenerationSaveError> {
+    let GenerationSaveIdentity { generation_id, save_id, saved_at } = identity;
     let stage =
         begin_generation(context, generation_id).map_err(GenerationSaveError::Generation)?;
     // Only the staging directory created by this invocation is eligible for
