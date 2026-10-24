@@ -1213,3 +1213,42 @@ fn controller_generation_save_as_commits_copy_and_switches_session() {
     );
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn controller_generation_save_as_failure_preserves_source_and_dirty_state() {
+    use workflow_ide_framework::project_controller::ProjectCommandResult;
+    let (root, source, mut controller) = controller_generation_fixture("save-as-failure");
+    let destination = ProjectContext::new(root.join("copy"));
+    controller.mark_unsaved();
+    let mut app = StagedSaver { mode: "failure", calls: 0 };
+    assert!(matches!(
+        controller.save_as(destination.clone(), "Copy", &mut app, "copy-save", "now"),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(app.calls, 1);
+    assert_eq!(controller.session.as_ref().unwrap().context(), Some(&source));
+    assert_eq!(controller.project_name(), Some("Test"));
+    assert_eq!(controller.session.as_ref().unwrap().current_save_id.as_deref(), Some("save-old"));
+    assert!(controller.has_unsaved_changes());
+    assert_eq!(read_committed_generation(&source).unwrap().unwrap().generation_id, "original");
+    assert!(read_committed_generation(&destination).unwrap().is_none());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn controller_generation_save_as_refuses_occupied_destination() {
+    use workflow_ide_framework::project_controller::ProjectCommandResult;
+    let (root, source, mut controller) = controller_generation_fixture("save-as-occupied");
+    let destination = ProjectContext::new(root.join("occupied"));
+    fs::create_dir_all(destination.root()).unwrap();
+    fs::write(destination.root().join("keep.txt"), "keep").unwrap();
+    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    assert!(matches!(
+        controller.save_as(destination.clone(), "Copy", &mut app, "copy-save", "now"),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(app.calls, 0);
+    assert_eq!(fs::read_to_string(destination.root().join("keep.txt")).unwrap(), "keep");
+    assert_eq!(controller.session.as_ref().unwrap().context(), Some(&source));
+    fs::remove_dir_all(root).unwrap();
+}
