@@ -1042,20 +1042,35 @@ fn save_cons_storage_format_detection_is_pointer_based_and_fails_closed() {
 
 fn controller_generation_fixture(
     name: &str,
-) -> (std::path::PathBuf, ProjectContext, workflow_ide_framework::project_controller::ProjectController) {
+) -> (
+    std::path::PathBuf,
+    ProjectContext,
+    workflow_ide_framework::project_controller::ProjectController,
+) {
     use workflow_ide_framework::{
         framework_settings::FrameworkSettings,
         project_controller::{ProjectCommandResult, ProjectController},
         project_save_generation::save_project_generation,
     };
     let (root, context, mut session, mut project) = save_fixture(name);
-    let mut app = StagedSaver { mode: "success", calls: 0 };
+    let mut app = StagedSaver {
+        mode: "success",
+        calls: 0,
+    };
     save_project_generation(
-        &mut session, &context, &mut project, &FrameworkSettings::default(),
-        &mut app, save_identity("original", "save-old"),
-    ).unwrap();
+        &mut session,
+        &context,
+        &mut project,
+        &FrameworkSettings::default(),
+        &mut app,
+        save_identity("original", "save-old"),
+    )
+    .unwrap();
     let mut controller = ProjectController::new("org.example.test", "Test");
-    assert_eq!(controller.open(context.clone(), &mut app), ProjectCommandResult::Completed);
+    assert_eq!(
+        controller.open(context.clone(), &mut app),
+        ProjectCommandResult::Completed
+    );
     (root, context, controller)
 }
 
@@ -1064,22 +1079,50 @@ fn controller_generation_save_round_trip_reopens_latest_snapshot() {
     use workflow_ide_framework::project_controller::{ProjectCommandResult, ProjectController};
     let (root, context, mut controller) = controller_generation_fixture("controller-roundtrip");
     controller.mark_unsaved();
-    let mut app = StagedSaver { mode: "resave", calls: 0 };
-    assert_eq!(controller.save(&mut app, "save-new", "2026-10-24"), ProjectCommandResult::Completed);
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
+    assert_eq!(
+        controller.save(&mut app, "save-new", "2026-10-24"),
+        ProjectCommandResult::Completed
+    );
     assert_eq!(app.calls, 1);
     assert!(!controller.has_unsaved_changes());
-    assert_eq!(controller.session.as_ref().unwrap().current_save_id.as_deref(), Some("save-new"));
-    assert_eq!(controller.project_file.as_ref().unwrap().project.save_id, "save-new");
+    assert_eq!(
+        controller
+            .session
+            .as_ref()
+            .unwrap()
+            .current_save_id
+            .as_deref(),
+        Some("save-new")
+    );
+    assert_eq!(
+        controller.project_file.as_ref().unwrap().project.save_id,
+        "save-new"
+    );
     let pointer = read_committed_generation(&context).unwrap().unwrap();
     assert_ne!(pointer.generation_id, "original");
     assert_eq!(
-        fs::read_to_string(generation_path(&context, &pointer.generation_id).unwrap().join("application/catalog.json")).unwrap(),
+        fs::read_to_string(
+            generation_path(&context, &pointer.generation_id)
+                .unwrap()
+                .join("application/catalog.json")
+        )
+        .unwrap(),
         "save-new"
     );
     assert!(!context.project_file_path().exists());
     let mut reopened = ProjectController::new("org.example.test", "Test");
-    assert_eq!(reopened.open(context.clone(), &mut app), ProjectCommandResult::Completed);
-    assert_eq!(reopened.project_file.as_ref().unwrap().project.save_id, "save-new");
+    assert_eq!(
+        reopened.open(context.clone(), &mut app),
+        ProjectCommandResult::Completed
+    );
+    assert_eq!(
+        reopened.project_file.as_ref().unwrap().project.save_id,
+        "save-new"
+    );
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -1088,13 +1131,36 @@ fn controller_generation_save_failure_preserves_pointer_and_dirty_state() {
     use workflow_ide_framework::project_controller::ProjectCommandResult;
     let (root, context, mut controller) = controller_generation_fixture("controller-failure");
     controller.mark_unsaved();
-    let mut app = StagedSaver { mode: "failure", calls: 0 };
-    assert!(matches!(controller.save(&mut app, "save-new", "2026-10-24"), ProjectCommandResult::Failed(_)));
+    let mut app = StagedSaver {
+        mode: "failure",
+        calls: 0,
+    };
+    assert!(matches!(
+        controller.save(&mut app, "save-new", "2026-10-24"),
+        ProjectCommandResult::Failed(_)
+    ));
     assert_eq!(app.calls, 1);
     assert!(controller.has_unsaved_changes());
-    assert_eq!(controller.session.as_ref().unwrap().current_save_id.as_deref(), Some("save-old"));
-    assert_eq!(controller.project_file.as_ref().unwrap().project.save_id, "save-old");
-    assert_eq!(read_committed_generation(&context).unwrap().unwrap().generation_id, "original");
+    assert_eq!(
+        controller
+            .session
+            .as_ref()
+            .unwrap()
+            .current_save_id
+            .as_deref(),
+        Some("save-old")
+    );
+    assert_eq!(
+        controller.project_file.as_ref().unwrap().project.save_id,
+        "save-old"
+    );
+    assert_eq!(
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "original"
+    );
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -1103,11 +1169,23 @@ fn controller_generation_save_unsupported_never_falls_back_to_legacy() {
     use workflow_ide_framework::project_controller::ProjectCommandResult;
     let (root, context, mut controller) = controller_generation_fixture("controller-unsupported");
     controller.mark_unsaved();
-    let mut app = StagedSaver { mode: "unsupported", calls: 0 };
-    assert!(matches!(controller.save(&mut app, "save-new", "2026-10-24"), ProjectCommandResult::Failed(_)));
+    let mut app = StagedSaver {
+        mode: "unsupported",
+        calls: 0,
+    };
+    assert!(matches!(
+        controller.save(&mut app, "save-new", "2026-10-24"),
+        ProjectCommandResult::Failed(_)
+    ));
     assert_eq!(app.calls, 1);
     assert!(controller.has_unsaved_changes());
-    assert_eq!(read_committed_generation(&context).unwrap().unwrap().generation_id, "original");
+    assert_eq!(
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "original"
+    );
     assert!(!context.project_file_path().exists());
     fs::remove_dir_all(root).unwrap();
 }
