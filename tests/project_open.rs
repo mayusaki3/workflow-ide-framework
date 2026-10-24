@@ -713,7 +713,12 @@ fn controller_opens_clean_generation_and_never_uses_legacy_save() {
         "generation-save"
     );
     assert_eq!(
-        controller.session.as_ref().unwrap().current_save_id.as_deref(),
+        controller
+            .session
+            .as_ref()
+            .unwrap()
+            .current_save_id
+            .as_deref(),
         Some("generation-save")
     );
     assert!(matches!(
