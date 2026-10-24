@@ -808,14 +808,25 @@ fn generation_authorization_is_consumed_after_rejected_result() {
     use workflow_ide_framework::project_controller::{ProjectCommandResult, ProjectController};
     use workflow_ide_framework::project_open::inspect_committed_generation;
     let (root, context) = committed_fixture("authorization-consumed");
-    let mut app = GenerationInspector { enabled: true, called: false };
-    let valid = inspect_committed_generation(&context, "org.example.open", &mut app).unwrap().unwrap();
+    let mut app = GenerationInspector {
+        enabled: true,
+        called: false,
+    };
+    let valid = inspect_committed_generation(&context, "org.example.open", &mut app)
+        .unwrap()
+        .unwrap();
     let mut forged = valid.clone();
     forged.project_file.project.save_id = "forged".into();
     let mut controller = ProjectController::new("org.example.open", "Open App");
     // A directly supplied result must not establish authorization.
-    assert!(matches!(controller.accept_open(context.clone(), forged), ProjectCommandResult::Failed(_)));
-    assert!(matches!(controller.accept_open(context.clone(), valid), ProjectCommandResult::Failed(_)));
+    assert!(matches!(
+        controller.accept_open(context.clone(), forged),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert!(matches!(
+        controller.accept_open(context.clone(), valid),
+        ProjectCommandResult::Failed(_)
+    ));
     assert!(!controller.is_open());
     fs::remove_dir_all(root).unwrap();
 }
@@ -825,12 +836,23 @@ fn generation_open_failure_invalidates_previous_authorization() {
     use workflow_ide_framework::project_controller::{ProjectCommandResult, ProjectController};
     use workflow_ide_framework::project_open::inspect_committed_generation;
     let (root, context) = committed_fixture("authorization-reset");
-    let mut app = GenerationInspector { enabled: true, called: false };
-    let result = inspect_committed_generation(&context, "org.example.open", &mut app).unwrap().unwrap();
+    let mut app = GenerationInspector {
+        enabled: true,
+        called: false,
+    };
+    let result = inspect_committed_generation(&context, "org.example.open", &mut app)
+        .unwrap()
+        .unwrap();
     let mut controller = ProjectController::new("org.example.open", "Open App");
     let missing = ProjectContext::new(root.join("nonexistent"));
-    assert!(matches!(controller.open(missing, &mut app), ProjectCommandResult::Failed(_)));
-    assert!(matches!(controller.accept_open(context, result), ProjectCommandResult::Failed(_)));
+    assert!(matches!(
+        controller.open(missing, &mut app),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert!(matches!(
+        controller.accept_open(context, result),
+        ProjectCommandResult::Failed(_)
+    ));
     assert!(!controller.is_open());
     fs::remove_dir_all(root).unwrap();
 }
@@ -840,11 +862,21 @@ fn generation_open_rejects_changed_committed_snapshot() {
     use workflow_ide_framework::project_controller::{ProjectCommandResult, ProjectController};
     use workflow_ide_framework::project_save_generation::generation_path;
     let (root, context) = committed_fixture("changed-snapshot");
-    let mut app = GenerationInspector { enabled: true, called: false };
+    let mut app = GenerationInspector {
+        enabled: true,
+        called: false,
+    };
     let mut controller = ProjectController::new("org.example.open", "Open App");
     let snapshot = generation_path(&context, "snapshot").unwrap();
-    fs::write(snapshot.join("framework_settings.toml"), "format_version = 1\nsave_id = 'tampered'\n").unwrap();
-    assert!(matches!(controller.open(context, &mut app), ProjectCommandResult::Failed(_)));
+    fs::write(
+        snapshot.join("framework_settings.toml"),
+        "format_version = 1\nsave_id = 'tampered'\n",
+    )
+    .unwrap();
+    assert!(matches!(
+        controller.open(context, &mut app),
+        ProjectCommandResult::Failed(_)
+    ));
     assert!(!controller.is_open());
     assert!(!app.called);
     fs::remove_dir_all(root).unwrap();
