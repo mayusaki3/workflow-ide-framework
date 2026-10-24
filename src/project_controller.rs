@@ -24,6 +24,45 @@ use crate::{
 };
 use std::collections::BTreeMap;
 
+
+type GenerationApplicationSnapshot = Vec<(std::path::PathBuf, Vec<u8>)>;
+
+fn snapshot_generation_application(
+    directory: &std::path::Path,
+) -> Result<GenerationApplicationSnapshot, String> {
+    fn visit(
+        root: &std::path::Path,
+        current: &std::path::Path,
+        files: &mut GenerationApplicationSnapshot,
+    ) -> Result<(), String> {
+        let entries = std::fs::read_dir(current).map_err(|error| error.to_string())?;
+        for entry in entries {
+            let entry = entry.map_err(|error| error.to_string())?;
+            let path = entry.path();
+            let kind = entry.file_type().map_err(|error| error.to_string())?;
+            if kind.is_symlink() {
+                return Err("generation application contains a symbolic link".into());
+            }
+            if kind.is_dir() {
+                visit(root, &path, files)?;
+            } else if kind.is_file() {
+                let relative = path.strip_prefix(root).map_err(|error| error.to_string())?;
+                files.push((
+                    relative.to_path_buf(),
+                    std::fs::read(&path).map_err(|error| error.to_string())?,
+                ));
+            } else {
+                return Err("generation application contains an unsupported entry".into());
+            }
+        }
+        Ok(())
+    }
+    let mut files = Vec::new();
+    visit(directory, directory, &mut files)?;
+    files.sort_by(|left, right| left.0.cmp(&right.0));
+    Ok(files)
+}
+
 // Preserve the public enum's payload shape for existing application consumers.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
@@ -43,7 +82,7 @@ pub struct ProjectController {
     pub framework_settings: FrameworkSettings,
     pub resource_registry: ResourceRegistry,
     registry_refresh: Option<crate::project_panel_api::ProjectPanelRefreshHandle>,
-    pending_generation_open: Option<(ProjectContext, ProjectOpenResult)>,
+    pending_generation_open: Option<(ProjectContext, ProjectOpenResult, GenerationApplicationSnapshot)>,
 }
 
 impl ProjectController {
@@ -136,7 +175,18 @@ impl ProjectController {
             );
         }
         if storage_format == ProjectStorageFormat::Generation {
-            self.pending_generation_open = Some((context.clone(), result.clone()));
+            let paths = match crate::project_save_generation::resolve_validated_committed_paths(
+                &context, &self.application_id, |_| Ok(()),
+            ) {
+                Ok(Some(paths)) => paths,
+                Ok(None) => return ProjectCommandResult::Failed("committed generation disappeared during Open".into()),
+                Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
+            };
+            let snapshot = match snapshot_generation_application(&paths.application_directory) {
+                Ok(snapshot) => snapshot,
+                Err(error) => return ProjectCommandResult::Failed(error),
+            };
+            self.pending_generation_open = Some((context.clone(), result.clone(), snapshot));
         }
         if open_requires_user_decision(&result) {
             return ProjectCommandResult::NeedsOpenDecision(result);
@@ -156,7 +206,7 @@ impl ProjectController {
         match detect_project_storage_format(&context) {
             Ok(ProjectStorageFormat::Legacy) => {}
             Ok(ProjectStorageFormat::Generation) => {
-                if !matches!(pending_generation, Some((ref authorized_context, ref authorized_result)) if *authorized_context == context && *authorized_result == result)
+                if !matches!(pending_generation, Some((ref authorized_context, ref authorized_result, _)) if *authorized_context == context && *authorized_result == result)
                 {
                     return ProjectCommandResult::Failed(
                         "generation Open requires a matching controller inspection".into(),
@@ -175,6 +225,17 @@ impl ProjectController {
                         }
                         Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
                     };
+                let expected_application = match pending_generation {
+                    Some((_, _, snapshot)) => snapshot,
+                    None => unreachable!("generation authorization checked above"),
+                };
+                match snapshot_generation_application(&paths.application_directory) {
+                    Ok(current) if current == expected_application => {}
+                    Ok(_) => return ProjectCommandResult::Failed(
+                        "generation application changed since inspection".into(),
+                    ),
+                    Err(error) => return ProjectCommandResult::Failed(error),
+                }
                 let committed = match std::fs::read_to_string(&paths.project_file)
                     .ok()
                     .and_then(|text| ProjectFile::from_toml(&text, &self.application_id).ok())
