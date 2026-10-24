@@ -901,14 +901,23 @@ fn generation_pending_decision_fixture(name: &str) -> (PathBuf, ProjectContext) 
 fn generation_decision_acceptance_is_one_shot() {
     use workflow_ide_framework::project_controller::{ProjectCommandResult, ProjectController};
     let (root, context) = generation_pending_decision_fixture("decision-once");
-    let mut app = GenerationInspector { enabled: true, called: false };
+    let mut app = GenerationInspector {
+        enabled: true,
+        called: false,
+    };
     let mut controller = ProjectController::new("org.example.open", "Open App");
     let result = match controller.open(context.clone(), &mut app) {
         ProjectCommandResult::NeedsOpenDecision(result) => result,
         other => panic!("expected decision, got {other:?}"),
     };
-    assert_eq!(controller.accept_open(context.clone(), result.clone()), ProjectCommandResult::Completed);
-    assert!(matches!(controller.accept_open(context, result), ProjectCommandResult::Failed(_)));
+    assert_eq!(
+        controller.accept_open(context.clone(), result.clone()),
+        ProjectCommandResult::Completed
+    );
+    assert!(matches!(
+        controller.accept_open(context, result),
+        ProjectCommandResult::Failed(_)
+    ));
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -917,14 +926,26 @@ fn generation_decision_rejects_application_mutation_after_inspection() {
     use workflow_ide_framework::project_controller::{ProjectCommandResult, ProjectController};
     use workflow_ide_framework::project_save_generation::generation_path;
     let (root, context) = generation_pending_decision_fixture("decision-mutated");
-    let mut app = GenerationInspector { enabled: true, called: false };
+    let mut app = GenerationInspector {
+        enabled: true,
+        called: false,
+    };
     let mut controller = ProjectController::new("org.example.open", "Open App");
     let result = match controller.open(context.clone(), &mut app) {
         ProjectCommandResult::NeedsOpenDecision(result) => result,
         other => panic!("expected decision, got {other:?}"),
     };
-    fs::write(generation_path(&context, "snapshot").unwrap().join("application/catalog.json"), "changed-data").unwrap();
-    assert!(matches!(controller.accept_open(context, result), ProjectCommandResult::Failed(_)));
+    fs::write(
+        generation_path(&context, "snapshot")
+            .unwrap()
+            .join("application/catalog.json"),
+        "changed-data",
+    )
+    .unwrap();
+    assert!(matches!(
+        controller.accept_open(context, result),
+        ProjectCommandResult::Failed(_)
+    ));
     assert!(!controller.is_open());
     fs::remove_dir_all(root).unwrap();
 }

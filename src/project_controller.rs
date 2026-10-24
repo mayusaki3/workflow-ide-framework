@@ -24,7 +24,6 @@ use crate::{
 };
 use std::collections::BTreeMap;
 
-
 type GenerationApplicationSnapshot = Vec<(std::path::PathBuf, Vec<u8>)>;
 
 fn snapshot_generation_application(
@@ -82,7 +81,11 @@ pub struct ProjectController {
     pub framework_settings: FrameworkSettings,
     pub resource_registry: ResourceRegistry,
     registry_refresh: Option<crate::project_panel_api::ProjectPanelRefreshHandle>,
-    pending_generation_open: Option<(ProjectContext, ProjectOpenResult, GenerationApplicationSnapshot)>,
+    pending_generation_open: Option<(
+        ProjectContext,
+        ProjectOpenResult,
+        GenerationApplicationSnapshot,
+    )>,
 }
 
 impl ProjectController {
@@ -176,10 +179,16 @@ impl ProjectController {
         }
         if storage_format == ProjectStorageFormat::Generation {
             let paths = match crate::project_save_generation::resolve_validated_committed_paths(
-                &context, &self.application_id, |_| Ok(()),
+                &context,
+                &self.application_id,
+                |_| Ok(()),
             ) {
                 Ok(Some(paths)) => paths,
-                Ok(None) => return ProjectCommandResult::Failed("committed generation disappeared during Open".into()),
+                Ok(None) => {
+                    return ProjectCommandResult::Failed(
+                        "committed generation disappeared during Open".into(),
+                    );
+                }
                 Err(error) => return ProjectCommandResult::Failed(format!("{error:?}")),
             };
             let snapshot = match snapshot_generation_application(&paths.application_directory) {
@@ -231,9 +240,11 @@ impl ProjectController {
                 };
                 match snapshot_generation_application(&paths.application_directory) {
                     Ok(current) if current == expected_application => {}
-                    Ok(_) => return ProjectCommandResult::Failed(
-                        "generation application changed since inspection".into(),
-                    ),
+                    Ok(_) => {
+                        return ProjectCommandResult::Failed(
+                            "generation application changed since inspection".into(),
+                        );
+                    }
                     Err(error) => return ProjectCommandResult::Failed(error),
                 }
                 let committed = match std::fs::read_to_string(&paths.project_file)
