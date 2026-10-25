@@ -1219,6 +1219,7 @@ fn controller_generation_save_as_failure_preserves_source_and_dirty_state() {
     use workflow_ide_framework::project_controller::ProjectCommandResult;
     let (root, source, mut controller) = controller_generation_fixture("save-as-failure");
     let destination = ProjectContext::new(root.join("copy"));
+    let original_name = controller.project_name().map(str::to_owned);
     controller.mark_unsaved();
     let mut app = StagedSaver { mode: "failure", calls: 0 };
     assert!(matches!(
@@ -1227,7 +1228,7 @@ fn controller_generation_save_as_failure_preserves_source_and_dirty_state() {
     ));
     assert_eq!(app.calls, 1);
     assert_eq!(controller.session.as_ref().unwrap().context(), Some(&source));
-    assert_eq!(controller.project_name(), Some("Test"));
+    assert_eq!(controller.project_name(), original_name.as_deref());
     assert_eq!(controller.session.as_ref().unwrap().current_save_id.as_deref(), Some("save-old"));
     assert!(controller.has_unsaved_changes());
     assert_eq!(read_committed_generation(&source).unwrap().unwrap().generation_id, "original");
