@@ -1196,19 +1196,36 @@ fn controller_generation_save_as_commits_copy_and_switches_session() {
     let (root, source, mut controller) = controller_generation_fixture("save-as-copy");
     let destination = ProjectContext::new(root.join("copy"));
     controller.mark_unsaved();
-    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
     assert_eq!(
         controller.save_as(destination.clone(), "Copy", &mut app, "copy-save", "now"),
         ProjectCommandResult::Completed
     );
     assert_eq!(app.calls, 1);
-    assert_eq!(controller.session.as_ref().unwrap().context(), Some(&destination));
+    assert_eq!(
+        controller.session.as_ref().unwrap().context(),
+        Some(&destination)
+    );
     assert_eq!(controller.project_name(), Some("Copy"));
     assert!(!controller.has_unsaved_changes());
-    assert_eq!(read_committed_generation(&source).unwrap().unwrap().generation_id, "original");
+    assert_eq!(
+        read_committed_generation(&source)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "original"
+    );
     let pointer = read_committed_generation(&destination).unwrap().unwrap();
     assert_eq!(
-        fs::read_to_string(generation_path(&destination, &pointer.generation_id).unwrap().join("application/catalog.json")).unwrap(),
+        fs::read_to_string(
+            generation_path(&destination, &pointer.generation_id)
+                .unwrap()
+                .join("application/catalog.json")
+        )
+        .unwrap(),
         "copy-save"
     );
     fs::remove_dir_all(root).unwrap();
@@ -1221,17 +1238,37 @@ fn controller_generation_save_as_failure_preserves_source_and_dirty_state() {
     let destination = ProjectContext::new(root.join("copy"));
     let original_name = controller.project_name().map(str::to_owned);
     controller.mark_unsaved();
-    let mut app = StagedSaver { mode: "failure", calls: 0 };
+    let mut app = StagedSaver {
+        mode: "failure",
+        calls: 0,
+    };
     assert!(matches!(
         controller.save_as(destination.clone(), "Copy", &mut app, "copy-save", "now"),
         ProjectCommandResult::Failed(_)
     ));
     assert_eq!(app.calls, 1);
-    assert_eq!(controller.session.as_ref().unwrap().context(), Some(&source));
+    assert_eq!(
+        controller.session.as_ref().unwrap().context(),
+        Some(&source)
+    );
     assert_eq!(controller.project_name(), original_name.as_deref());
-    assert_eq!(controller.session.as_ref().unwrap().current_save_id.as_deref(), Some("save-old"));
+    assert_eq!(
+        controller
+            .session
+            .as_ref()
+            .unwrap()
+            .current_save_id
+            .as_deref(),
+        Some("save-old")
+    );
     assert!(controller.has_unsaved_changes());
-    assert_eq!(read_committed_generation(&source).unwrap().unwrap().generation_id, "original");
+    assert_eq!(
+        read_committed_generation(&source)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "original"
+    );
     assert!(read_committed_generation(&destination).unwrap().is_none());
     fs::remove_dir_all(root).unwrap();
 }
@@ -1243,13 +1280,22 @@ fn controller_generation_save_as_refuses_occupied_destination() {
     let destination = ProjectContext::new(root.join("occupied"));
     fs::create_dir_all(destination.root()).unwrap();
     fs::write(destination.root().join("keep.txt"), "keep").unwrap();
-    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
     assert!(matches!(
         controller.save_as(destination.clone(), "Copy", &mut app, "copy-save", "now"),
         ProjectCommandResult::Failed(_)
     ));
     assert_eq!(app.calls, 0);
-    assert_eq!(fs::read_to_string(destination.root().join("keep.txt")).unwrap(), "keep");
-    assert_eq!(controller.session.as_ref().unwrap().context(), Some(&source));
+    assert_eq!(
+        fs::read_to_string(destination.root().join("keep.txt")).unwrap(),
+        "keep"
+    );
+    assert_eq!(
+        controller.session.as_ref().unwrap().context(),
+        Some(&source)
+    );
     fs::remove_dir_all(root).unwrap();
 }
