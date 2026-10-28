@@ -1,16 +1,24 @@
-use std::{fs, path::{Path, PathBuf}, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
 use workflow_ide_framework::{
     framework_settings::{FrameworkSettings, StoredResourceEntry, StoredResourceScope},
-    project_save_generation::{diagnose_generation_project_resources, GenerationResourceStatus},
+    project_save_generation::{GenerationResourceStatus, diagnose_generation_project_resources},
 };
 
 struct Fixture(PathBuf);
 
 impl Fixture {
     fn new(label: &str) -> Self {
-        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         let root = std::env::temp_dir().join(format!(
-            "wfide-res-diag-{label}-{}-{nonce}", std::process::id()
+            "wfide-res-diag-{label}-{}-{nonce}",
+            std::process::id()
         ));
         fs::create_dir_all(&root).unwrap();
         Self(root)
@@ -53,7 +61,14 @@ fn res_diag_001_existing_project_file_is_available() {
     fs::create_dir_all(&folder).unwrap();
     fs::write(folder.join("file.txt"), b"data").unwrap();
     assert_eq!(
-        diagnose(fixture.root(), vec![entry("file", StoredResourceScope::Project, "nested/file.txt")]),
+        diagnose(
+            fixture.root(),
+            vec![entry(
+                "file",
+                StoredResourceScope::Project,
+                "nested/file.txt"
+            )]
+        ),
         vec![GenerationResourceStatus::Available]
     );
 }
@@ -63,7 +78,10 @@ fn res_diag_002_missing_project_file_is_missing() {
     let fixture = Fixture::new("missing");
     fs::create_dir_all(fixture.root().join("resources")).unwrap();
     assert_eq!(
-        diagnose(fixture.root(), vec![entry("missing", StoredResourceScope::Project, "absent.txt")]),
+        diagnose(
+            fixture.root(),
+            vec![entry("missing", StoredResourceScope::Project, "absent.txt")]
+        ),
         vec![GenerationResourceStatus::Missing]
     );
 }
@@ -73,7 +91,10 @@ fn res_diag_003_directory_instead_of_file_is_unsafe() {
     let fixture = Fixture::new("directory");
     fs::create_dir_all(fixture.root().join("resources/folder")).unwrap();
     assert_eq!(
-        diagnose(fixture.root(), vec![entry("folder", StoredResourceScope::Project, "folder")]),
+        diagnose(
+            fixture.root(),
+            vec![entry("folder", StoredResourceScope::Project, "folder")]
+        ),
         vec![GenerationResourceStatus::Unsafe]
     );
 }
@@ -84,7 +105,14 @@ fn res_diag_004_non_directory_ancestor_is_unsafe() {
     fs::create_dir_all(fixture.root().join("resources")).unwrap();
     fs::write(fixture.root().join("resources/parent"), b"not a directory").unwrap();
     assert_eq!(
-        diagnose(fixture.root(), vec![entry("nested", StoredResourceScope::Project, "parent/file.txt")]),
+        diagnose(
+            fixture.root(),
+            vec![entry(
+                "nested",
+                StoredResourceScope::Project,
+                "parent/file.txt"
+            )]
+        ),
         vec![GenerationResourceStatus::Unsafe]
     );
 }
@@ -92,13 +120,16 @@ fn res_diag_004_non_directory_ancestor_is_unsafe() {
 #[test]
 fn res_diag_005_other_scopes_are_excluded() {
     let fixture = Fixture::new("scopes");
-    assert!(diagnose(
-        fixture.root(),
-        vec![
-            entry("application", StoredResourceScope::Application, "icon.png"),
-            entry("external", StoredResourceScope::External, "external.png"),
-        ],
-    ).is_empty());
+    assert!(
+        diagnose(
+            fixture.root(),
+            vec![
+                entry("application", StoredResourceScope::Application, "icon.png"),
+                entry("external", StoredResourceScope::External, "external.png"),
+            ],
+        )
+        .is_empty()
+    );
 }
 
 #[test]
@@ -131,7 +162,14 @@ fn res_diag_007_unix_symlink_ancestor_is_unsafe() {
     fs::create_dir_all(fixture.root().join("resources")).unwrap();
     symlink(&outside, fixture.root().join("resources/linked")).unwrap();
     assert_eq!(
-        diagnose(fixture.root(), vec![entry("linked", StoredResourceScope::Project, "linked/file.txt")]),
+        diagnose(
+            fixture.root(),
+            vec![entry(
+                "linked",
+                StoredResourceScope::Project,
+                "linked/file.txt"
+            )]
+        ),
         vec![GenerationResourceStatus::Unsafe]
     );
 }
@@ -149,12 +187,32 @@ fn res_diag_007_windows_junction_ancestor_is_unsafe() {
     let script = fixture.root().join("create-junction.cmd");
     fs::write(
         &script,
-        format!("@echo off\r\nmklink /J \"{}\" \"{}\"\r\n", link.display(), outside.display()),
-    ).unwrap();
-    let output = Command::new("cmd").args(["/D", "/C"]).arg(&script).output().unwrap();
-    assert!(output.status.success(), "mklink failed: {}", String::from_utf8_lossy(&output.stderr));
+        format!(
+            "@echo off\r\nmklink /J \"{}\" \"{}\"\r\n",
+            link.display(),
+            outside.display()
+        ),
+    )
+    .unwrap();
+    let output = Command::new("cmd")
+        .args(["/D", "/C"])
+        .arg(&script)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "mklink failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert_eq!(
-        diagnose(fixture.root(), vec![entry("linked", StoredResourceScope::Project, "linked/file.txt")]),
+        diagnose(
+            fixture.root(),
+            vec![entry(
+                "linked",
+                StoredResourceScope::Project,
+                "linked/file.txt"
+            )]
+        ),
         vec![GenerationResourceStatus::Unsafe]
     );
     fs::remove_dir(&link).unwrap();
