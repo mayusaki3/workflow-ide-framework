@@ -123,6 +123,14 @@ fn resource_metadata_is_unsafe(metadata: &fs::Metadata) -> bool {
     false
 }
 
+fn resource_metadata_error_status(error: &io::Error) -> GenerationResourceStatus {
+    if error.kind() == io::ErrorKind::NotFound {
+        GenerationResourceStatus::Missing
+    } else {
+        GenerationResourceStatus::Inaccessible
+    }
+}
+
 /// Inspect registered Project resources without copying, repairing, or mutating
 /// the generation. Application and External references are not inspected.
 pub fn diagnose_generation_project_resources(
@@ -157,10 +165,10 @@ pub fn diagnose_generation_project_resources(
                         {
                             unsafe_path = true;
                         }
-                        Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                            missing = true;
-                        }
-                        Err(_) => inaccessible = true,
+                        Err(error) => match resource_metadata_error_status(&error) {
+                            GenerationResourceStatus::Missing => missing = true,
+                            _ => inaccessible = true,
+                        },
                         _ => {}
                     }
                     if !unsafe_path && !inaccessible && !missing {
@@ -176,12 +184,11 @@ pub fn diagnose_generation_project_resources(
                                         break;
                                     }
                                 }
-                                Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                                    missing = true;
-                                    break;
-                                }
-                                Err(_) => {
-                                    inaccessible = true;
+                                Err(error) => {
+                                    match resource_metadata_error_status(&error) {
+                                        GenerationResourceStatus::Missing => missing = true,
+                                        _ => inaccessible = true,
+                                    }
                                     break;
                                 }
                             }
@@ -774,4 +781,37 @@ pub enum GenerationSaveError {
     StagedSaveNotSupported,
     Serialization(String),
     Io(io::Error),
+}
+
+#[cfg(test)]
+mod generation_resource_diagnostic_error_tests {
+    use super::{GenerationResourceStatus, resource_metadata_error_status};
+    use std::io;
+
+    #[test]
+    fn res_diag_012_permission_denied_is_inaccessible() {
+        let error = io::Error::from(io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            resource_metadata_error_status(&error),
+            GenerationResourceStatus::Inaccessible
+        );
+    }
+
+    #[test]
+    fn res_diag_013_missing_path_is_missing() {
+        let error = io::Error::from(io::ErrorKind::NotFound);
+        assert_eq!(
+            resource_metadata_error_status(&error),
+            GenerationResourceStatus::Missing
+        );
+    }
+
+    #[test]
+    fn res_diag_014_other_io_failure_is_inaccessible() {
+        let error = io::Error::from(io::ErrorKind::Other);
+        assert_eq!(
+            resource_metadata_error_status(&error),
+            GenerationResourceStatus::Inaccessible
+        );
+    }
 }
