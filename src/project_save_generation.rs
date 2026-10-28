@@ -89,6 +89,111 @@ pub fn generation_project_resource_path(
     Ok(generation_root.join("resources").join(&reference.path))
 }
 
+/// Read-only diagnostics for registered Project resources in a generation.
+///
+/// Missing resources remain registered and do not block a save. Unsafe paths,
+/// including symlinks and junctions, are reported separately from missing files.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GenerationResourceStatus {
+    Available,
+    Missing,
+    Unsafe,
+    Inaccessible,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GenerationResourceDiagnostic {
+    pub reference: crate::project_resource::ResourceReference,
+    pub status: GenerationResourceStatus,
+}
+
+fn resource_metadata_is_unsafe(metadata: &fs::Metadata) -> bool {
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return true;
+        }
+    }
+    false
+}
+
+/// Inspect registered Project resources without copying, repairing, or mutating
+/// the generation. Application and External references are not inspected.
+pub fn diagnose_generation_project_resources(
+    generation_root: &Path,
+    settings: &FrameworkSettings,
+) -> Vec<GenerationResourceDiagnostic> {
+    use crate::project_resource::ResourceScope;
+
+    settings
+        .resources
+        .iter()
+        .filter(|entry| entry.reference.scope == ResourceScope::Project)
+        .map(|entry| {
+            let reference = entry.reference.clone();
+            let status = match generation_project_resource_path(generation_root, &reference) {
+                Err(_) => GenerationResourceStatus::Unsafe,
+                Ok(path) => {
+                    let resource_root = generation_root.join("resources");
+                    let mut current = resource_root.clone();
+                    let mut unsafe_path = false;
+                    let mut inaccessible = false;
+                    let mut missing = false;
+                    for component in reference.path.components() {
+                        current.push(component.as_os_str());
+                        match fs::symlink_metadata(&current) {
+                            Ok(metadata) => {
+                                if resource_metadata_is_unsafe(&metadata)
+                                    || (current != path && !metadata.is_dir())
+                                    || (current == path && !metadata.is_file())
+                                {
+                                    unsafe_path = true;
+                                    break;
+                                }
+                            }
+                            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                                missing = true;
+                                break;
+                            }
+                            Err(_) => {
+                                inaccessible = true;
+                                break;
+                            }
+                        }
+                    }
+                    if !unsafe_path && !inaccessible && !missing {
+                        match fs::symlink_metadata(&resource_root) {
+                            Ok(metadata) if resource_metadata_is_unsafe(&metadata) || !metadata.is_dir() => {
+                                unsafe_path = true;
+                            }
+                            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                                missing = true;
+                            }
+                            Err(_) => inaccessible = true,
+                            _ => {}
+                        }
+                    }
+                    if unsafe_path {
+                        GenerationResourceStatus::Unsafe
+                    } else if inaccessible {
+                        GenerationResourceStatus::Inaccessible
+                    } else if missing {
+                        GenerationResourceStatus::Missing
+                    } else {
+                        GenerationResourceStatus::Available
+                    }
+                }
+            };
+            GenerationResourceDiagnostic { reference, status }
+        })
+        .collect()
+}
+
 pub fn committed_path(context: &ProjectContext) -> PathBuf {
     generations_root(context).join("committed.toml")
 }
