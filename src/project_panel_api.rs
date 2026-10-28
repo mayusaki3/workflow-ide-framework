@@ -423,3 +423,17 @@ impl ProjectPanelResourceDiagnostics {
         &self.diagnostics
     }
 }
+
+/// A panel node has no generation diagnostic unless it represents a registered
+/// Project resource with a matching diagnostic entry.
+pub fn registered_node_resource_diagnostic<'a>(
+    node: &AppPanelNode,
+    diagnostics: &'a ProjectPanelResourceDiagnostics,
+) -> Option<&'a crate::project_save_generation::GenerationResourceDiagnostic> {
+    match &node.kind {
+        AppPanelNodeKind::RegisteredResource {
+            registry_resource_id,
+        } => diagnostics.get(registry_resource_id),
+        _ => None,
+    }
+}
