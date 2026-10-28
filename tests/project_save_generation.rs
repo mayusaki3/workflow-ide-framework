@@ -1411,3 +1411,75 @@ fn generation_project_resource_path_is_scoped_to_snapshot() {
     assert!(generation_project_resource_path(&root, &application).is_err());
     assert!(ResourceReference::new(ResourceScope::Project, "../escape").is_err());
 }
+
+#[test]
+fn controller_generation_save_as_copies_project_resource_file() {
+    use workflow_ide_framework::{
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, source, mut controller) = controller_generation_fixture("save-as-resource-copy");
+    let source_file = generation_path(&source, "original")
+        .unwrap()
+        .join("resources/images/controller.png");
+    fs::create_dir_all(source_file.parent().unwrap()).unwrap();
+    fs::write(&source_file, b"original-resource").unwrap();
+    controller
+        .register_resource(
+            ResourceReference::new(ResourceScope::Project, "images/controller.png").unwrap(),
+        )
+        .unwrap();
+    let destination = ProjectContext::new(root.join("copy"));
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
+    assert_eq!(
+        controller.save_as(destination.clone(), "Copy", &mut app, "copy-save", "now"),
+        ProjectCommandResult::Completed
+    );
+    let pointer = read_committed_generation(&destination).unwrap().unwrap();
+    let copied = generation_path(&destination, &pointer.generation_id)
+        .unwrap()
+        .join("resources/images/controller.png");
+    assert_eq!(fs::read(&copied).unwrap(), b"original-resource");
+    fs::write(&copied, b"changed").unwrap();
+    assert_eq!(fs::read(&source_file).unwrap(), b"original-resource");
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn controller_generation_save_copies_project_resource_file() {
+    use workflow_ide_framework::{
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, source, mut controller) = controller_generation_fixture("resave-resource-copy");
+    let source_file = generation_path(&source, "original")
+        .unwrap()
+        .join("resources/robot.urdf");
+    fs::create_dir_all(source_file.parent().unwrap()).unwrap();
+    fs::write(&source_file, b"robot").unwrap();
+    controller
+        .register_resource(ResourceReference::new(ResourceScope::Project, "robot.urdf").unwrap())
+        .unwrap();
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
+    assert_eq!(
+        controller.save(&mut app, "resave-resource", "now"),
+        ProjectCommandResult::Completed
+    );
+    let pointer = read_committed_generation(&source).unwrap().unwrap();
+    assert_eq!(
+        fs::read(
+            generation_path(&source, &pointer.generation_id)
+                .unwrap()
+                .join("resources/robot.urdf")
+        )
+        .unwrap(),
+        b"robot"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
