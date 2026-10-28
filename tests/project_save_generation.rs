@@ -1407,8 +1407,7 @@ fn generation_project_resource_path_is_scoped_to_snapshot() {
     )
     .unwrap();
     assert!(generation_project_resource_path(&root, &external).is_err());
-    let application =
-        ResourceReference::new(ResourceScope::Application, "controller.png").unwrap();
+    let application = ResourceReference::new(ResourceScope::Application, "controller.png").unwrap();
     assert!(generation_project_resource_path(&root, &application).is_err());
     assert!(ResourceReference::new(ResourceScope::Project, "../escape").is_err());
 }
