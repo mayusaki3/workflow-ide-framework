@@ -1676,11 +1676,10 @@ fn res_fail_007_partial_copy_failure_cleans_stage_and_preserves_commit() {
         "original"
     );
     assert_eq!(fs::read(&first).unwrap(), b"unchanged");
-    let staging_root = context.framework_directory().join("save-generations/staging");
-    assert!(
-        !staging_root.exists()
-            || fs::read_dir(staging_root).unwrap().next().is_none()
-    );
+    let staging_root = context
+        .framework_directory()
+        .join("save-generations/staging");
+    assert!(!staging_root.exists() || fs::read_dir(staging_root).unwrap().next().is_none());
     fs::remove_dir_all(root).unwrap();
 }
 
