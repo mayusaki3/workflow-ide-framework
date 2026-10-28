@@ -1387,3 +1387,28 @@ fn controller_generation_save_as_preserves_external_resource_reference() {
     assert_eq!(settings.resources[0].path, external);
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn generation_project_resource_path_is_scoped_to_snapshot() {
+    use workflow_ide_framework::{
+        project_resource::{ResourceReference, ResourceScope},
+        project_save_generation::generation_project_resource_path,
+    };
+    let root = std::path::PathBuf::from("generation-1");
+    let reference =
+        ResourceReference::new(ResourceScope::Project, "images/controller.png").unwrap();
+    assert_eq!(
+        generation_project_resource_path(&root, &reference).unwrap(),
+        root.join("resources/images/controller.png")
+    );
+    let external = ResourceReference::new(
+        ResourceScope::External,
+        std::env::temp_dir().join("controller.png"),
+    )
+    .unwrap();
+    assert!(generation_project_resource_path(&root, &external).is_err());
+    let application =
+        ResourceReference::new(ResourceScope::Application, "controller.png").unwrap();
+    assert!(generation_project_resource_path(&root, &application).is_err());
+    assert!(ResourceReference::new(ResourceScope::Project, "../escape").is_err());
+}
