@@ -1299,3 +1299,90 @@ fn controller_generation_save_as_refuses_occupied_destination() {
     );
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn controller_generation_save_as_preserves_project_resource_registry() {
+    use workflow_ide_framework::{
+        framework_settings::{FrameworkSettings, StoredResourceScope},
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, source, mut controller) = controller_generation_fixture("save-as-project-registry");
+    let destination = ProjectContext::new(root.join("copy"));
+    let id = controller
+        .register_resource(
+            ResourceReference::new(ResourceScope::Project, "resources/robot.urdf").unwrap(),
+        )
+        .unwrap();
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
+    assert_eq!(
+        controller.save_as(destination.clone(), "Copy", &mut app, "copy-save", "now"),
+        ProjectCommandResult::Completed
+    );
+    let pointer = read_committed_generation(&destination).unwrap().unwrap();
+    let settings = FrameworkSettings::from_toml(
+        &fs::read_to_string(
+            generation_path(&destination, &pointer.generation_id)
+                .unwrap()
+                .join("framework_settings.toml"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(settings.resources.len(), 1);
+    assert_eq!(settings.resources[0].resource_id, id);
+    assert_eq!(settings.resources[0].scope, StoredResourceScope::Project);
+    assert_eq!(
+        settings.resources[0].path,
+        std::path::PathBuf::from("resources/robot.urdf")
+    );
+    assert_eq!(
+        read_committed_generation(&source)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "original"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn controller_generation_save_as_preserves_external_resource_reference() {
+    use workflow_ide_framework::{
+        framework_settings::{FrameworkSettings, StoredResourceScope},
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, _source, mut controller) = controller_generation_fixture("save-as-external-registry");
+    let destination = ProjectContext::new(root.join("copy"));
+    let external = root.join("external").join("model.urdf");
+    let id = controller
+        .register_resource(ResourceReference::new(ResourceScope::External, &external).unwrap())
+        .unwrap();
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
+    assert_eq!(
+        controller.save_as(destination.clone(), "Copy", &mut app, "copy-save", "now"),
+        ProjectCommandResult::Completed
+    );
+    let pointer = read_committed_generation(&destination).unwrap().unwrap();
+    let settings = FrameworkSettings::from_toml(
+        &fs::read_to_string(
+            generation_path(&destination, &pointer.generation_id)
+                .unwrap()
+                .join("framework_settings.toml"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(settings.resources.len(), 1);
+    assert_eq!(settings.resources[0].resource_id, id);
+    assert_eq!(settings.resources[0].scope, StoredResourceScope::External);
+    assert_eq!(settings.resources[0].path, external);
+    fs::remove_dir_all(root).unwrap();
+}
