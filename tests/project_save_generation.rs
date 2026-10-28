@@ -1356,7 +1356,8 @@ fn controller_generation_save_as_preserves_external_resource_reference() {
         project_controller::ProjectCommandResult,
         project_resource::{ResourceReference, ResourceScope},
     };
-    let (root, _source, mut controller) = controller_generation_fixture("save-as-external-registry");
+    let (root, _source, mut controller) =
+        controller_generation_fixture("save-as-external-registry");
     let destination = ProjectContext::new(root.join("copy"));
     let external = root.join("external").join("model.urdf");
     let id = controller
