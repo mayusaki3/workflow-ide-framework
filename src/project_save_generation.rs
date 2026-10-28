@@ -128,15 +128,16 @@ pub fn diagnose_generation_project_resources(
     generation_root: &Path,
     settings: &FrameworkSettings,
 ) -> Vec<GenerationResourceDiagnostic> {
+    use crate::framework_settings::StoredResourceScope;
     use crate::project_resource::ResourceScope;
 
     settings
         .resources
         .iter()
-        .filter(|entry| entry.scope == ResourceScope::Project)
+        .filter(|entry| entry.scope == StoredResourceScope::Project)
         .map(|entry| {
             let reference = crate::project_resource::ResourceReference {
-                scope: entry.scope,
+                scope: ResourceScope::Project,
                 path: entry.path.clone(),
             };
             let status = match generation_project_resource_path(generation_root, &reference) {
