@@ -5,7 +5,10 @@ use std::{
 };
 use workflow_ide_framework::{
     framework_settings::{FrameworkSettings, StoredResourceEntry, StoredResourceScope},
-    project_panel_api::ProjectPanelResourceDiagnostics,
+    project_panel_api::{
+        AppPanelNode, AppPanelNodeKind, ProjectPanelResourceDiagnostics,
+        registered_node_resource_diagnostic,
+    },
     project_save_generation::{GenerationResourceStatus, diagnose_generation_project_resources},
 };
 
@@ -376,4 +379,59 @@ fn res_diag_016_project_panel_snapshot_is_not_live() {
         refreshed.get("item").unwrap().status,
         GenerationResourceStatus::Available
     );
+}
+
+#[test]
+fn res_diag_017_registered_panel_node_resolves_by_registry_id() {
+    let fixture = Fixture::new("panel-node");
+    fs::create_dir_all(fixture.root().join("resources")).unwrap();
+    let settings = FrameworkSettings {
+        resources: vec![entry("registered", StoredResourceScope::Project, "missing.txt")],
+        ..FrameworkSettings::default()
+    };
+    let diagnostics = ProjectPanelResourceDiagnostics::from_generation(fixture.root(), &settings);
+    let node = AppPanelNode {
+        id: "panel-node-1".to_owned(),
+        label: "Resource".to_owned(),
+        kind: AppPanelNodeKind::RegisteredResource {
+            registry_resource_id: "registered".to_owned(),
+        },
+        children: Vec::new(),
+    };
+    let result = registered_node_resource_diagnostic(&node, &diagnostics).unwrap();
+    assert_eq!(result.resource_id, "registered");
+    assert_eq!(result.status, GenerationResourceStatus::Missing);
+}
+
+#[test]
+fn res_diag_018_unknown_registered_node_is_not_assumed_available() {
+    let diagnostics = ProjectPanelResourceDiagnostics::default();
+    let node = AppPanelNode {
+        id: "unknown-node".to_owned(),
+        label: "Unknown".to_owned(),
+        kind: AppPanelNodeKind::RegisteredResource {
+            registry_resource_id: "not-diagnosed".to_owned(),
+        },
+        children: Vec::new(),
+    };
+    assert!(registered_node_resource_diagnostic(&node, &diagnostics).is_none());
+}
+
+#[test]
+fn res_diag_019_non_registered_panel_node_has_no_diagnostic() {
+    let fixture = Fixture::new("panel-category");
+    let settings = FrameworkSettings {
+        resources: vec![entry("registered", StoredResourceScope::Project, "missing.txt")],
+        ..FrameworkSettings::default()
+    };
+    let diagnostics = ProjectPanelResourceDiagnostics::from_generation(fixture.root(), &settings);
+    let node = AppPanelNode {
+        id: "category".to_owned(),
+        label: "Category".to_owned(),
+        kind: AppPanelNodeKind::Category {
+            type_id: "registered".to_owned(),
+        },
+        children: Vec::new(),
+    };
+    assert!(registered_node_resource_diagnostic(&node, &diagnostics).is_none());
 }
