@@ -62,6 +62,33 @@ pub fn generation_path(context: &ProjectContext, id: &str) -> Result<PathBuf, Ge
     Ok(generations_root(context).join(id))
 }
 
+/// Resolve a project-scoped resource inside a generation snapshot.
+///
+/// The reference must already have been validated as Project-scoped.
+/// This function does not follow symlinks or verify file existence; callers
+/// performing filesystem I/O must enforce those checks separately.
+pub fn generation_project_resource_path(
+    generation_root: &Path,
+    reference: &crate::project_resource::ResourceReference,
+) -> Result<PathBuf, GenerationError> {
+    use crate::project_resource::ResourceScope;
+    use std::path::Component;
+
+    if reference.scope != ResourceScope::Project
+        || reference.path.as_os_str().is_empty()
+        || reference
+            .path
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_)))
+    {
+        return Err(GenerationError::InvalidCandidate(
+            "generation project resource must use a nonempty relative path without traversal"
+                .into(),
+        ));
+    }
+    Ok(generation_root.join("resources").join(&reference.path))
+}
+
 pub fn committed_path(context: &ProjectContext) -> PathBuf {
     generations_root(context).join("committed.toml")
 }
