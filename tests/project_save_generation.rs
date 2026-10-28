@@ -1776,7 +1776,13 @@ fn res_fail_win_001_junction_parent_is_rejected() {
     let link = source.join("resources/linked");
     fs::create_dir_all(link.parent().unwrap()).unwrap();
     let command = format!("mklink /J \"{}\" \"{}\"", link.display(), outside.display());
-    let output = Command::new("cmd").args(["/C", &command]).output().unwrap();
+    // cmd.exe requires /S to handle a quoted /C command consistently.
+    // Wrap the entire command in quotes so the embedded path quotes survive.
+    let wrapped_command = format!("\"{command}\"");
+    let output = Command::new("cmd")
+        .args(["/D", "/S", "/C", &wrapped_command])
+        .output()
+        .unwrap();
     assert!(
         output.status.success(),
         "mklink /J failed: {}",
