@@ -1483,3 +1483,126 @@ fn controller_generation_save_copies_project_resource_file() {
     );
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn res_fail_003_directory_resource_preserves_committed_generation() {
+    use workflow_ide_framework::{
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, context, mut controller) = controller_generation_fixture("res-fail-003");
+    let path = generation_path(&context, "original")
+        .unwrap()
+        .join("resources/invalid.bin");
+    fs::create_dir_all(&path).unwrap();
+    controller
+        .register_resource(ResourceReference::new(ResourceScope::Project, "invalid.bin").unwrap())
+        .unwrap();
+    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    assert!(matches!(
+        controller.save(&mut app, "save-failed", "now"),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(app.calls, 0);
+    assert!(controller.has_unsaved_changes());
+    assert_eq!(
+        read_committed_generation(&context).unwrap().unwrap().generation_id,
+        "original"
+    );
+    assert_eq!(
+        controller.session.as_ref().unwrap().current_save_id.as_deref(),
+        Some("save-old")
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn res_fail_004_invalid_resource_ancestor_preserves_commit() {
+    use workflow_ide_framework::{
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, context, mut controller) = controller_generation_fixture("res-fail-004");
+    let path = generation_path(&context, "original")
+        .unwrap()
+        .join("resources/not-a-directory");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, b"file-not-directory").unwrap();
+    controller
+        .register_resource(
+            ResourceReference::new(ResourceScope::Project, "not-a-directory/robot.urdf").unwrap(),
+        )
+        .unwrap();
+    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    assert!(matches!(
+        controller.save(&mut app, "save-failed", "now"),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(app.calls, 0);
+    assert_eq!(
+        read_committed_generation(&context).unwrap().unwrap().generation_id,
+        "original"
+    );
+    assert!(controller.has_unsaved_changes());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn res_fail_005_save_as_resource_failure_preserves_session() {
+    use workflow_ide_framework::{
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, source, mut controller) = controller_generation_fixture("res-fail-005");
+    let path = generation_path(&source, "original")
+        .unwrap()
+        .join("resources/invalid.bin");
+    fs::create_dir_all(&path).unwrap();
+    controller
+        .register_resource(ResourceReference::new(ResourceScope::Project, "invalid.bin").unwrap())
+        .unwrap();
+    let original_name = controller.project_name().map(str::to_owned);
+    let destination = ProjectContext::new(root.join("copy"));
+    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    assert!(matches!(
+        controller.save_as(destination.clone(), "Copy", &mut app, "copy-save", "now"),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(app.calls, 0);
+    assert_eq!(controller.session.as_ref().unwrap().context(), Some(&source));
+    assert_eq!(controller.project_name(), original_name.as_deref());
+    assert!(controller.has_unsaved_changes());
+    assert_eq!(
+        read_committed_generation(&source).unwrap().unwrap().generation_id,
+        "original"
+    );
+    assert!(read_committed_generation(&destination).unwrap().is_none());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn res_fail_006_missing_resource_keeps_registry_and_commits() {
+    use workflow_ide_framework::{
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, context, mut controller) = controller_generation_fixture("res-fail-006");
+    controller
+        .register_resource(ResourceReference::new(ResourceScope::Project, "missing.urdf").unwrap())
+        .unwrap();
+    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    assert_eq!(
+        controller.save(&mut app, "save-with-missing", "now"),
+        ProjectCommandResult::Completed
+    );
+    let pointer = read_committed_generation(&context).unwrap().unwrap();
+    let generation = generation_path(&context, &pointer.generation_id).unwrap();
+    assert!(!generation.join("resources/missing.urdf").exists());
+    let settings = workflow_ide_framework::framework_settings::FrameworkSettings::from_toml(
+        &fs::read_to_string(generation.join("framework_settings.toml")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(settings.resources.len(), 1);
+    assert_eq!(settings.resources[0].path, std::path::PathBuf::from("missing.urdf"));
+    fs::remove_dir_all(root).unwrap();
+}
