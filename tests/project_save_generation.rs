@@ -1638,3 +1638,125 @@ fn res_fail_006_missing_resource_keeps_registry_and_commits() {
     );
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn res_fail_007_partial_copy_failure_cleans_stage_and_preserves_commit() {
+    use workflow_ide_framework::{
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, context, mut controller) = controller_generation_fixture("res-fail-007");
+    let source = generation_path(&context, "original").unwrap();
+    let first = source.join("resources/a-good.txt");
+    fs::create_dir_all(first.parent().unwrap()).unwrap();
+    fs::write(&first, b"unchanged").unwrap();
+    let second = source.join("resources/z-bad.txt");
+    fs::create_dir_all(&second).unwrap();
+    controller
+        .register_resource(ResourceReference::new(ResourceScope::Project, "a-good.txt").unwrap())
+        .unwrap();
+    controller
+        .register_resource(ResourceReference::new(ResourceScope::Project, "z-bad.txt").unwrap())
+        .unwrap();
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
+    assert!(matches!(
+        controller.save(&mut app, "save-partial", "now"),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(app.calls, 0);
+    assert!(controller.has_unsaved_changes());
+    assert_eq!(
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "original"
+    );
+    assert_eq!(fs::read(&first).unwrap(), b"unchanged");
+    let staging_root = context.framework_directory().join("save-generations/staging");
+    assert!(
+        !staging_root.exists()
+            || fs::read_dir(staging_root).unwrap().next().is_none()
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn res_fail_001_symlink_resource_is_rejected() {
+    use std::os::unix::fs::symlink;
+    use workflow_ide_framework::{
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, context, mut controller) = controller_generation_fixture("res-fail-001");
+    let source = generation_path(&context, "original").unwrap();
+    let target = root.join("external.txt");
+    fs::write(&target, b"outside").unwrap();
+    let link = source.join("resources/link.txt");
+    fs::create_dir_all(link.parent().unwrap()).unwrap();
+    symlink(&target, &link).unwrap();
+    controller
+        .register_resource(ResourceReference::new(ResourceScope::Project, "link.txt").unwrap())
+        .unwrap();
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
+    assert!(matches!(
+        controller.save(&mut app, "save-link", "now"),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(app.calls, 0);
+    assert_eq!(
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "original"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn res_fail_002_symlink_parent_is_rejected() {
+    use std::os::unix::fs::symlink;
+    use workflow_ide_framework::{
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, context, mut controller) = controller_generation_fixture("res-fail-002");
+    let source = generation_path(&context, "original").unwrap();
+    let outside = root.join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(outside.join("file.txt"), b"outside").unwrap();
+    let link = source.join("resources/linked");
+    fs::create_dir_all(link.parent().unwrap()).unwrap();
+    symlink(&outside, &link).unwrap();
+    controller
+        .register_resource(
+            ResourceReference::new(ResourceScope::Project, "linked/file.txt").unwrap(),
+        )
+        .unwrap();
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
+    assert!(matches!(
+        controller.save(&mut app, "save-link-parent", "now"),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(app.calls, 0);
+    assert_eq!(
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "original"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
