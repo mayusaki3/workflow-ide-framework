@@ -133,9 +133,12 @@ pub fn diagnose_generation_project_resources(
     settings
         .resources
         .iter()
-        .filter(|entry| entry.reference.scope == ResourceScope::Project)
+        .filter(|entry| entry.scope == ResourceScope::Project)
         .map(|entry| {
-            let reference = entry.reference.clone();
+            let reference = crate::project_resource::ResourceReference {
+                scope: entry.scope,
+                path: entry.path.clone(),
+            };
             let status = match generation_project_resource_path(generation_root, &reference) {
                 Err(_) => GenerationResourceStatus::Unsafe,
                 Ok(path) => {
@@ -168,7 +171,9 @@ pub fn diagnose_generation_project_resources(
                     }
                     if !unsafe_path && !inaccessible && !missing {
                         match fs::symlink_metadata(&resource_root) {
-                            Ok(metadata) if resource_metadata_is_unsafe(&metadata) || !metadata.is_dir() => {
+                            Ok(metadata)
+                                if resource_metadata_is_unsafe(&metadata) || !metadata.is_dir() =>
+                            {
                                 unsafe_path = true;
                             }
                             Err(error) if error.kind() == io::ErrorKind::NotFound => {
