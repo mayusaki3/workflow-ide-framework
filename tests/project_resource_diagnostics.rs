@@ -217,3 +217,104 @@ fn res_diag_007_windows_junction_ancestor_is_unsafe() {
     );
     fs::remove_dir(&link).unwrap();
 }
+
+#[test]
+fn res_diag_008_missing_resource_root_is_missing() {
+    let fixture = Fixture::new("missing-root");
+    assert_eq!(
+        diagnose(
+            fixture.root(),
+            vec![entry("missing", StoredResourceScope::Project, "file.txt")]
+        ),
+        vec![GenerationResourceStatus::Missing]
+    );
+}
+
+#[test]
+fn res_diag_009_non_directory_resource_root_is_unsafe() {
+    let fixture = Fixture::new("bad-root");
+    fs::write(fixture.root().join("resources"), b"not a directory").unwrap();
+    assert_eq!(
+        diagnose(
+            fixture.root(),
+            vec![entry("bad", StoredResourceScope::Project, "file.txt")]
+        ),
+        vec![GenerationResourceStatus::Unsafe]
+    );
+}
+
+#[test]
+fn res_diag_010_diagnostics_keep_resource_identity_and_order() {
+    let fixture = Fixture::new("identity");
+    let settings = FrameworkSettings {
+        resources: vec![
+            entry("first", StoredResourceScope::Project, "first.txt"),
+            entry("excluded", StoredResourceScope::External, "outside.txt"),
+            entry("second", StoredResourceScope::Project, "second.txt"),
+        ],
+        ..FrameworkSettings::default()
+    };
+    let diagnostics = diagnose_generation_project_resources(fixture.root(), &settings);
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(diagnostics[0].resource_id, "first");
+    assert_eq!(diagnostics[1].resource_id, "second");
+    assert_eq!(diagnostics[0].reference.path, PathBuf::from("first.txt"));
+    assert_eq!(diagnostics[1].reference.path, PathBuf::from("second.txt"));
+}
+
+#[cfg(unix)]
+#[test]
+fn res_diag_011_unix_resource_root_symlink_is_unsafe() {
+    use std::os::unix::fs::symlink;
+    let fixture = Fixture::new("root-link");
+    let outside = fixture.root().join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(outside.join("file.txt"), b"outside").unwrap();
+    symlink(&outside, fixture.root().join("resources")).unwrap();
+    assert_eq!(
+        diagnose(
+            fixture.root(),
+            vec![entry("linked", StoredResourceScope::Project, "file.txt")]
+        ),
+        vec![GenerationResourceStatus::Unsafe]
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn res_diag_011_windows_resource_root_junction_is_unsafe() {
+    use std::process::Command;
+    let fixture = Fixture::new("root-junction");
+    let outside = fixture.root().join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(outside.join("file.txt"), b"outside").unwrap();
+    let link = fixture.root().join("resources");
+    let script = fixture.root().join("create-root-junction.cmd");
+    fs::write(
+        &script,
+        format!(
+            "@echo off\\r\\nmklink /J \\"{}\\" \\"{}\\"\\r\\n",
+            link.display(),
+            outside.display()
+        ),
+    )
+    .unwrap();
+    let output = Command::new("cmd")
+        .args(["/D", "/C"])
+        .arg(&script)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "mklink failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        diagnose(
+            fixture.root(),
+            vec![entry("linked", StoredResourceScope::Project, "file.txt")]
+        ),
+        vec![GenerationResourceStatus::Unsafe]
+    );
+    fs::remove_dir(&link).unwrap();
+}
