@@ -491,6 +491,74 @@ pub fn save_project_generation(
     )
 }
 
+/// Copy registered project resources from the source snapshot into the new stage.
+/// Missing references are left unresolved for compatibility with existing
+/// registry-only projects; existing symlinks and non-files are rejected.
+fn copy_generation_project_resources(
+    source: &Path,
+    stage: &Path,
+    settings: &FrameworkSettings,
+) -> Result<(), GenerationSaveError> {
+    use crate::project_resource::{ResourceReference, ResourceScope};
+    for entry in &settings.resources {
+        if entry.scope != crate::framework_settings::StoredResourceScope::Project {
+            continue;
+        }
+        let reference = ResourceReference::new(ResourceScope::Project, entry.path.clone())
+            .map_err(|error| {
+                GenerationSaveError::Generation(GenerationError::InvalidCandidate(format!(
+                    "invalid project resource {}: {error:?}",
+                    entry.resource_id
+                )))
+            })?;
+        let from = generation_project_resource_path(source, &reference)
+            .map_err(GenerationSaveError::Generation)?;
+        let to = generation_project_resource_path(stage, &reference)
+            .map_err(GenerationSaveError::Generation)?;
+        let root = source.join("resources");
+        let mut ancestor = from.parent();
+        while let Some(path) = ancestor {
+            if !path.starts_with(&root) {
+                break;
+            }
+            match fs::symlink_metadata(path) {
+                Ok(meta) if meta.file_type().is_symlink() || !meta.is_dir() => {
+                    return Err(GenerationSaveError::Generation(
+                        GenerationError::InvalidCandidate(format!(
+                            "unsafe project resource ancestor: {}",
+                            path.display()
+                        )),
+                    ));
+                }
+                Ok(_) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(GenerationSaveError::Io(error)),
+            }
+            if path == root {
+                break;
+            }
+            ancestor = path.parent();
+        }
+        match fs::symlink_metadata(&from) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(GenerationSaveError::Io(error)),
+            Ok(meta) if !meta.is_file() || meta.file_type().is_symlink() => {
+                return Err(GenerationSaveError::Generation(
+                    GenerationError::InvalidCandidate(format!(
+                        "project resource is not a regular file: {}",
+                        from.display()
+                    )),
+                ));
+            }
+            Ok(_) => {}
+        }
+        fs::create_dir_all(to.parent().expect("resource has parent"))
+            .map_err(GenerationSaveError::Io)?;
+        fs::copy(&from, &to).map_err(GenerationSaveError::Io)?;
+    }
+    Ok(())
+}
+
 fn save_project_generation_from(
     session: &mut crate::project_lifecycle::ProjectSession,
     context: &ProjectContext,
@@ -511,6 +579,7 @@ fn save_project_generation_from(
     // cleanup. Never remove an already promoted or committed generation.
     let staged_result = (|| -> Result<ProjectFile, GenerationSaveError> {
         let stage_context = ProjectContext::new(&stage);
+        copy_generation_project_resources(source_context.root(), &stage, framework_settings)?;
         let app = application
             .save_project_data_staged(source_context, &stage_context, save_id)
             .map_err(GenerationSaveError::Application)?
