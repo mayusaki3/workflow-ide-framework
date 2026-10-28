@@ -293,7 +293,7 @@ fn res_diag_011_windows_resource_root_junction_is_unsafe() {
     fs::write(
         &script,
         format!(
-            "@echo off\\r\\nmklink /J \\"{}\\" \\"{}\\"\\r\\n",
+            "@echo off\r\nmklink /J \"{}\" \"{}\"\r\n",
             link.display(),
             outside.display()
         ),
