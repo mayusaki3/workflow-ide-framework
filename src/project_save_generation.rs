@@ -103,6 +103,7 @@ pub enum GenerationResourceStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GenerationResourceDiagnostic {
+    pub resource_id: String,
     pub reference: crate::project_resource::ResourceReference,
     pub status: GenerationResourceStatus,
 }
@@ -148,40 +149,42 @@ pub fn diagnose_generation_project_resources(
                     let mut unsafe_path = false;
                     let mut inaccessible = false;
                     let mut missing = false;
-                    for component in reference.path.components() {
-                        current.push(component.as_os_str());
-                        match fs::symlink_metadata(&current) {
-                            Ok(metadata) => {
-                                if resource_metadata_is_unsafe(&metadata)
-                                    || (current != path && !metadata.is_dir())
-                                    || (current == path && !metadata.is_file())
-                                {
-                                    unsafe_path = true;
+                    // Validate the root before examining descendants: never traverse
+                    // through a root junction or symbolic link.
+                    match fs::symlink_metadata(&resource_root) {
+                        Ok(metadata)
+                            if resource_metadata_is_unsafe(&metadata) || !metadata.is_dir() =>
+                        {
+                            unsafe_path = true;
+                        }
+                        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                            missing = true;
+                        }
+                        Err(_) => inaccessible = true,
+                        _ => {}
+                    }
+                    if !unsafe_path && !inaccessible && !missing {
+                        for component in reference.path.components() {
+                            current.push(component.as_os_str());
+                            match fs::symlink_metadata(&current) {
+                                Ok(metadata) => {
+                                    if resource_metadata_is_unsafe(&metadata)
+                                        || (current != path && !metadata.is_dir())
+                                        || (current == path && !metadata.is_file())
+                                    {
+                                        unsafe_path = true;
+                                        break;
+                                    }
+                                }
+                                Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                                    missing = true;
+                                    break;
+                                }
+                                Err(_) => {
+                                    inaccessible = true;
                                     break;
                                 }
                             }
-                            Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                                missing = true;
-                                break;
-                            }
-                            Err(_) => {
-                                inaccessible = true;
-                                break;
-                            }
-                        }
-                    }
-                    if !unsafe_path && !inaccessible && !missing {
-                        match fs::symlink_metadata(&resource_root) {
-                            Ok(metadata)
-                                if resource_metadata_is_unsafe(&metadata) || !metadata.is_dir() =>
-                            {
-                                unsafe_path = true;
-                            }
-                            Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                                missing = true;
-                            }
-                            Err(_) => inaccessible = true,
-                            _ => {}
                         }
                     }
                     if unsafe_path {
@@ -195,7 +198,11 @@ pub fn diagnose_generation_project_resources(
                     }
                 }
             };
-            GenerationResourceDiagnostic { reference, status }
+            GenerationResourceDiagnostic {
+                resource_id: entry.resource_id.clone(),
+                reference,
+                status,
+            }
         })
         .collect()
 }
