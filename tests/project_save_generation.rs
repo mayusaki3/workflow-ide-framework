@@ -1775,12 +1775,21 @@ fn res_fail_win_001_junction_parent_is_rejected() {
     fs::write(outside.join("file.txt"), b"outside").unwrap();
     let link = source.join("resources/linked");
     fs::create_dir_all(link.parent().unwrap()).unwrap();
-    let command = format!("mklink /J \"{}\" \"{}\"", link.display(), outside.display());
-    // cmd.exe requires /S to handle a quoted /C command consistently.
-    // Wrap the entire command in quotes so the embedded path quotes survive.
-    let wrapped_command = format!("\"{command}\"");
+    // Invoke mklink from a batch file instead of passing nested quotes through
+    // cmd.exe /C. Windows junctions do not require symlink privileges.
+    let script = root.join("create-junction.cmd");
+    fs::write(
+        &script,
+        format!(
+            "@echo off\r\nmklink /J \"{}\" \"{}\"\r\n",
+            link.display(),
+            outside.display()
+        ),
+    )
+    .unwrap();
     let output = Command::new("cmd")
-        .args(["/D", "/S", "/C", &wrapped_command])
+        .args(["/D", "/C"])
+        .arg(&script)
         .output()
         .unwrap();
     assert!(
