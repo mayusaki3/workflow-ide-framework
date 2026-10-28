@@ -5,6 +5,7 @@ use std::{
 };
 use workflow_ide_framework::{
     framework_settings::{FrameworkSettings, StoredResourceEntry, StoredResourceScope},
+    project_panel_api::ProjectPanelResourceDiagnostics,
     project_save_generation::{GenerationResourceStatus, diagnose_generation_project_resources},
 };
 
@@ -317,4 +318,62 @@ fn res_diag_011_windows_resource_root_junction_is_unsafe() {
         vec![GenerationResourceStatus::Unsafe]
     );
     fs::remove_dir(&link).unwrap();
+}
+
+#[test]
+fn res_diag_015_project_panel_snapshot_lookup_is_read_only() {
+    let fixture = Fixture::new("panel-lookup");
+    fs::create_dir_all(fixture.root().join("resources")).unwrap();
+    fs::write(fixture.root().join("resources/exists.txt"), b"original").unwrap();
+    let settings = FrameworkSettings {
+        resources: vec![
+            entry("exists", StoredResourceScope::Project, "exists.txt"),
+            entry("excluded", StoredResourceScope::Application, "app.png"),
+            entry("missing", StoredResourceScope::Project, "missing.txt"),
+        ],
+        ..FrameworkSettings::default()
+    };
+    let original = settings.clone();
+    let snapshot = ProjectPanelResourceDiagnostics::from_generation(fixture.root(), &settings);
+    assert_eq!(snapshot.all().len(), 2);
+    assert_eq!(
+        snapshot.get("exists").unwrap().status,
+        GenerationResourceStatus::Available
+    );
+    assert_eq!(
+        snapshot.get("missing").unwrap().status,
+        GenerationResourceStatus::Missing
+    );
+    assert!(snapshot.get("excluded").is_none());
+    assert!(snapshot.get("unknown").is_none());
+    assert_eq!(settings, original);
+    assert_eq!(
+        fs::read(fixture.root().join("resources/exists.txt")).unwrap(),
+        b"original"
+    );
+}
+
+#[test]
+fn res_diag_016_project_panel_snapshot_is_not_live() {
+    let fixture = Fixture::new("panel-snapshot");
+    fs::create_dir_all(fixture.root().join("resources")).unwrap();
+    let settings = FrameworkSettings {
+        resources: vec![entry("item", StoredResourceScope::Project, "item.txt")],
+        ..FrameworkSettings::default()
+    };
+    let old = ProjectPanelResourceDiagnostics::from_generation(fixture.root(), &settings);
+    assert_eq!(
+        old.get("item").unwrap().status,
+        GenerationResourceStatus::Missing
+    );
+    fs::write(fixture.root().join("resources/item.txt"), b"new").unwrap();
+    assert_eq!(
+        old.get("item").unwrap().status,
+        GenerationResourceStatus::Missing
+    );
+    let refreshed = ProjectPanelResourceDiagnostics::from_generation(fixture.root(), &settings);
+    assert_eq!(
+        refreshed.get("item").unwrap().status,
+        GenerationResourceStatus::Available
+    );
 }
