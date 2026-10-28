@@ -380,3 +380,46 @@ impl ProjectPanelRefreshHandle {
             .swap(false, std::sync::atomic::Ordering::AcqRel)
     }
 }
+
+/// Read-only resource diagnostics lookup for application-owned Project Panel nodes.
+///
+/// A snapshot is scoped to one generation and should be discarded when the
+/// active project or committed generation changes. Unknown IDs return None.
+/// Duplicate IDs are retained in source order; the first diagnostic wins.
+#[derive(Debug, Clone, Default)]
+pub struct ProjectPanelResourceDiagnostics {
+    diagnostics: Vec<crate::project_save_generation::GenerationResourceDiagnostic>,
+}
+
+impl ProjectPanelResourceDiagnostics {
+    pub fn from_generation(
+        generation_root: &Path,
+        settings: &crate::framework_settings::FrameworkSettings,
+    ) -> Self {
+        Self {
+            diagnostics: crate::project_save_generation::diagnose_generation_project_resources(
+                generation_root,
+                settings,
+            ),
+        }
+    }
+
+    pub fn from_diagnostics(
+        diagnostics: Vec<crate::project_save_generation::GenerationResourceDiagnostic>,
+    ) -> Self {
+        Self { diagnostics }
+    }
+
+    pub fn get(
+        &self,
+        resource_id: &str,
+    ) -> Option<&crate::project_save_generation::GenerationResourceDiagnostic> {
+        self.diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.resource_id == resource_id)
+    }
+
+    pub fn all(&self) -> &[crate::project_save_generation::GenerationResourceDiagnostic] {
+        &self.diagnostics
+    }
+}
