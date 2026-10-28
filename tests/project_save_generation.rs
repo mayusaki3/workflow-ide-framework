@@ -1759,3 +1759,104 @@ fn res_fail_002_symlink_parent_is_rejected() {
     );
     fs::remove_dir_all(root).unwrap();
 }
+
+#[cfg(windows)]
+#[test]
+fn res_fail_win_001_junction_parent_is_rejected() {
+    use std::process::Command;
+    use workflow_ide_framework::{
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, context, mut controller) = controller_generation_fixture("res-fail-win-junction");
+    let source = generation_path(&context, "original").unwrap();
+    let outside = root.join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(outside.join("file.txt"), b"outside").unwrap();
+    let link = source.join("resources/linked");
+    fs::create_dir_all(link.parent().unwrap()).unwrap();
+    let command = format!("mklink /J \"{}\" \"{}\"", link.display(), outside.display());
+    let output = Command::new("cmd").args(["/C", &command]).output().unwrap();
+    assert!(
+        output.status.success(),
+        "mklink /J failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    controller
+        .register_resource(
+            ResourceReference::new(ResourceScope::Project, "linked/file.txt").unwrap(),
+        )
+        .unwrap();
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
+    assert!(matches!(
+        controller.save(&mut app, "save-junction", "now"),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(app.calls, 0);
+    assert!(controller.has_unsaved_changes());
+    assert_eq!(
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "original"
+    );
+    assert_eq!(fs::read(outside.join("file.txt")).unwrap(), b"outside");
+    let staging_root = context
+        .framework_directory()
+        .join("save-generations/staging");
+    assert!(!staging_root.exists() || fs::read_dir(staging_root).unwrap().next().is_none());
+    fs::remove_dir(&link).unwrap();
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(windows)]
+#[test]
+fn res_fail_win_002_file_symlink_is_rejected_when_supported() {
+    use std::os::windows::fs::symlink_file;
+    use workflow_ide_framework::{
+        project_controller::ProjectCommandResult,
+        project_resource::{ResourceReference, ResourceScope},
+    };
+    let (root, context, mut controller) = controller_generation_fixture("res-fail-win-symlink");
+    let source = generation_path(&context, "original").unwrap();
+    let outside = root.join("outside.txt");
+    fs::write(&outside, b"outside").unwrap();
+    let link = source.join("resources/link.txt");
+    fs::create_dir_all(link.parent().unwrap()).unwrap();
+    if let Err(error) = symlink_file(&outside, &link) {
+        if error.kind() == std::io::ErrorKind::PermissionDenied
+            || error.raw_os_error() == Some(1314)
+        {
+            eprintln!("RES-FAIL-WIN-002 NOT VERIFIED: symlink privilege unavailable: {error}");
+            fs::remove_dir_all(root).unwrap();
+            return;
+        }
+        panic!("cannot create file symlink: {error}");
+    }
+    controller
+        .register_resource(ResourceReference::new(ResourceScope::Project, "link.txt").unwrap())
+        .unwrap();
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
+    assert!(matches!(
+        controller.save(&mut app, "save-symlink", "now"),
+        ProjectCommandResult::Failed(_)
+    ));
+    assert_eq!(app.calls, 0);
+    assert!(controller.has_unsaved_changes());
+    assert_eq!(
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
+        "original"
+    );
+    assert_eq!(fs::read(&outside).unwrap(), b"outside");
+    fs::remove_dir_all(root).unwrap();
+}
