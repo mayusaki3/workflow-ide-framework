@@ -1498,7 +1498,10 @@ fn res_fail_003_directory_resource_preserves_committed_generation() {
     controller
         .register_resource(ResourceReference::new(ResourceScope::Project, "invalid.bin").unwrap())
         .unwrap();
-    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
     assert!(matches!(
         controller.save(&mut app, "save-failed", "now"),
         ProjectCommandResult::Failed(_)
@@ -1506,11 +1509,19 @@ fn res_fail_003_directory_resource_preserves_committed_generation() {
     assert_eq!(app.calls, 0);
     assert!(controller.has_unsaved_changes());
     assert_eq!(
-        read_committed_generation(&context).unwrap().unwrap().generation_id,
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
         "original"
     );
     assert_eq!(
-        controller.session.as_ref().unwrap().current_save_id.as_deref(),
+        controller
+            .session
+            .as_ref()
+            .unwrap()
+            .current_save_id
+            .as_deref(),
         Some("save-old")
     );
     fs::remove_dir_all(root).unwrap();
@@ -1533,14 +1544,20 @@ fn res_fail_004_invalid_resource_ancestor_preserves_commit() {
             ResourceReference::new(ResourceScope::Project, "not-a-directory/robot.urdf").unwrap(),
         )
         .unwrap();
-    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
     assert!(matches!(
         controller.save(&mut app, "save-failed", "now"),
         ProjectCommandResult::Failed(_)
     ));
     assert_eq!(app.calls, 0);
     assert_eq!(
-        read_committed_generation(&context).unwrap().unwrap().generation_id,
+        read_committed_generation(&context)
+            .unwrap()
+            .unwrap()
+            .generation_id,
         "original"
     );
     assert!(controller.has_unsaved_changes());
@@ -1563,17 +1580,26 @@ fn res_fail_005_save_as_resource_failure_preserves_session() {
         .unwrap();
     let original_name = controller.project_name().map(str::to_owned);
     let destination = ProjectContext::new(root.join("copy"));
-    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
     assert!(matches!(
         controller.save_as(destination.clone(), "Copy", &mut app, "copy-save", "now"),
         ProjectCommandResult::Failed(_)
     ));
     assert_eq!(app.calls, 0);
-    assert_eq!(controller.session.as_ref().unwrap().context(), Some(&source));
+    assert_eq!(
+        controller.session.as_ref().unwrap().context(),
+        Some(&source)
+    );
     assert_eq!(controller.project_name(), original_name.as_deref());
     assert!(controller.has_unsaved_changes());
     assert_eq!(
-        read_committed_generation(&source).unwrap().unwrap().generation_id,
+        read_committed_generation(&source)
+            .unwrap()
+            .unwrap()
+            .generation_id,
         "original"
     );
     assert!(read_committed_generation(&destination).unwrap().is_none());
@@ -1590,7 +1616,10 @@ fn res_fail_006_missing_resource_keeps_registry_and_commits() {
     controller
         .register_resource(ResourceReference::new(ResourceScope::Project, "missing.urdf").unwrap())
         .unwrap();
-    let mut app = StagedSaver { mode: "resave", calls: 0 };
+    let mut app = StagedSaver {
+        mode: "resave",
+        calls: 0,
+    };
     assert_eq!(
         controller.save(&mut app, "save-with-missing", "now"),
         ProjectCommandResult::Completed
@@ -1603,6 +1632,9 @@ fn res_fail_006_missing_resource_keeps_registry_and_commits() {
     )
     .unwrap();
     assert_eq!(settings.resources.len(), 1);
-    assert_eq!(settings.resources[0].path, std::path::PathBuf::from("missing.urdf"));
+    assert_eq!(
+        settings.resources[0].path,
+        std::path::PathBuf::from("missing.urdf")
+    );
     fs::remove_dir_all(root).unwrap();
 }
