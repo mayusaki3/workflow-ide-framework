@@ -386,7 +386,11 @@ fn res_diag_017_registered_panel_node_resolves_by_registry_id() {
     let fixture = Fixture::new("panel-node");
     fs::create_dir_all(fixture.root().join("resources")).unwrap();
     let settings = FrameworkSettings {
-        resources: vec![entry("registered", StoredResourceScope::Project, "missing.txt")],
+        resources: vec![entry(
+            "registered",
+            StoredResourceScope::Project,
+            "missing.txt",
+        )],
         ..FrameworkSettings::default()
     };
     let diagnostics = ProjectPanelResourceDiagnostics::from_generation(fixture.root(), &settings);
@@ -421,7 +425,11 @@ fn res_diag_018_unknown_registered_node_is_not_assumed_available() {
 fn res_diag_019_non_registered_panel_node_has_no_diagnostic() {
     let fixture = Fixture::new("panel-category");
     let settings = FrameworkSettings {
-        resources: vec![entry("registered", StoredResourceScope::Project, "missing.txt")],
+        resources: vec![entry(
+            "registered",
+            StoredResourceScope::Project,
+            "missing.txt",
+        )],
         ..FrameworkSettings::default()
     };
     let diagnostics = ProjectPanelResourceDiagnostics::from_generation(fixture.root(), &settings);
