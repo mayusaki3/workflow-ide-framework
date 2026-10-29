@@ -437,3 +437,31 @@ pub fn registered_node_resource_diagnostic<'a>(
         _ => None,
     }
 }
+
+/// Presentation-only state; no filesystem access or mutation is performed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectPanelResourceDisplayStatus {
+    Available,
+    Missing,
+    Unsafe,
+    Inaccessible,
+    NotDiagnosed,
+}
+
+/// Convert a registered node's generation diagnostic to a display state.
+/// Non-registered nodes and unknown IDs remain NotDiagnosed, never Available.
+pub fn registered_node_resource_display_status(
+    node: &AppPanelNode,
+    diagnostics: &ProjectPanelResourceDiagnostics,
+) -> ProjectPanelResourceDisplayStatus {
+    use crate::project_save_generation::GenerationResourceStatus;
+    match registered_node_resource_diagnostic(node, diagnostics).map(|entry| entry.status) {
+        Some(GenerationResourceStatus::Available) => ProjectPanelResourceDisplayStatus::Available,
+        Some(GenerationResourceStatus::Missing) => ProjectPanelResourceDisplayStatus::Missing,
+        Some(GenerationResourceStatus::Unsafe) => ProjectPanelResourceDisplayStatus::Unsafe,
+        Some(GenerationResourceStatus::Inaccessible) => {
+            ProjectPanelResourceDisplayStatus::Inaccessible
+        }
+        None => ProjectPanelResourceDisplayStatus::NotDiagnosed,
+    }
+}
