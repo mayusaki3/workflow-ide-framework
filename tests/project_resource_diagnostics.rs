@@ -7,7 +7,8 @@ use workflow_ide_framework::{
     framework_settings::{FrameworkSettings, StoredResourceEntry, StoredResourceScope},
     project_panel_api::{
         AppPanelNode, AppPanelNodeKind, ProjectPanelResourceDiagnostics,
-        registered_node_resource_diagnostic,
+        registered_node_resource_diagnostic, registered_node_resource_display_status,
+        ProjectPanelResourceDisplayStatus,
     },
     project_save_generation::{GenerationResourceStatus, diagnose_generation_project_resources},
 };
@@ -442,4 +443,72 @@ fn res_diag_019_non_registered_panel_node_has_no_diagnostic() {
         children: Vec::new(),
     };
     assert!(registered_node_resource_diagnostic(&node, &diagnostics).is_none());
+}
+
+#[test]
+fn res_diag_020_panel_display_maps_all_diagnostic_states() {
+    use workflow_ide_framework::{
+        project_resource::{ResourceReference, ResourceScope},
+        project_save_generation::GenerationResourceDiagnostic,
+    };
+
+    let statuses = [
+        (GenerationResourceStatus::Available, ProjectPanelResourceDisplayStatus::Available),
+        (GenerationResourceStatus::Missing, ProjectPanelResourceDisplayStatus::Missing),
+        (GenerationResourceStatus::Unsafe, ProjectPanelResourceDisplayStatus::Unsafe),
+        (GenerationResourceStatus::Inaccessible, ProjectPanelResourceDisplayStatus::Inaccessible),
+    ];
+    for (status, expected) in statuses {
+        let diagnostics = ProjectPanelResourceDiagnostics::from_diagnostics(vec![
+            GenerationResourceDiagnostic {
+                resource_id: "resource".to_owned(),
+                reference: ResourceReference {
+                    scope: ResourceScope::Project,
+                    path: PathBuf::from("file.txt"),
+                },
+                status,
+            },
+        ]);
+        let node = AppPanelNode {
+            id: "node".to_owned(),
+            label: "File".to_owned(),
+            kind: AppPanelNodeKind::RegisteredResource {
+                registry_resource_id: "resource".to_owned(),
+            },
+            children: Vec::new(),
+        };
+        assert_eq!(
+            registered_node_resource_display_status(&node, &diagnostics),
+            expected
+        );
+    }
+}
+
+#[test]
+fn res_diag_021_panel_display_unknown_and_category_are_not_diagnosed() {
+    let diagnostics = ProjectPanelResourceDiagnostics::default();
+    let registered = AppPanelNode {
+        id: "registered".to_owned(),
+        label: "Unknown".to_owned(),
+        kind: AppPanelNodeKind::RegisteredResource {
+            registry_resource_id: "unknown".to_owned(),
+        },
+        children: Vec::new(),
+    };
+    let category = AppPanelNode {
+        id: "category".to_owned(),
+        label: "Category".to_owned(),
+        kind: AppPanelNodeKind::Category {
+            type_id: "type".to_owned(),
+        },
+        children: Vec::new(),
+    };
+    assert_eq!(
+        registered_node_resource_display_status(&registered, &diagnostics),
+        ProjectPanelResourceDisplayStatus::NotDiagnosed
+    );
+    assert_eq!(
+        registered_node_resource_display_status(&category, &diagnostics),
+        ProjectPanelResourceDisplayStatus::NotDiagnosed
+    );
 }
