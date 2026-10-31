@@ -465,3 +465,37 @@ pub fn registered_node_resource_display_status(
         None => ProjectPanelResourceDisplayStatus::NotDiagnosed,
     }
 }
+
+/// Convert a generation diagnostic into generic Tree Viewer presentation.
+/// The diagnostic remains read-only; unknown states are never shown as normal.
+pub fn registered_node_resource_presentation(
+    node: &AppPanelNode,
+    diagnostics: &ProjectPanelResourceDiagnostics,
+) -> crate::tree_viewer::TreeNodePresentation {
+    use crate::tree_viewer::{TreeNodePresentation, TreeNodeStatus};
+    match registered_node_resource_display_status(node, diagnostics) {
+        ProjectPanelResourceDisplayStatus::Available => TreeNodePresentation {
+            status: Some(TreeNodeStatus::Normal),
+            ..TreeNodePresentation::default()
+        },
+        ProjectPanelResourceDisplayStatus::Missing => TreeNodePresentation {
+            icon: Some("⚠".to_owned()),
+            tooltip: Some("Registered resource is missing".to_owned()),
+            status: Some(TreeNodeStatus::Warning),
+        },
+        ProjectPanelResourceDisplayStatus::Unsafe => TreeNodePresentation {
+            icon: Some("⛔".to_owned()),
+            tooltip: Some("Registered resource path is unsafe".to_owned()),
+            status: Some(TreeNodeStatus::Error),
+        },
+        ProjectPanelResourceDisplayStatus::Inaccessible => TreeNodePresentation {
+            icon: Some("⛔".to_owned()),
+            tooltip: Some("Registered resource is inaccessible".to_owned()),
+            status: Some(TreeNodeStatus::Error),
+        },
+        ProjectPanelResourceDisplayStatus::NotDiagnosed => TreeNodePresentation {
+            status: Some(TreeNodeStatus::Unknown),
+            ..TreeNodePresentation::default()
+        },
+    }
+}
