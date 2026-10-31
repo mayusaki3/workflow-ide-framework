@@ -1,10 +1,28 @@
 use eframe::egui;
 
+/// Generic visual severity, independent of Project Panel diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TreeNodeStatus {
+    Normal,
+    Warning,
+    Error,
+    Unknown,
+}
+
+/// Optional presentation metadata. Absence preserves the ordinary tree label.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TreeNodePresentation {
+    pub icon: Option<String>,
+    pub tooltip: Option<String>,
+    pub status: Option<TreeNodeStatus>,
+}
+
 #[derive(Debug, Clone)]
 pub struct TreeNode {
     pub id: String,
     pub label: String,
     pub node_type: Option<String>,
+    pub presentation: TreeNodePresentation,
     pub children: Vec<TreeNode>,
 }
 
@@ -14,12 +32,19 @@ impl TreeNode {
             id: id.into(),
             label: label.into(),
             node_type: None,
+            presentation: TreeNodePresentation::default(),
             children: Vec::new(),
         }
     }
 
     pub fn node_type(mut self, node_type: impl Into<String>) -> Self {
         self.node_type = Some(node_type.into());
+        self
+    }
+
+    /// Attach generic presentation data without changing node identity.
+    pub fn presentation(mut self, presentation: TreeNodePresentation) -> Self {
+        self.presentation = presentation;
         self
     }
 
@@ -104,14 +129,14 @@ fn show_node(
 ) {
     if node.children.is_empty() {
         let selected = model.selected_id.as_deref() == Some(node.id.as_str());
-        if ui.selectable_label(selected, &node.label).clicked() {
+        if ui.selectable_label(selected, node_display_label(node)).clicked() {
             model.selected_id = Some(node.id.clone());
             response.selected(&node.id);
         }
         return;
     }
 
-    let header = egui::CollapsingHeader::new(&node.label)
+    let header = egui::CollapsingHeader::new(node_display_label(node))
         .id_salt((&node.id, "wfide_tree"))
         .show(ui, |ui| {
             for child in &node.children {
@@ -161,6 +186,11 @@ fn show_node_extended(
             });
         result.header_response
     };
+    let header = if let Some(tooltip) = &node.presentation.tooltip {
+        header.on_hover_text(tooltip)
+    } else {
+        header
+    };
     if header.clicked() {
         let additive = ui.input(|input| input.modifiers.command || input.modifiers.ctrl);
         selection.select(&node.id, additive);
@@ -183,5 +213,12 @@ fn show_node_extended(
         response.actions.push(TreeAction::ContextRequested {
             node_ids: selection.node_ids.clone(),
         });
+    }
+}
+
+fn node_display_label(node: &TreeNode) -> String {
+    match &node.presentation.icon {
+        Some(icon) => format!("{icon} {}", node.label),
+        None => node.label.clone(),
     }
 }
