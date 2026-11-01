@@ -175,9 +175,9 @@ fn show_node_extended(
 ) {
     let selected = selection.node_ids.contains(&node.id);
     let header = if node.children.is_empty() {
-        ui.selectable_label(selected, &node.label)
+        ui.selectable_label(selected, node_display_label(node))
     } else {
-        let result = egui::CollapsingHeader::new(&node.label)
+        let result = egui::CollapsingHeader::new(node_display_label(node))
             .id_salt((&node.id, "wfide_tree_extended"))
             .show(ui, |ui| {
                 for child in &node.children {
