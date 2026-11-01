@@ -512,3 +512,42 @@ fn res_diag_021_panel_display_unknown_and_category_are_not_diagnosed() {
         ProjectPanelResourceDisplayStatus::NotDiagnosed
     );
 }
+
+#[test]
+fn res_diag_022_presentation_preserves_missing_and_unknown() {
+    use workflow_ide_framework::{
+        project_panel_api::registered_node_resource_presentation,
+        project_resource::{ResourceReference, ResourceScope},
+        project_save_generation::GenerationResourceDiagnostic,
+        tree_viewer::TreeNodeStatus,
+    };
+    let node = AppPanelNode {
+        id: "node".to_owned(),
+        label: "Resource".to_owned(),
+        kind: AppPanelNodeKind::RegisteredResource {
+            registry_resource_id: "resource".to_owned(),
+        },
+        children: Vec::new(),
+    };
+    let missing = ProjectPanelResourceDiagnostics::from_diagnostics(vec![
+        GenerationResourceDiagnostic {
+            resource_id: "resource".to_owned(),
+            reference: ResourceReference {
+                scope: ResourceScope::Project,
+                path: PathBuf::from("missing.txt"),
+            },
+            status: GenerationResourceStatus::Missing,
+        },
+    ]);
+    let presentation = registered_node_resource_presentation(&node, &missing);
+    assert_eq!(presentation.status, Some(TreeNodeStatus::Warning));
+    assert!(presentation.icon.is_some());
+    assert!(presentation.tooltip.is_some());
+
+    let unknown = registered_node_resource_presentation(
+        &node,
+        &ProjectPanelResourceDiagnostics::default(),
+    );
+    assert_eq!(unknown.status, Some(TreeNodeStatus::Unknown));
+    assert!(unknown.icon.is_none());
+}
