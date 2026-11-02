@@ -129,7 +129,10 @@ fn show_node(
 ) {
     if node.children.is_empty() {
         let selected = model.selected_id.as_deref() == Some(node.id.as_str());
-        if ui.selectable_label(selected, node_display_label(node)).clicked() {
+        if ui
+            .selectable_label(selected, node_display_label(node))
+            .clicked()
+        {
             model.selected_id = Some(node.id.clone());
             response.selected(&node.id);
         }
