@@ -133,7 +133,7 @@ pub fn build_application_project_tree(
     roots: &[AppPanelNode],
     registry: &crate::resource_registry::ResourceRegistry,
 ) -> Result<crate::tree_viewer::TreeModel, AppPanelTreeError> {
-    build_tree_internal(roots, registry, None)
+    build_tree_internal(roots, registry, None, None)
 }
 
 pub fn build_application_project_tree_with_directories(
@@ -141,18 +141,30 @@ pub fn build_application_project_tree_with_directories(
     registry: &crate::resource_registry::ResourceRegistry,
     project: &ProjectContext,
 ) -> Result<crate::tree_viewer::TreeModel, AppPanelTreeError> {
-    build_tree_internal(roots, registry, Some(project))
+    build_tree_internal(roots, registry, Some(project), None)
+}
+
+/// Build a Project Panel tree with an explicit, read-only generation diagnostic snapshot.
+/// Callers must supply a snapshot for the active committed generation.
+pub fn build_application_project_tree_with_diagnostics(
+    roots: &[AppPanelNode],
+    registry: &crate::resource_registry::ResourceRegistry,
+    project: &ProjectContext,
+    diagnostics: &ProjectPanelResourceDiagnostics,
+) -> Result<crate::tree_viewer::TreeModel, AppPanelTreeError> {
+    build_tree_internal(roots, registry, Some(project), Some(diagnostics))
 }
 
 fn build_tree_internal(
     roots: &[AppPanelNode],
     registry: &crate::resource_registry::ResourceRegistry,
     project: Option<&ProjectContext>,
+    diagnostics: Option<&ProjectPanelResourceDiagnostics>,
 ) -> Result<crate::tree_viewer::TreeModel, AppPanelTreeError> {
     let mut seen = std::collections::HashSet::new();
     let roots = roots
         .iter()
-        .map(|node| build_application_node(node, registry, &mut seen, project))
+        .map(|node| build_application_node(node, registry, &mut seen, project, diagnostics))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(crate::tree_viewer::TreeModel {
         roots,
@@ -165,6 +177,7 @@ fn build_application_node(
     registry: &crate::resource_registry::ResourceRegistry,
     seen: &mut std::collections::HashSet<String>,
     project: Option<&ProjectContext>,
+    diagnostics: Option<&ProjectPanelResourceDiagnostics>,
 ) -> Result<crate::tree_viewer::TreeNode, AppPanelTreeError> {
     if !seen.insert(node.id.clone()) {
         return Err(AppPanelTreeError::DuplicateNodeId(node.id.clone()));
@@ -185,8 +198,13 @@ fn build_application_node(
         }
     };
     let mut tree = crate::tree_viewer::TreeNode::new(&node.id, &node.label).node_type(node_type);
+    if matches!(node.kind, AppPanelNodeKind::RegisteredResource { .. }) {
+        if let Some(diagnostics) = diagnostics {
+            tree = tree.presentation(registered_node_resource_presentation(node, diagnostics));
+        }
+    }
     for child in &node.children {
-        tree = tree.child(build_application_node(child, registry, seen, project)?);
+        tree = tree.child(build_application_node(child, registry, seen, project, diagnostics)?);
     }
     if let AppPanelNodeKind::Directory {
         relative_path,
