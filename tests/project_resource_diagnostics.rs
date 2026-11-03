@@ -559,3 +559,87 @@ fn res_diag_022_presentation_preserves_missing_and_unknown() {
     assert_eq!(unknown.status, Some(TreeNodeStatus::Unknown));
     assert!(unknown.icon.is_none());
 }
+
+#[test]
+fn res_diag_023_tree_build_applies_registered_resource_presentation_only() {
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        project_panel_api::build_application_project_tree_with_diagnostics,
+        project_resource::{ResourceReference, ResourceScope},
+        project_save_generation::GenerationResourceDiagnostic,
+        resource_registry::ResourceRegistry,
+        tree_viewer::TreeNodeStatus,
+    };
+    let mut registry = ResourceRegistry::default();
+    registry.register(
+        "resource",
+        ResourceReference::new(ResourceScope::Project, "missing.txt").unwrap(),
+    );
+    let roots = vec![AppPanelNode {
+        id: "category".into(),
+        label: "Category".into(),
+        kind: AppPanelNodeKind::Category {
+            type_id: "files".into(),
+        },
+        children: vec![AppPanelNode {
+            id: "registered".into(),
+            label: "Missing".into(),
+            kind: AppPanelNodeKind::RegisteredResource {
+                registry_resource_id: "resource".into(),
+            },
+            children: vec![],
+        }],
+    }];
+    let diagnostics = ProjectPanelResourceDiagnostics::from_diagnostics(vec![
+        GenerationResourceDiagnostic {
+            resource_id: "resource".into(),
+            reference: ResourceReference::new(ResourceScope::Project, "missing.txt").unwrap(),
+            status: GenerationResourceStatus::Missing,
+        },
+    ]);
+    let model = build_application_project_tree_with_diagnostics(
+        &roots,
+        &registry,
+        &ProjectContext::new("project"),
+        &diagnostics,
+    )
+    .unwrap();
+    assert_eq!(model.roots[0].presentation.status, None);
+    let child = &model.roots[0].children[0];
+    assert_eq!(child.presentation.status, Some(TreeNodeStatus::Warning));
+    assert!(child.presentation.icon.is_some());
+    assert_eq!(child.label, "Missing");
+    assert_eq!(child.id, "registered");
+}
+
+#[test]
+fn res_diag_024_tree_build_does_not_treat_missing_diagnostic_as_available() {
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        project_panel_api::build_application_project_tree_with_diagnostics,
+        project_resource::{ResourceReference, ResourceScope},
+        resource_registry::ResourceRegistry,
+        tree_viewer::TreeNodeStatus,
+    };
+    let mut registry = ResourceRegistry::default();
+    registry.register(
+        "resource",
+        ResourceReference::new(ResourceScope::Project, "file.txt").unwrap(),
+    );
+    let roots = vec![AppPanelNode {
+        id: "registered".into(),
+        label: "File".into(),
+        kind: AppPanelNodeKind::RegisteredResource {
+            registry_resource_id: "resource".into(),
+        },
+        children: vec![],
+    }];
+    let model = build_application_project_tree_with_diagnostics(
+        &roots,
+        &registry,
+        &ProjectContext::new("project"),
+        &ProjectPanelResourceDiagnostics::default(),
+    )
+    .unwrap();
+    assert_eq!(model.roots[0].presentation.status, Some(TreeNodeStatus::Unknown));
+}
