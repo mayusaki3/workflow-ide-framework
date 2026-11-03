@@ -198,13 +198,19 @@ fn build_application_node(
         }
     };
     let mut tree = crate::tree_viewer::TreeNode::new(&node.id, &node.label).node_type(node_type);
-    if matches!(node.kind, AppPanelNodeKind::RegisteredResource { .. }) {
-        if let Some(diagnostics) = diagnostics {
-            tree = tree.presentation(registered_node_resource_presentation(node, diagnostics));
-        }
+    if matches!(node.kind, AppPanelNodeKind::RegisteredResource { .. })
+        && let Some(diagnostics) = diagnostics
+    {
+        tree = tree.presentation(registered_node_resource_presentation(node, diagnostics));
     }
     for child in &node.children {
-        tree = tree.child(build_application_node(child, registry, seen, project, diagnostics)?);
+        tree = tree.child(build_application_node(
+            child,
+            registry,
+            seen,
+            project,
+            diagnostics,
+        )?);
     }
     if let AppPanelNodeKind::Directory {
         relative_path,
