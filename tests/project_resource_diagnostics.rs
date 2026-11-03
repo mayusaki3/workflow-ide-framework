@@ -590,13 +590,12 @@ fn res_diag_023_tree_build_applies_registered_resource_presentation_only() {
             children: vec![],
         }],
     }];
-    let diagnostics = ProjectPanelResourceDiagnostics::from_diagnostics(vec![
-        GenerationResourceDiagnostic {
+    let diagnostics =
+        ProjectPanelResourceDiagnostics::from_diagnostics(vec![GenerationResourceDiagnostic {
             resource_id: "resource".into(),
             reference: ResourceReference::new(ResourceScope::Project, "missing.txt").unwrap(),
             status: GenerationResourceStatus::Missing,
-        },
-    ]);
+        }]);
     let model = build_application_project_tree_with_diagnostics(
         &roots,
         &registry,
@@ -641,5 +640,8 @@ fn res_diag_024_tree_build_does_not_treat_missing_diagnostic_as_available() {
         &ProjectPanelResourceDiagnostics::default(),
     )
     .unwrap();
-    assert_eq!(model.roots[0].presentation.status, Some(TreeNodeStatus::Unknown));
+    assert_eq!(
+        model.roots[0].presentation.status,
+        Some(TreeNodeStatus::Unknown)
+    );
 }
