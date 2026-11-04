@@ -645,3 +645,31 @@ fn res_diag_024_tree_build_does_not_treat_missing_diagnostic_as_available() {
         Some(TreeNodeStatus::Unknown)
     );
 }
+
+#[test]
+fn res_diag_025_legacy_project_has_no_committed_diagnostics() {
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        project_panel_api::load_committed_project_panel_diagnostics,
+    };
+    let fixture = Fixture::new("legacy-commit");
+    let result = load_committed_project_panel_diagnostics(&ProjectContext::new(fixture.root()));
+    assert!(matches!(result, Ok(None)));
+}
+
+#[test]
+fn res_diag_026_invalid_commit_is_not_silently_treated_as_legacy() {
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        project_panel_api::load_committed_project_panel_diagnostics,
+    };
+    let fixture = Fixture::new("invalid-commit");
+    let marker = fixture.root().join(".framework/committed.toml");
+    // Deliberately malformed commit data must never be interpreted as no generation.
+    fs::create_dir_all(marker.parent().unwrap()).unwrap();
+    fs::write(&marker, "not valid = [").unwrap();
+    let result = load_committed_project_panel_diagnostics(&ProjectContext::new(fixture.root()));
+    // The marker location is defined by ProjectContext; if no commit is found,
+    // this fixture does not exercise the invalid-pointer branch.
+    assert!(result.is_err());
+}
