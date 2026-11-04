@@ -405,6 +405,28 @@ impl ProjectPanelRefreshHandle {
     }
 }
 
+/// Load diagnostics strictly from the committed generation, never from unsaved settings.
+/// Legacy projects return None; invalid commits or settings return an error.
+pub fn load_committed_project_panel_diagnostics(
+    project: &ProjectContext,
+) -> Result<Option<ProjectPanelResourceDiagnostics>, String> {
+    use crate::project_save_generation::{generation_path, read_committed_generation};
+
+    let Some(commit) = read_committed_generation(project).map_err(|error| format!("{error:?}"))?
+    else {
+        return Ok(None);
+    };
+    let root = generation_path(project, &commit.generation_id)
+        .map_err(|error| format!("{error:?}"))?;
+    let text = std::fs::read_to_string(root.join("framework_settings.toml"))
+        .map_err(|error| error.to_string())?;
+    let settings = crate::framework_settings::FrameworkSettings::from_toml(&text)
+        .map_err(|error| format!("{error:?}"))?;
+    Ok(Some(ProjectPanelResourceDiagnostics::from_generation(
+        &root, &settings,
+    )))
+}
+
 /// Read-only resource diagnostics lookup for application-owned Project Panel nodes.
 ///
 /// A snapshot is scoped to one generation and should be discarded when the
