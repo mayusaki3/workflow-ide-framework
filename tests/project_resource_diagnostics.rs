@@ -662,14 +662,13 @@ fn res_diag_026_invalid_commit_is_not_silently_treated_as_legacy() {
     use workflow_ide_framework::{
         project::ProjectContext,
         project_panel_api::load_committed_project_panel_diagnostics,
+        project_save_generation::committed_path,
     };
     let fixture = Fixture::new("invalid-commit");
-    let marker = fixture.root().join(".framework/committed.toml");
+    let marker = committed_path(&ProjectContext::new(fixture.root()));
     // Deliberately malformed commit data must never be interpreted as no generation.
     fs::create_dir_all(marker.parent().unwrap()).unwrap();
     fs::write(&marker, "not valid = [").unwrap();
     let result = load_committed_project_panel_diagnostics(&ProjectContext::new(fixture.root()));
-    // The marker location is defined by ProjectContext; if no commit is found,
-    // this fixture does not exercise the invalid-pointer branch.
     assert!(result.is_err());
 }
