@@ -649,8 +649,7 @@ fn res_diag_024_tree_build_does_not_treat_missing_diagnostic_as_available() {
 #[test]
 fn res_diag_025_legacy_project_has_no_committed_diagnostics() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::load_committed_project_panel_diagnostics,
+        project::ProjectContext, project_panel_api::load_committed_project_panel_diagnostics,
     };
     let fixture = Fixture::new("legacy-commit");
     let result = load_committed_project_panel_diagnostics(&ProjectContext::new(fixture.root()));
