@@ -416,8 +416,8 @@ pub fn load_committed_project_panel_diagnostics(
     else {
         return Ok(None);
     };
-    let root = generation_path(project, &commit.generation_id)
-        .map_err(|error| format!("{error:?}"))?;
+    let root =
+        generation_path(project, &commit.generation_id).map_err(|error| format!("{error:?}"))?;
     let text = std::fs::read_to_string(root.join("framework_settings.toml"))
         .map_err(|error| error.to_string())?;
     let settings = crate::framework_settings::FrameworkSettings::from_toml(&text)
