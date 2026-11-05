@@ -173,12 +173,8 @@ pub fn build_application_project_tree_from_committed(
         Ok(None) => (ProjectPanelResourceDiagnostics::default(), None),
         Err(error) => (ProjectPanelResourceDiagnostics::default(), Some(error)),
     };
-    let model = build_application_project_tree_with_diagnostics(
-        roots,
-        registry,
-        project,
-        &diagnostics,
-    )?;
+    let model =
+        build_application_project_tree_with_diagnostics(roots, registry, project, &diagnostics)?;
     Ok((model, warning))
 }
 
