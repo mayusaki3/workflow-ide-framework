@@ -858,8 +858,7 @@ fn refresh_diagnostic_roots() -> Vec<AppPanelNode> {
 #[test]
 fn res_diag_031_refresh_uses_committed_generation_diagnostics() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::build_application_project_tree_from_committed,
+        project::ProjectContext, project_panel_api::build_application_project_tree_from_committed,
         tree_viewer::TreeNodeStatus,
     };
     let fixture = Fixture::new("refresh-committed");
@@ -882,8 +881,7 @@ fn res_diag_031_refresh_uses_committed_generation_diagnostics() {
 #[test]
 fn res_diag_032_legacy_refresh_is_not_diagnosed() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::build_application_project_tree_from_committed,
+        project::ProjectContext, project_panel_api::build_application_project_tree_from_committed,
         tree_viewer::TreeNodeStatus,
     };
     let fixture = Fixture::new("refresh-legacy");
@@ -904,10 +902,8 @@ fn res_diag_032_legacy_refresh_is_not_diagnosed() {
 #[test]
 fn res_diag_033_refresh_diagnostic_error_preserves_panel_and_reports_warning() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::build_application_project_tree_from_committed,
-        project_save_generation::committed_path,
-        tree_viewer::TreeNodeStatus,
+        project::ProjectContext, project_panel_api::build_application_project_tree_from_committed,
+        project_save_generation::committed_path, tree_viewer::TreeNodeStatus,
     };
     let fixture = Fixture::new("refresh-invalid");
     let context = ProjectContext::new(fixture.root());
@@ -931,8 +927,7 @@ fn res_diag_033_refresh_diagnostic_error_preserves_panel_and_reports_warning() {
 #[test]
 fn res_diag_034_refresh_after_save_uses_new_commit() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::build_application_project_tree_from_committed,
+        project::ProjectContext, project_panel_api::build_application_project_tree_from_committed,
         tree_viewer::TreeNodeStatus,
     };
     let fixture = Fixture::new("refresh-save");
@@ -941,21 +936,32 @@ fn res_diag_034_refresh_after_save_uses_new_commit() {
     committed_diagnostic_fixture(&context, "generation-b", "missing.txt", false);
     select_diagnostic_generation(&context, "generation-a");
     let (before, _) = build_application_project_tree_from_committed(
-        &refresh_diagnostic_roots(), &refresh_diagnostic_registry(), &context,
-    ).unwrap();
+        &refresh_diagnostic_roots(),
+        &refresh_diagnostic_registry(),
+        &context,
+    )
+    .unwrap();
     select_diagnostic_generation(&context, "generation-b");
     let (after, _) = build_application_project_tree_from_committed(
-        &refresh_diagnostic_roots(), &refresh_diagnostic_registry(), &context,
-    ).unwrap();
-    assert_eq!(before.roots[0].presentation.status, Some(TreeNodeStatus::Normal));
-    assert_eq!(after.roots[0].presentation.status, Some(TreeNodeStatus::Warning));
+        &refresh_diagnostic_roots(),
+        &refresh_diagnostic_registry(),
+        &context,
+    )
+    .unwrap();
+    assert_eq!(
+        before.roots[0].presentation.status,
+        Some(TreeNodeStatus::Normal)
+    );
+    assert_eq!(
+        after.roots[0].presentation.status,
+        Some(TreeNodeStatus::Warning)
+    );
 }
 
 #[test]
 fn res_diag_035_refresh_after_save_as_uses_new_project_context() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::build_application_project_tree_from_committed,
+        project::ProjectContext, project_panel_api::build_application_project_tree_from_committed,
         tree_viewer::TreeNodeStatus,
     };
     let first = Fixture::new("refresh-project-a");
@@ -967,20 +973,31 @@ fn res_diag_035_refresh_after_save_as_uses_new_project_context() {
     select_diagnostic_generation(&first_context, "generation-a");
     select_diagnostic_generation(&second_context, "generation-b");
     let (old, _) = build_application_project_tree_from_committed(
-        &refresh_diagnostic_roots(), &refresh_diagnostic_registry(), &first_context,
-    ).unwrap();
+        &refresh_diagnostic_roots(),
+        &refresh_diagnostic_registry(),
+        &first_context,
+    )
+    .unwrap();
     let (new, _) = build_application_project_tree_from_committed(
-        &refresh_diagnostic_roots(), &refresh_diagnostic_registry(), &second_context,
-    ).unwrap();
-    assert_eq!(old.roots[0].presentation.status, Some(TreeNodeStatus::Normal));
-    assert_eq!(new.roots[0].presentation.status, Some(TreeNodeStatus::Warning));
+        &refresh_diagnostic_roots(),
+        &refresh_diagnostic_registry(),
+        &second_context,
+    )
+    .unwrap();
+    assert_eq!(
+        old.roots[0].presentation.status,
+        Some(TreeNodeStatus::Normal)
+    );
+    assert_eq!(
+        new.roots[0].presentation.status,
+        Some(TreeNodeStatus::Warning)
+    );
 }
 
 #[test]
 fn res_diag_036_unsaved_registry_change_does_not_change_committed_status() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::build_application_project_tree_from_committed,
+        project::ProjectContext, project_panel_api::build_application_project_tree_from_committed,
         project_resource::{ResourceReference, ResourceScope},
         tree_viewer::TreeNodeStatus,
     };
@@ -990,27 +1007,37 @@ fn res_diag_036_unsaved_registry_change_does_not_change_committed_status() {
     select_diagnostic_generation(&context, "generation-a");
     let mut registry = refresh_diagnostic_registry();
     let (before, _) = build_application_project_tree_from_committed(
-        &refresh_diagnostic_roots(), &registry, &context,
-    ).unwrap();
+        &refresh_diagnostic_roots(),
+        &registry,
+        &context,
+    )
+    .unwrap();
     registry.remove("saved-resource");
     registry.register(
         "saved-resource",
         ResourceReference::new(ResourceScope::Project, "unsaved.txt").unwrap(),
     );
     let (after, _) = build_application_project_tree_from_committed(
-        &refresh_diagnostic_roots(), &registry, &context,
-    ).unwrap();
-    assert_eq!(before.roots[0].presentation.status, Some(TreeNodeStatus::Normal));
-    assert_eq!(after.roots[0].presentation.status, Some(TreeNodeStatus::Normal));
+        &refresh_diagnostic_roots(),
+        &registry,
+        &context,
+    )
+    .unwrap();
+    assert_eq!(
+        before.roots[0].presentation.status,
+        Some(TreeNodeStatus::Normal)
+    );
+    assert_eq!(
+        after.roots[0].presentation.status,
+        Some(TreeNodeStatus::Normal)
+    );
 }
 
 #[test]
 fn res_diag_037_refresh_recovers_after_diagnostic_load_error() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::build_application_project_tree_from_committed,
-        project_save_generation::committed_path,
-        tree_viewer::TreeNodeStatus,
+        project::ProjectContext, project_panel_api::build_application_project_tree_from_committed,
+        project_save_generation::committed_path, tree_viewer::TreeNodeStatus,
     };
     let fixture = Fixture::new("refresh-recovery");
     let context = ProjectContext::new(fixture.root());
@@ -1019,16 +1046,28 @@ fn res_diag_037_refresh_recovers_after_diagnostic_load_error() {
     fs::create_dir_all(marker.parent().unwrap()).unwrap();
     fs::write(&marker, "invalid = [").unwrap();
     let (failed, warning) = build_application_project_tree_from_committed(
-        &refresh_diagnostic_roots(), &refresh_diagnostic_registry(), &context,
-    ).unwrap();
+        &refresh_diagnostic_roots(),
+        &refresh_diagnostic_registry(),
+        &context,
+    )
+    .unwrap();
     assert!(warning.is_some());
-    assert_eq!(failed.roots[0].presentation.status, Some(TreeNodeStatus::Unknown));
+    assert_eq!(
+        failed.roots[0].presentation.status,
+        Some(TreeNodeStatus::Unknown)
+    );
     select_diagnostic_generation(&context, "generation-a");
     let (recovered, warning) = build_application_project_tree_from_committed(
-        &refresh_diagnostic_roots(), &refresh_diagnostic_registry(), &context,
-    ).unwrap();
+        &refresh_diagnostic_roots(),
+        &refresh_diagnostic_registry(),
+        &context,
+    )
+    .unwrap();
     assert!(warning.is_none());
-    assert_eq!(recovered.roots[0].presentation.status, Some(TreeNodeStatus::Normal));
+    assert_eq!(
+        recovered.roots[0].presentation.status,
+        Some(TreeNodeStatus::Normal)
+    );
 }
 
 #[test]
@@ -1060,10 +1099,16 @@ fn res_diag_038_refresh_keeps_directory_nodes_with_diagnostics() {
         refresh_diagnostic_roots().remove(0),
     ];
     let (model, warning) = build_application_project_tree_from_committed(
-        &roots, &refresh_diagnostic_registry(), &context,
-    ).unwrap();
+        &roots,
+        &refresh_diagnostic_registry(),
+        &context,
+    )
+    .unwrap();
     assert!(warning.is_none());
     assert_eq!(model.roots[0].id, "directory");
     assert!(!model.roots[0].children.is_empty());
-    assert_eq!(model.roots[1].presentation.status, Some(TreeNodeStatus::Normal));
+    assert_eq!(
+        model.roots[1].presentation.status,
+        Some(TreeNodeStatus::Normal)
+    );
 }
