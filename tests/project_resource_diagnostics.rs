@@ -695,7 +695,11 @@ fn committed_diagnostic_fixture(
         )],
         ..FrameworkSettings::default()
     };
-    fs::write(root.join("framework_settings.toml"), toml::to_string(&settings).unwrap()).unwrap();
+    fs::write(
+        root.join("framework_settings.toml"),
+        toml::to_string(&settings).unwrap(),
+    )
+    .unwrap();
     if create_resource {
         let file = root.join("resources").join(resource_path);
         fs::create_dir_all(file.parent().unwrap()).unwrap();
@@ -722,28 +726,28 @@ fn select_diagnostic_generation(
 #[test]
 fn res_diag_027_committed_resources_are_diagnosed_from_saved_settings() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::load_committed_project_panel_diagnostics,
+        project::ProjectContext, project_panel_api::load_committed_project_panel_diagnostics,
     };
     let fixture = Fixture::new("committed-status");
     let context = ProjectContext::new(fixture.root());
     committed_diagnostic_fixture(&context, "generation-a", "exists.txt", true);
     select_diagnostic_generation(&context, "generation-a");
-    let diagnostics = load_committed_project_panel_diagnostics(&context).unwrap().unwrap();
+    let diagnostics = load_committed_project_panel_diagnostics(&context)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         diagnostics.get("saved-resource").unwrap().status,
         GenerationResourceStatus::Available
     );
     fs::remove_file(
-        workflow_ide_framework::project_save_generation::generation_path(
-            &context,
-            "generation-a",
-        )
-        .unwrap()
-        .join("resources/exists.txt"),
+        workflow_ide_framework::project_save_generation::generation_path(&context, "generation-a")
+            .unwrap()
+            .join("resources/exists.txt"),
     )
     .unwrap();
-    let refreshed = load_committed_project_panel_diagnostics(&context).unwrap().unwrap();
+    let refreshed = load_committed_project_panel_diagnostics(&context)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         refreshed.get("saved-resource").unwrap().status,
         GenerationResourceStatus::Missing
@@ -758,15 +762,16 @@ fn res_diag_027_committed_resources_are_diagnosed_from_saved_settings() {
 #[test]
 fn res_diag_028_uncommitted_generation_does_not_override_committed_snapshot() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::load_committed_project_panel_diagnostics,
+        project::ProjectContext, project_panel_api::load_committed_project_panel_diagnostics,
     };
     let fixture = Fixture::new("uncommitted");
     let context = ProjectContext::new(fixture.root());
     committed_diagnostic_fixture(&context, "generation-a", "exists.txt", true);
     committed_diagnostic_fixture(&context, "generation-b", "absent.txt", false);
     select_diagnostic_generation(&context, "generation-a");
-    let diagnostics = load_committed_project_panel_diagnostics(&context).unwrap().unwrap();
+    let diagnostics = load_committed_project_panel_diagnostics(&context)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         diagnostics.get("saved-resource").unwrap().status,
         GenerationResourceStatus::Available
@@ -776,17 +781,20 @@ fn res_diag_028_uncommitted_generation_does_not_override_committed_snapshot() {
 #[test]
 fn res_diag_029_switching_commit_changes_diagnostic_source() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::load_committed_project_panel_diagnostics,
+        project::ProjectContext, project_panel_api::load_committed_project_panel_diagnostics,
     };
     let fixture = Fixture::new("switch-commit");
     let context = ProjectContext::new(fixture.root());
     committed_diagnostic_fixture(&context, "generation-a", "exists.txt", true);
     committed_diagnostic_fixture(&context, "generation-b", "absent.txt", false);
     select_diagnostic_generation(&context, "generation-a");
-    let before = load_committed_project_panel_diagnostics(&context).unwrap().unwrap();
+    let before = load_committed_project_panel_diagnostics(&context)
+        .unwrap()
+        .unwrap();
     select_diagnostic_generation(&context, "generation-b");
-    let after = load_committed_project_panel_diagnostics(&context).unwrap().unwrap();
+    let after = load_committed_project_panel_diagnostics(&context)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         before.get("saved-resource").unwrap().status,
         GenerationResourceStatus::Available
@@ -800,8 +808,7 @@ fn res_diag_029_switching_commit_changes_diagnostic_source() {
 #[test]
 fn res_diag_030_invalid_committed_settings_are_not_silently_ignored() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::load_committed_project_panel_diagnostics,
+        project::ProjectContext, project_panel_api::load_committed_project_panel_diagnostics,
         project_save_generation::generation_path,
     };
     let fixture = Fixture::new("invalid-settings");
