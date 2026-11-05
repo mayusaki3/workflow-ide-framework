@@ -659,8 +659,7 @@ fn res_diag_025_legacy_project_has_no_committed_diagnostics() {
 #[test]
 fn res_diag_026_invalid_commit_is_not_silently_treated_as_legacy() {
     use workflow_ide_framework::{
-        project::ProjectContext,
-        project_panel_api::load_committed_project_panel_diagnostics,
+        project::ProjectContext, project_panel_api::load_committed_project_panel_diagnostics,
         project_save_generation::committed_path,
     };
     let fixture = Fixture::new("invalid-commit");
