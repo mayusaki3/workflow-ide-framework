@@ -822,3 +822,108 @@ fn res_diag_030_invalid_committed_settings_are_not_silently_ignored() {
     assert!(load_committed_project_panel_diagnostics(&context).is_err());
     assert_eq!(fs::read_to_string(settings_path).unwrap(), "invalid = [");
 }
+
+/*
+ * RES-DIAG-031..033: FrameworkHost refresh decision contract.
+ *
+ * These tests intentionally target the proposed pure refresh builder before
+ * its implementation. A compile failure for the missing function is expected
+ * until the subsequent implementation step.
+ *
+ * Contract: build_application_project_tree_from_committed returns a TreeModel
+ * and an optional diagnostic-load warning. It never reports a load failure as
+ * a successful Available diagnosis.
+ */
+fn refresh_diagnostic_registry() -> workflow_ide_framework::resource_registry::ResourceRegistry {
+    use workflow_ide_framework::project_resource::{ResourceReference, ResourceScope};
+    let mut registry = workflow_ide_framework::resource_registry::ResourceRegistry::default();
+    registry.register(
+        "saved-resource",
+        ResourceReference::new(ResourceScope::Project, "exists.txt").unwrap(),
+    );
+    registry
+}
+
+fn refresh_diagnostic_roots() -> Vec<AppPanelNode> {
+    vec![AppPanelNode {
+        id: "registered".into(),
+        label: "Saved resource".into(),
+        kind: AppPanelNodeKind::RegisteredResource {
+            registry_resource_id: "saved-resource".into(),
+        },
+        children: vec![],
+    }]
+}
+
+#[test]
+fn res_diag_031_refresh_uses_committed_generation_diagnostics() {
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        project_panel_api::build_application_project_tree_from_committed,
+        tree_viewer::TreeNodeStatus,
+    };
+    let fixture = Fixture::new("refresh-committed");
+    let context = ProjectContext::new(fixture.root());
+    committed_diagnostic_fixture(&context, "generation-a", "exists.txt", true);
+    select_diagnostic_generation(&context, "generation-a");
+    let (model, warning) = build_application_project_tree_from_committed(
+        &refresh_diagnostic_roots(),
+        &refresh_diagnostic_registry(),
+        &context,
+    )
+    .unwrap();
+    assert!(warning.is_none());
+    assert_eq!(
+        model.roots[0].presentation.status,
+        Some(TreeNodeStatus::Normal)
+    );
+}
+
+#[test]
+fn res_diag_032_legacy_refresh_is_not_diagnosed() {
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        project_panel_api::build_application_project_tree_from_committed,
+        tree_viewer::TreeNodeStatus,
+    };
+    let fixture = Fixture::new("refresh-legacy");
+    let context = ProjectContext::new(fixture.root());
+    let (model, warning) = build_application_project_tree_from_committed(
+        &refresh_diagnostic_roots(),
+        &refresh_diagnostic_registry(),
+        &context,
+    )
+    .unwrap();
+    assert!(warning.is_none());
+    assert_eq!(
+        model.roots[0].presentation.status,
+        Some(TreeNodeStatus::Unknown)
+    );
+}
+
+#[test]
+fn res_diag_033_refresh_diagnostic_error_preserves_panel_and_reports_warning() {
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        project_panel_api::build_application_project_tree_from_committed,
+        project_save_generation::committed_path,
+        tree_viewer::TreeNodeStatus,
+    };
+    let fixture = Fixture::new("refresh-invalid");
+    let context = ProjectContext::new(fixture.root());
+    let marker = committed_path(&context);
+    fs::create_dir_all(marker.parent().unwrap()).unwrap();
+    fs::write(marker, "invalid = [").unwrap();
+    let (model, warning) = build_application_project_tree_from_committed(
+        &refresh_diagnostic_roots(),
+        &refresh_diagnostic_registry(),
+        &context,
+    )
+    .unwrap();
+    assert!(warning.is_some());
+    assert_eq!(model.roots[0].id, "registered");
+    assert_eq!(
+        model.roots[0].presentation.status,
+        Some(TreeNodeStatus::Unknown)
+    );
+}
