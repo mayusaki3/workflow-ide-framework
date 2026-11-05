@@ -992,6 +992,7 @@ fn res_diag_036_unsaved_registry_change_does_not_change_committed_status() {
     let (before, _) = build_application_project_tree_from_committed(
         &refresh_diagnostic_roots(), &registry, &context,
     ).unwrap();
+    registry.remove("saved-resource");
     registry.register(
         "saved-resource",
         ResourceReference::new(ResourceScope::Project, "unsaved.txt").unwrap(),
