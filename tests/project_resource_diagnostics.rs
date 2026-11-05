@@ -670,3 +670,148 @@ fn res_diag_026_invalid_commit_is_not_silently_treated_as_legacy() {
     let result = load_committed_project_panel_diagnostics(&ProjectContext::new(fixture.root()));
     assert!(result.is_err());
 }
+
+/*
+ * RES-DIAG-027..030: committed diagnostic snapshot integration.
+ * These fixtures construct the minimum committed layout; the loader must not
+ * consult an uncommitted generation or modify persisted settings.
+ */
+fn committed_diagnostic_fixture(
+    context: &workflow_ide_framework::project::ProjectContext,
+    generation_id: &str,
+    resource_path: &str,
+    create_resource: bool,
+) {
+    use workflow_ide_framework::project_save_generation::generation_path;
+
+    let root = generation_path(context, generation_id).unwrap();
+    fs::create_dir_all(root.join("application")).unwrap();
+    fs::write(root.join("project.toml"), "[project]\n").unwrap();
+    let settings = FrameworkSettings {
+        resources: vec![entry(
+            "saved-resource",
+            StoredResourceScope::Project,
+            resource_path,
+        )],
+        ..FrameworkSettings::default()
+    };
+    fs::write(root.join("framework_settings.toml"), toml::to_string(&settings).unwrap()).unwrap();
+    if create_resource {
+        let file = root.join("resources").join(resource_path);
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(file, b"committed").unwrap();
+    } else {
+        fs::create_dir_all(root.join("resources")).unwrap();
+    }
+}
+
+fn select_diagnostic_generation(
+    context: &workflow_ide_framework::project::ProjectContext,
+    generation_id: &str,
+) {
+    use workflow_ide_framework::project_save_generation::committed_path;
+    let marker = committed_path(context);
+    fs::create_dir_all(marker.parent().unwrap()).unwrap();
+    fs::write(
+        marker,
+        format!("format_version = 1\ngeneration_id = \"{generation_id}\"\n"),
+    )
+    .unwrap();
+}
+
+#[test]
+fn res_diag_027_committed_resources_are_diagnosed_from_saved_settings() {
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        project_panel_api::load_committed_project_panel_diagnostics,
+    };
+    let fixture = Fixture::new("committed-status");
+    let context = ProjectContext::new(fixture.root());
+    committed_diagnostic_fixture(&context, "generation-a", "exists.txt", true);
+    select_diagnostic_generation(&context, "generation-a");
+    let diagnostics = load_committed_project_panel_diagnostics(&context).unwrap().unwrap();
+    assert_eq!(
+        diagnostics.get("saved-resource").unwrap().status,
+        GenerationResourceStatus::Available
+    );
+    fs::remove_file(
+        workflow_ide_framework::project_save_generation::generation_path(
+            &context,
+            "generation-a",
+        )
+        .unwrap()
+        .join("resources/exists.txt"),
+    )
+    .unwrap();
+    let refreshed = load_committed_project_panel_diagnostics(&context).unwrap().unwrap();
+    assert_eq!(
+        refreshed.get("saved-resource").unwrap().status,
+        GenerationResourceStatus::Missing
+    );
+    // The previously captured diagnostic snapshot remains unchanged.
+    assert_eq!(
+        diagnostics.get("saved-resource").unwrap().status,
+        GenerationResourceStatus::Available
+    );
+}
+
+#[test]
+fn res_diag_028_uncommitted_generation_does_not_override_committed_snapshot() {
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        project_panel_api::load_committed_project_panel_diagnostics,
+    };
+    let fixture = Fixture::new("uncommitted");
+    let context = ProjectContext::new(fixture.root());
+    committed_diagnostic_fixture(&context, "generation-a", "exists.txt", true);
+    committed_diagnostic_fixture(&context, "generation-b", "absent.txt", false);
+    select_diagnostic_generation(&context, "generation-a");
+    let diagnostics = load_committed_project_panel_diagnostics(&context).unwrap().unwrap();
+    assert_eq!(
+        diagnostics.get("saved-resource").unwrap().status,
+        GenerationResourceStatus::Available
+    );
+}
+
+#[test]
+fn res_diag_029_switching_commit_changes_diagnostic_source() {
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        project_panel_api::load_committed_project_panel_diagnostics,
+    };
+    let fixture = Fixture::new("switch-commit");
+    let context = ProjectContext::new(fixture.root());
+    committed_diagnostic_fixture(&context, "generation-a", "exists.txt", true);
+    committed_diagnostic_fixture(&context, "generation-b", "absent.txt", false);
+    select_diagnostic_generation(&context, "generation-a");
+    let before = load_committed_project_panel_diagnostics(&context).unwrap().unwrap();
+    select_diagnostic_generation(&context, "generation-b");
+    let after = load_committed_project_panel_diagnostics(&context).unwrap().unwrap();
+    assert_eq!(
+        before.get("saved-resource").unwrap().status,
+        GenerationResourceStatus::Available
+    );
+    assert_eq!(
+        after.get("saved-resource").unwrap().status,
+        GenerationResourceStatus::Missing
+    );
+}
+
+#[test]
+fn res_diag_030_invalid_committed_settings_are_not_silently_ignored() {
+    use workflow_ide_framework::{
+        project::ProjectContext,
+        project_panel_api::load_committed_project_panel_diagnostics,
+        project_save_generation::generation_path,
+    };
+    let fixture = Fixture::new("invalid-settings");
+    let context = ProjectContext::new(fixture.root());
+    committed_diagnostic_fixture(&context, "generation-a", "exists.txt", true);
+    select_diagnostic_generation(&context, "generation-a");
+    let settings_path = generation_path(&context, "generation-a")
+        .unwrap()
+        .join("framework_settings.toml");
+    fs::write(&settings_path, "invalid = [").unwrap();
+    assert!(load_committed_project_panel_diagnostics(&context).is_err());
+    assert_eq!(fs::read_to_string(settings_path).unwrap(), "invalid = [");
+}
