@@ -155,6 +155,33 @@ pub fn build_application_project_tree_with_diagnostics(
     build_tree_internal(roots, registry, Some(project), Some(diagnostics))
 }
 
+/// Build the current Project Panel from the active committed generation.
+///
+/// The optional warning reports a diagnostic-loading failure. In that case,
+/// registered resources remain Unknown and the tree stays usable. Legacy
+/// projects also use Unknown but do not produce a warning.
+///
+/// The snapshot is loaded on every call, so a Save, SaveAs or project switch
+/// cannot reuse stale diagnostics. This function does not mutate the registry.
+pub fn build_application_project_tree_from_committed(
+    roots: &[AppPanelNode],
+    registry: &crate::resource_registry::ResourceRegistry,
+    project: &ProjectContext,
+) -> Result<(crate::tree_viewer::TreeModel, Option<String>), AppPanelTreeError> {
+    let (diagnostics, warning) = match load_committed_project_panel_diagnostics(project) {
+        Ok(Some(diagnostics)) => (diagnostics, None),
+        Ok(None) => (ProjectPanelResourceDiagnostics::default(), None),
+        Err(error) => (ProjectPanelResourceDiagnostics::default(), Some(error)),
+    };
+    let model = build_application_project_tree_with_diagnostics(
+        roots,
+        registry,
+        project,
+        &diagnostics,
+    )?;
+    Ok((model, warning))
+}
+
 fn build_tree_internal(
     roots: &[AppPanelNode],
     registry: &crate::resource_registry::ResourceRegistry,
