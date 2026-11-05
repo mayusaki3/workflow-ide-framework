@@ -997,7 +997,8 @@ fn res_diag_035_refresh_after_save_as_uses_new_project_context() {
 #[test]
 fn res_diag_036_unsaved_registry_change_does_not_change_committed_status() {
     use workflow_ide_framework::{
-        project::ProjectContext, project_panel_api::build_application_project_tree_from_committed,
+        project::ProjectContext,
+        project_panel_api::build_application_project_tree_from_committed,
         project_resource::{ResourceReference, ResourceScope},
         tree_viewer::TreeNodeStatus,
     };
