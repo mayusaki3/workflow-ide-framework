@@ -1385,10 +1385,17 @@ impl FrameworkHost {
                 }
             }
         }
-        match project_panel_api::build_application_project_tree_with_directories(
+        match project_panel_api::build_application_project_tree_from_committed(
             &roots, registry, &project,
         ) {
-            Ok(mut model) => {
+            Ok((mut model, diagnostic_warning)) => {
+                if let Some(error) = diagnostic_warning {
+                    tracing::warn!(
+                        target: "wfide::project_panel",
+                        %error,
+                        "committed resource diagnostics unavailable; displaying unknown status"
+                    );
+                }
                 if let Some(previous) = self.tree_viewers.get(panel_id) {
                     model.selected_id = previous.selected_id.clone();
                 }
