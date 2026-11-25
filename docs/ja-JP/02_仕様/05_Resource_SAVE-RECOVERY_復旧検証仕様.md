@@ -31,6 +31,7 @@ transport: [true_out]
 ## 3. 用語・状態
 
 ### 3.1 Resource Status
+<!-- hldocs:sec_id=sec_e4390c271897978f0bfd5181 -->
 
 Resource StatusはResource実体の利用可能性を表す。少なくとも以下の概念を区別する。
 
@@ -40,6 +41,7 @@ Resource StatusはResource実体の利用可能性を表す。少なくとも以
 Resource StatusはValidation Statusと独立して管理しなければならない。Missingは検証開始のみを理由にAvailableへ変化してはならない。
 
 ### 3.2 Validation Status
+<!-- hldocs:sec_id=sec_5486c895f4a8fe10934fdf0b -->
 
 Validation Statusは検証の進行と結果を表し、少なくとも以下の状態を区別する。
 
@@ -53,6 +55,7 @@ Validation Statusは検証の進行と結果を表し、少なくとも以下の
 Validation Statusはセッション内の一時状態であり、プロジェクト保存データに永続化してはならない。CancelledのみをResource実体の消失や検証失敗の証拠として扱ってはならない。
 
 ### 3.3 識別情報
+<!-- hldocs:sec_id=sec_6f54e0f13d044fb7a564ed72 -->
 
 - Resource ID：Registry内でResource参照を識別する安定ID。
 - Session ID：プロジェクトのOpenから切替・Closeまでの有効期間を区別する識別情報。
@@ -60,6 +63,7 @@ Validation Statusはセッション内の一時状態であり、プロジェク
 - Validation Target：現在のプロジェクトルート、ResourceReferenceおよび検証に影響する対象情報の組。
 
 ## 4. Resource参照の不変条件
+<!-- hldocs:sec_id=sec_36d084a1dc4de0b1503d1a38 -->
 
 1. 外部操作によるResource消失はRegistry登録解除を意味しない。Resource IDとResourceReferenceを維持しなければならない。
 2. Project内のResource参照は相対パスの意味を維持し、旧プロジェクトルートの絶対パスを復旧先として固定してはならない。
@@ -72,10 +76,12 @@ Registryの所有権、ID維持、Missing時の参照保持および保存整合
 ## 5. 検証契約
 
 ### 5.1 Framework共通検証
+<!-- hldocs:sec_id=sec_f2b0b09e44dc08e0ff99d415 -->
 
 Framework共通検証は、対象の存在、アクセス可能性および期待される実体種別を判定対象としなければならない。
 
 ### 5.2 アプリ固有検証
+<!-- hldocs:sec_id=sec_5008d87cdac12a1c65f674a9 -->
 
 アプリは固有の検証を提供してよい。各検証の必須性をRequiredまたはOptionalとして区別できなければならない。
 
@@ -86,6 +92,7 @@ Framework共通検証は、対象の存在、アクセス可能性および期�
 - 実施不能な検証はSkippedとし、原因となる診断識別情報を関連付けなければならない。
 
 ### 5.3 利用可能性
+<!-- hldocs:sec_id=sec_e283e27df679a175849e7347 -->
 
 Resource StatusをAvailableへ変更できるのは、現在のValidation TargetについてFramework共通検証とすべてのRequired検証が成功した場合に限る。失敗時はMissingを維持する。
 
@@ -94,6 +101,7 @@ Resource StatusをAvailableへ変更できるのは、現在のValidation Target
 ## 6. 非同期検証の制約
 
 ### 6.1 実行数・重複
+<!-- hldocs:sec_id=sec_952fc34ec9c82d85d7be6968 -->
 
 - 全セッションを通じた同時検証実行数は最大2とする。
 - 同一Resource IDに対する待機要求は、同一セッション内で最大1件とする。
@@ -102,6 +110,7 @@ Resource StatusをAvailableへ変更できるのは、現在のValidation Target
 - 検証の進行に周期的ポーリングを必須としてはならない。
 
 ### 6.2 優先度と公平性
+<!-- hldocs:sec_id=sec_eaa877437c9d025cbb1c77eb -->
 
 - 利用者操作に起因する検証要求はHigh、OS通知に起因する要求はNormalとする。
 - 同一優先度内の開始順序はFIFOとする。
@@ -109,10 +118,12 @@ Resource StatusをAvailableへ変更できるのは、現在のValidation Target
 - Normal待機中のResourceに利用者操作が発生した場合、その要求をHighの末尾へ昇格させる。昇格した要求をNormalへ降格させてはならない。
 
 ### 6.3 検証対象変更
+<!-- hldocs:sec_id=sec_6652bb1067ba1d0e173e3e9e -->
 
 検証中に対象が変更された場合、旧世代の結果をRegistryへ反映してはならない。通常のファイル変更のみを理由として実行中検証の強制中止を必須としてはならず、最新世代の再検証が成立しなければならない。
 
 ### 6.4 セッション切替とキャンセル
+<!-- hldocs:sec_id=sec_4ae1105c8ab0f7fb09085d79 -->
 
 - プロジェクト切替・Closeは旧セッションの待機要求を無効化する。
 - 旧セッションの実行中要求には協調キャンセルを通知するが、切替完了をその終了待ちに依存させてはならない。
@@ -122,6 +133,7 @@ Resource StatusをAvailableへ変更できるのは、現在のValidation Target
 - アプリ固有検証器による協調キャンセル対応は任意とする。非対応でも旧結果の適用禁止を維持しなければならない。
 
 ## 7. 検証結果の確定境界
+<!-- hldocs:sec_id=sec_925d45edc497a099bf3ac558 -->
 
 検証結果をRegistryへ確定する時点で、次の条件がすべて成立しなければならない。
 
@@ -135,6 +147,7 @@ Resource StatusをAvailableへ変更できるのは、現在のValidation Target
 これらの判定とRegistryへの結果反映は、他の状態変更による割込みで不整合が生じない一貫した確定境界を持たなければならない。Project Panelへの状態変更通知はRegistry反映後の状態を参照しなければならない。
 
 ## 8. 再Open・再出現時の状態
+<!-- hldocs:sec_id=sec_0d2d5c75f41a39f64b3a6bca -->
 
 - 再Open時にMissingとして保持されているResourceはNormal優先度の検証対象とする。
 - その他のResourceは利用要求または変更通知を契機として検証対象とする。
@@ -142,6 +155,7 @@ Resource StatusをAvailableへ変更できるのは、現在のValidation Target
 - 再検証が開始された場合、以前のInvalid診断を新たな検証結果と混同してはならない。
 
 ## 9. 診断情報の契約
+<!-- hldocs:sec_id=sec_af3dda9a59d04a6f6aaf4899 -->
 
 診断情報は少なくとも以下の項目を識別できなければならない。
 
@@ -159,6 +173,7 @@ errorCodeは安定した識別子とし、利用者向けmessageはローカラ�
 現在有効な診断と履歴ログは独立した情報とする。再検証中の旧診断は内部的に保持してよいが、最新検証の確定成功時に消去し、失敗時に新結果へ置換する。セッション切替またはResource削除後、旧診断を現行Resourceの診断として表示してはならない。
 
 ## 10. 状態公開と観測情報
+<!-- hldocs:sec_id=sec_bd005d88f3d0d2cf0dce0421 -->
 
 Resourceの状態を参照する利用者は、Resource Status、Validation Status、現在有効な診断およびValidation Generationの整合した組を取得できなければならない。
 
