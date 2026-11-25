@@ -21,6 +21,7 @@ Project Rootの消失後もCurrent Projectのメモリ状態を維持し、Save 
 Resource単位の検証、非同期検証の制御、診断状態の表示、監視機構の内部構造は本仕様の対象外とする。
 
 ## 3. 基本契約
+<!-- hldocs:sec_id=sec_e157eb7f35e664379a4b9553 -->
 
 - Project Rootの消失はProject Closeを意味しない。
 - Project metadata、Framework管理状態、Resource Registry、Application管理状態および未保存変更を保持する。
@@ -29,6 +30,7 @@ Resource単位の検証、非同期検証の制御、診断状態の表示、監
 - RootMissingのみを理由としてSave Asを禁止してはならない。
 
 ## 4. 復旧対象と責務
+<!-- hldocs:sec_id=sec_f8ef31fd51c296a4f223131b -->
 
 | 対象 | 復旧契約 |
 |---|---|
@@ -44,6 +46,7 @@ FrameworkはApplication固有データの意味や内部保存形式を解釈し
 取得不能な内容を空データ等で暗黙に置換し、完全に復旧したと扱ってはならない。
 
 ## 5. 欠落と利用者判断
+<!-- hldocs:sec_id=sec_4e4603724a0a2d49b3209a73 -->
 
 - 復旧できない内容がある場合、利用者が欠落対象と保存への影響を識別できなければならない。
 - 欠落を伴うSave Asの確定には、利用者の明示的な同意を必要とする。
@@ -52,6 +55,7 @@ FrameworkはApplication固有データの意味や内部保存形式を解釈し
 - 同意の対象外の欠落を暗黙に許容してはならない。
 
 ## 6. 保存確定と状態保持
+<!-- hldocs:sec_id=sec_325de8e019361e4562e94098 -->
 
 Save Asの確定は、合意された保存対象について保存処理が成立し、保存世代の整合性が確保された場合に限る。
 
@@ -66,6 +70,7 @@ Save Asの確定は、合意された保存対象について保存処理が成�
 保存世代の整合性はREG-001の保存整合性契約に従う。本仕様は通常Saveに対する一括rollbackの保証を追加するものではない。
 
 ## 7. 結果の区別
+<!-- hldocs:sec_id=sec_fb9237d862d88c0681d0d45a -->
 
 | 結果 | Current Project Root | 保存結果の扱い |
 |---|---|---|
@@ -79,6 +84,7 @@ Save Asの確定は、合意された保存対象について保存処理が成�
 Project lifecycle Eventは既存Application / Project仕様に従う。取消または失敗に対してSavedAsを通知してはならない。
 
 ## 8. Resource復旧との関係
+<!-- hldocs:sec_id=sec_b45ec7593713bcc2c4590443 -->
 
 新ルートにおけるProject Resourceの参照は、保持された相対パスを基準とする。旧ルートの絶対パスを復旧先として固定してはならない。
 
