@@ -113,6 +113,18 @@
 - 旧IDのGitHubコード検索は該当なし。ただし検索対象は既定ブランチであり、develop全体の参照不存在は未確認。ローカルcloneはDNS解決失敗。
 - 次工程はdevelop全体の参照確認、残りのHLDocS・仕様整合性検証。コード作成は未着手。
 
+## 保存成立契約の確定（2026-11-27）
+
+- 利用者承認A案：完全保存・同意済み欠落保存ともSave As成功。復旧完全性は保存結果で区別し、既存SavedAsを通知する。専用イベントなし。MissingのみではDirtyを維持せず、未保存編集のDirtyは維持する。
+- 既決定のPanel方針（通常状態表示はアイコンのみ、中央集約通知ルーティング新設なし）を明文化。
+- 仕様2文書・テスト仕様3文書を更新し再取得照合。
+- 02_仕様/02_Application_Project_SAVE-RECOVERY_仕様.md (9d4d28c1): PASS
+- 02_仕様/04_Panel_SAVE-RECOVERY_状態表示仕様.md (a9ff65bf): PASS
+- 04_テスト仕様/02_Application_Project_SAVE-RECOVERY_テスト仕様.md (6ea5363b): PASS
+- 04_テスト仕様/04_Panel_SAVE-RECOVERY_テスト仕様.md (8163d6d3): PASS
+- 04_テスト仕様/SAVE-RECOVERY_結合テスト仕様.md (68efe468): PASS
+- doc_id、sec_id、テスト番号は維持。次工程は残りのHLDocS適合性と網羅性検証。コード未着手。
+
 ## 未確認事項
 
 - 現行developのResource Registry実体、状態型、Panel構造と設計内容の対応。
