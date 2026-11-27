@@ -131,6 +131,15 @@
 - 001について、Availableだった対象の変更・必須検証失敗時のResource Status遷移が仕様に明示されていないため利用者確認を要する。利用要求は有効な検証成功を前提とする既存契約を維持。
 - Application / Project・Panel・結合テストの網羅性レビュー、HLDocS全規約検証は未完了。コード未着手。
 
+## Resource Status再検証契約確定（2026-11-27）
+
+- 利用者承認B案：直近確定Resource Statusを再検証中維持。実体消失確認時は即Missing。現在の必須検証失敗・未成立確定時はMissing。Availableのみでは新規利用を許可せず現対象の検証成功を待つ。
+- Resource仕様、UT-SPEC-01-001/007、IT-SPEC-004を更新。結合テストに関連仕様参照3件を追加。既存識別子・番号維持。
+- docs/ja-JP/02_仕様/05_Resource_SAVE-RECOVERY_復旧検証仕様.md (2176dae1): PASS
+- docs/ja-JP/04_テスト仕様/05_Resource_SAVE-RECOVERY_テスト仕様.md (d1f307bc): PASS
+- docs/ja-JP/04_テスト仕様/SAVE-RECOVERY_結合テスト仕様.md (561f102b): PASS
+- 次工程はApplication / Project・Panel・結合テストの網羅性レビューおよび残存HLDocS検証。コード未着手。
+
 ## 未確認事項
 
 - 現行developのResource Registry実体、状態型、Panel構造と設計内容の対応。
