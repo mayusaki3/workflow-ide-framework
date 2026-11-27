@@ -20,15 +20,15 @@ transport: [true_out]
 
 ### 前提条件
 
-MissingのResource。
+MissingおよびAvailableのResource。
 
 ### 検証内容
 
-待機・検証開始・成功・失敗をそれぞれ観測。
+各初期状態について対象変更、待機、検証開始、成功、必須検証失敗・未成立を個別に評価する。Availableの実体消失確認と再出現も評価する。
 
 ### 期待結果
 
-成功確定前はMissingを維持し、成功時のみAvailableとなる。
+Missingは成功確定前にAvailableとならない。Availableは対象変更・待機・実行中に維持し、現在の必須検証失敗・未成立の確定時にMissingとなる。実体消失確認時は検証完了を待たずMissingとなり、再出現後も検証成功までMissingを維持する。
 
 ## SAVE-RECOVERY-UT-SPEC-01-002 検証状態と永続化
 <!-- hldocs:sec_id=sec_5486c895f4a8fe10934fdf0b -->
@@ -116,7 +116,7 @@ Required失敗・Skippedは利用不可、Optional警告のみは利用可。独
 
 ### 前提条件
 
-未検証Resourceと無関係なResource。
+未検証Resource、再検証が必要なAvailableのResourceおよび無関係なResource。
 
 ### 検証内容
 
@@ -124,7 +124,7 @@ Required失敗・Skippedは利用不可、Optional警告のみは利用可。独
 
 ### 期待結果
 
-成功前に対象利用を許可せず、失敗時は利用不可、無関係な操作は継続できる。
+現在の対象の検証成功前に対象利用を許可せず、Availableのみでは許可しない。失敗時は利用不可、無関係な操作は継続できる。
 
 ## SAVE-RECOVERY-UT-SPEC-01-008 実行上限と統合
 <!-- hldocs:sec_id=sec_952fc34ec9c82d85d7be6968 -->
