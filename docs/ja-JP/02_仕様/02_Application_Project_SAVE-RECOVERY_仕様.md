@@ -64,7 +64,7 @@ Save Asの確定は、合意された保存対象について保存処理が成�
 - 元Projectの保存内容を変更してはならない。
 - 未確定の保存先を正常な確定済みProjectとして扱ってはならない。
 - 中止または失敗時はCurrent Project、メモリ上の状態およびDirtyを維持する。
-- Dirtyの解除は、既存Application / Project仕様に従い、対応する保存が成立した範囲に限る。
+- Dirtyの解除は、既存Application / Project仕様に従い、対応する保存が成立した範囲に限る。Missingの存在のみを理由にDirtyを維持してはならない。保存されていないメモリ上の編集内容に対応するDirtyは維持する。
 - 欠落を伴う保存を完全復旧として扱ってはならない。
 
 保存世代の整合性はREG-001の保存整合性契約に従う。本仕様は通常Saveに対する一括rollbackの保証を追加するものではない。
@@ -81,7 +81,7 @@ Save Asの確定は、合意された保存対象について保存処理が成�
 
 欠落を伴う保存が成立した場合も、欠落Resourceの参照を保持し、利用可能性を偽ってはならない。
 
-Project lifecycle Eventは既存Application / Project仕様に従う。取消または失敗に対してSavedAsを通知してはならない。
+Save Asの成功と復旧の完全性は独立して扱う。完全保存成立および明示同意済みの欠落を伴う保存成立は、ともにSave As成功とする。両者を保存結果で区別し、既存のSavedAsを通知する。欠落保存専用のlifecycle Eventは追加しない。同意なし・取消・失敗に対してSavedAsを通知してはならない。
 
 ## 8. Resource復旧との関係
 <!-- hldocs:sec_id=sec_b45ec7593713bcc2c4590443 -->
