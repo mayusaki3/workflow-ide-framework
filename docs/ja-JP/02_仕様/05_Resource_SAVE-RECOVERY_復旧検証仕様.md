@@ -33,12 +33,12 @@ transport: [true_out]
 ### 3.1 Resource Status
 <!-- hldocs:sec_id=sec_e4390c271897978f0bfd5181 -->
 
-Resource StatusはResource実体の利用可能性を表す。少なくとも以下の概念を区別する。
+Resource StatusはResource実体の直近の確定した利用可能性を表す。少なくとも以下の概念を区別する。
 
-- Available：対象Resourceが現在の有効な検証結果に基づき利用可能と判定された状態。
+- Available：対象Resourceが直近の確定した検証結果に基づき利用可能と判定された状態。
 - Missing：対象Resourceが利用可能と確定できず、参照情報を保持した状態。
 
-Resource StatusはValidation Statusと独立して管理しなければならない。Missingは検証開始のみを理由にAvailableへ変化してはならない。
+Resource StatusはValidation Statusと独立して管理しなければならない。Missingは検証開始のみを理由にAvailableへ変化してはならない。Availableの対象変更・再検証待機・実行中は直近のResource Statusを維持する。ただし実体の消失が確認された場合は検証完了を待たずMissingへ変更する。
 
 ### 3.2 Validation Status
 <!-- hldocs:sec_id=sec_5486c895f4a8fe10934fdf0b -->
@@ -94,9 +94,9 @@ Framework共通検証は、対象の存在、アクセス可能性および期�
 ### 5.3 利用可能性
 <!-- hldocs:sec_id=sec_e283e27df679a175849e7347 -->
 
-Resource StatusをAvailableへ変更できるのは、現在のValidation TargetについてFramework共通検証とすべてのRequired検証が成功した場合に限る。失敗時はMissingを維持する。
+Resource StatusをAvailableへ変更できるのは、現在のValidation TargetについてFramework共通検証とすべてのRequired検証が成功した場合に限る。現在の必須検証の失敗または未成立が確定した場合はMissingへ変更または維持する。
 
-未検証Resourceを必要とする操作は、当該Resourceの有効な検証成功を前提としなければならない。無関係なResourceの操作を一律に停止してはならない。
+Resourceを必要とする新規操作は、現在のValidation Targetに対する有効な検証成功を前提としなければならない。Availableのみを根拠として利用を許可してはならず、有効な検証結果がない場合は検証成功を待つ。無関係なResourceの操作を一律に停止してはならない。
 
 ## 6. 非同期検証の制約
 
