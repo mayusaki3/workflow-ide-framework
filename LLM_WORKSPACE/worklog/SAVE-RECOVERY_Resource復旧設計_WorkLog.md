@@ -140,6 +140,13 @@
 - docs/ja-JP/04_テスト仕様/SAVE-RECOVERY_結合テスト仕様.md (561f102b): PASS
 - 次工程はApplication / Project・Panel・結合テストの網羅性レビューおよび残存HLDocS検証。コード未着手。
 
+## Application / Projectテスト網羅性レビュー（2026-11-28）
+
+- 基本仕様とSAVE-RECOVERY仕様・単体テスト6単位を再取得照合。002/004/005/006の検証条件を補完（eabd4683）。001/003は既存条件維持。番号・識別子維持。
+- 保存候補準備・永続化・確定記録、3 owner Dirty、確定前後の通知、旧ルート実体の誤参照を検証対象として明示。新規設計判断なし。
+- 基本仕様の旧形式doc_idを確認。今回変更せず全体HLDocS監査対象とする。
+- 次工程：Panel・結合テスト網羅性、全体HLDocS監査。コード未着手。
+
 ## 未確認事項
 
 - 現行developのResource Registry実体、状態型、Panel構造と設計内容の対応。
